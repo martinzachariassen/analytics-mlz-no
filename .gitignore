@@ -14,12 +14,17 @@
 node_modules/
 dist/
 
+# Firebase CLI cache
+.firebase/
+
 # Terraform
 .terraform/
 *.tfstate
 *.tfstate.*
 *.tfvars
 !*.tfvars.example
+tfplan
+*.tfplan
 
 # Env / OS
 .env

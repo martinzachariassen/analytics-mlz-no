@@ -1,14 +1,17 @@
 # Build context: repository root.
 #   docker build -f deploy/Dockerfile -t analytics-mlz-no .
 
-FROM golang:1.27-alpine AS build
+# Build stages run on the host platform and cross-compile (pure Go, no CGO). Running the Go
+# toolchain under amd64 emulation on Apple Silicon crashes, and native builds are much faster.
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS build
+ARG TARGETOS TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY server ./server
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/analytics ./server/cmd/analytics
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build -trimpath -ldflags="-s -w" -o /out/analytics ./server/cmd/analytics
 
-FROM alpine:3.24 AS assets
+FROM --platform=$BUILDPLATFORM alpine:3.24 AS assets
 ARG TARGETARCH
 ARG LITESTREAM_VERSION=0.5.17
 RUN apk add --no-cache curl

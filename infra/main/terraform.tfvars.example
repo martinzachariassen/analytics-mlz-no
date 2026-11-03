@@ -1,0 +1,6 @@
+# Copy to terraform.tfvars (git-ignored) and adjust.
+project_id           = "analytics-mlz-no"
+domain               = "t.mlz.no"
+github_client_id     = "Ov23li..."
+allowed_github_users = ["martinzachariassen"]
+retention_days       = 0

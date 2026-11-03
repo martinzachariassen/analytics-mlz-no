@@ -7,11 +7,12 @@ Self-hostable, cookie-free web analytics. Plan and all architectural decisions: 
 - `server/cmd/analytics` — main binary (`serve`, `sites add|list`)
 - `server/internal/` — `config`, `store` (SQLite + embedded migrations), `ingest` (POST /api/event), `visitor` (daily salt + hashing), `geo`, `httpx` (client IP, rate limit), `server` (router)
 - `deploy/` — Dockerfile, docker-compose, Litestream config, entrypoint
-- `web/`, `tracker/`, `infra/` — coming in later milestones
+- `tracker/` — TypeScript tracking script (`src/core.ts` logic, `src/index.ts` entry). Built with esbuild into `server/internal/tracker/script.js`, which is committed and embedded in the Go binary. Run `make tracker` after changes; CI fails if it's stale.
+- `web/`, `infra/` — coming in later milestones
 
 ## Commands
 
-- `make test` — `go test ./...`
+- `make test` — Go tests + tracker tests (vitest + happy-dom)
 - `make lint` — `golangci-lint run`
 - `make run` — run the server locally on :8080 (data in `./data`)
 - `docker compose -f deploy/docker-compose.yml up --build`

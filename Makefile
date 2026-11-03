@@ -1,10 +1,11 @@
-.PHONY: run test lint build docker
+.PHONY: run test lint build docker tracker
 
 run:
 	go run ./server/cmd/analytics serve
 
 test:
 	go test -race ./...
+	cd tracker && npm test
 
 lint:
 	golangci-lint run
@@ -14,3 +15,7 @@ build:
 
 docker:
 	docker build -f deploy/Dockerfile -t analytics-mlz-no:local .
+
+# Rebuild the embedded tracking script after changing tracker/src.
+tracker:
+	cd tracker && npm run build

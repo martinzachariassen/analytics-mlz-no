@@ -12,6 +12,7 @@ import (
 	"github.com/martinzachariassen/analytics-mlz-no/server/internal/httpx"
 	"github.com/martinzachariassen/analytics-mlz-no/server/internal/ingest"
 	"github.com/martinzachariassen/analytics-mlz-no/server/internal/store"
+	"github.com/martinzachariassen/analytics-mlz-no/server/internal/tracker"
 	"github.com/martinzachariassen/analytics-mlz-no/server/internal/visitor"
 )
 
@@ -29,6 +30,7 @@ func New(cfg config.Config, st *store.Store, loc *geo.Locator, log *slog.Logger)
 	}
 	mux.Handle("POST /api/event", events)
 	mux.Handle("OPTIONS /api/event", events)
+	mux.Handle("GET /api/script.js", tracker.Handler())
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)

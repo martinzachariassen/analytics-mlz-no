@@ -21,8 +21,8 @@ Lightweight, privacy-friendly, self-hostable web analytics (inspired by Umami/Pl
 
 ## Milestones
 
-1. **Foundation** — repo skeleton, Go server, SQLite migrations, `POST /api/event`, Docker + compose, Litestream.
-2. **Tracker** — `script.js`: page views, SPA navigation, outbound links, `data-track`, `mlz.track()`.
+1. ✅ **Foundation** — repo skeleton, Go server, SQLite migrations, `POST /api/event`, Docker + compose, Litestream.
+2. ✅ **Tracker** — `script.js`: page views, SPA navigation, outbound links, `data-track`, `mlz.track()`.
 3. **Stats API + auth** — login/logout, sites CRUD, stats + breakdown endpoints.
 4. **Dashboard** — React + Vite + shadcn/ui.
 5. **Terraform** — Artifact Registry, Cloud Run, GCS, Secret Manager, Firebase Hosting.

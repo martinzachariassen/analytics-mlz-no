@@ -1,0 +1,19 @@
+{
+  "name": "@analytics-mlz-no/tracker",
+  "private": true,
+  "type": "module",
+  "description": "Tiny, cookie-free tracking script for analytics-mlz-no",
+  "license": "MIT",
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --minify --format=iife --target=es2019 --legal-comments=none --outfile=../server/internal/tracker/script.js",
+    "size": "npm run build && gzip -c ../server/internal/tracker/script.js | wc -c",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "happy-dom": "^21.0.4",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}

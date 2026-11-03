@@ -14,7 +14,7 @@ Self-hostable, cookie-free web analytics. Plan and all architectural decisions: 
   - Structure: `routes/app-layout.tsx` (auth + sidebar shell), `routes/site/` (per-site views: overview, realtime, pages/sources/locations/devices via `report.tsx`, events; `layout.tsx` has the top bar). Period, comparison, interval, filters (`f=dim:op:value`) and the detail sheet (`detail=dim:value`) live in the URL via `lib/use-scope.ts`, shared by all views. Dimension labels in `lib/dims.ts`, metrics in `lib/metrics.ts`, query hooks in `lib/queries.ts`.
   - Look: Linear/Vercel-style, dark first (`index.html` + `theme-provider`). Neutral tokens, one violet accent, `--positive`/`--negative` for deltas, and `--series-1..6` as the categorical chart palette in fixed order (validated for colour vision deficiency in both themes; do not reorder). All defined in `src/index.css`; `src/styles/mlz-brand.css` only supplies the wordmark face. Type is Geist plus Geist Mono. shadcn components are restyled from `index.css` via `data-slot`, not by editing them.
   - App primitives: `panel.tsx`, `kpi-strip.tsx`, `traffic-chart.tsx`, `bar-list.tsx`, `data-table.tsx`, `report-card.tsx`, `filter-bar.tsx`, `date-range-picker.tsx`, `detail-sheet.tsx`, `delta.tsx`.
-- `infra/` — coming in milestone 5
+- `infra/` — Terraform for GCP: `bootstrap` (project, APIs, state bucket, budget; local state) and `main` (Cloud Run, GCS replica bucket, Secret Manager, Firebase Hosting; GCS state). Deploy guide: `docs/DEPLOY.md`
 
 ## Commands
 
@@ -25,6 +25,7 @@ Self-hostable, cookie-free web analytics. Plan and all architectural decisions: 
 - `make dev` — local test environment: API + dashboard + demo site (:8081), two demo sites with two years of synthetic data in `data/dev.db`, one-click sign-in via `DEV_LOGIN=1` (localhost only). `make dev-reset` wipes it.
 - `make dev-web` — dashboard on :5173; set `PUBLIC_URL=http://localhost:5173` for the server
 - `docker compose -f deploy/docker-compose.yml up --build`
+- `make deploy` — build/push the server image to Cloud Run and publish the dashboard to Firebase Hosting
 
 ## Conventions
 

@@ -8,8 +8,13 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     // The Go server runs on :8080 (`make run`). Same-origin /api keeps the session cookie simple,
-    // exactly like Firebase Hosting's rewrite in production.
-    proxy: { "/api": { target: "http://localhost:8080", xfwd: true } },
+    // exactly like Firebase Hosting's rewrite in production. API_PROXY points elsewhere.
+    proxy: {
+      "/api": {
+        target: process.env.API_PROXY ?? "http://localhost:8080",
+        xfwd: true,
+      },
+    },
   },
   resolve: {
     alias: {

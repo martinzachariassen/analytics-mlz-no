@@ -1,37 +1,35 @@
-import { Suspense } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { Link, Navigate, Outlet, useLocation } from "react-router"
-import { ChartNoAxesColumn, LogOut, Moon, Sun } from "lucide-react"
+import { Suspense, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { Navigate, Outlet, useLocation } from "react-router"
 
-import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { AppSidebar } from "@/components/app-sidebar"
+import { CommandMenu } from "@/components/command-menu"
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useTheme } from "@/components/theme-provider"
 import { api, ApiError } from "@/lib/api"
 
-/** Authenticated shell: redirects to /login without a session. */
+/**
+ * Authenticated shell: a collapsible sidebar (sites and views) next to the
+ * page. Sends visitors without a session to the home page.
+ */
 export function AppLayout() {
   const location = useLocation()
   const me = useQuery({ queryKey: ["me"], queryFn: api.me })
+  const [search, setSearch] = useState(false)
 
   if (me.isPending) {
     return (
-      <div className="mx-auto max-w-6xl p-6">
-        <Skeleton className="h-8 w-48" />
+      <div className="flex min-h-svh">
+        <div className="w-64 border-r max-md:hidden" />
+        <div className="flex-1 p-6">
+          <Skeleton className="h-6 w-32" />
+        </div>
       </div>
     )
   }
   if (me.error instanceof ApiError && me.error.status === 401) {
-    // Keep ?auth_error=… from a failed OAuth callback so the login page can show it.
-    return <Navigate to={`/login${location.search}`} replace />
+    // Keep ?auth_error=… from a failed OAuth callback so the home page can show it.
+    return <Navigate to={`/${location.search}`} replace />
   }
   if (me.isError) {
     return (
@@ -41,69 +39,21 @@ export function AppLayout() {
     )
   }
 
+  const dev = me.data.provider === "dev"
   return (
-    <div className="min-h-svh bg-muted/30">
-      <header className="border-b bg-background">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <Link to="/" className="flex items-center gap-2 font-medium">
-            <ChartNoAxesColumn className="size-5" />
-            analytics
-          </Link>
-          <UserMenu login={me.data.login} />
-        </div>
-      </header>
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-        <Suspense fallback={<Skeleton className="h-96" />}>
+    <SidebarProvider>
+      <AppSidebar user={me.data} onSearch={() => setSearch(true)} />
+      <SidebarInset className="min-w-0 bg-bg">
+        {dev && (
+          <div className="border-b py-1 text-center text-[11px] text-fg-muted">
+            Local development · demo data, automatic sign-in
+          </div>
+        )}
+        <Suspense fallback={<Skeleton className="m-6 h-96" />}>
           <Outlet />
         </Suspense>
-      </main>
-    </div>
-  )
-}
-
-function UserMenu({ login }: { login: string }) {
-  const queryClient = useQueryClient()
-  const { theme, setTheme } = useTheme()
-  const dark =
-    theme === "dark" ||
-    (theme === "system" &&
-      window.matchMedia("(prefers-color-scheme: dark)").matches)
-
-  async function logout() {
-    await api.logout()
-    queryClient.clear()
-    window.location.assign("/login")
-  }
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="gap-2">
-          <Avatar className="size-6">
-            {/* GitHub avatars are public; only loaded for the signed-in admin. */}
-            <AvatarImage
-              src={`https://github.com/${login}.png?size=48`}
-              alt=""
-            />
-            <AvatarFallback>{login.slice(0, 2).toUpperCase()}</AvatarFallback>
-          </Avatar>
-          <span className="hidden sm:inline">{login}</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuLabel className="text-muted-foreground">
-          Signed in with GitHub
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => setTheme(dark ? "light" : "dark")}>
-          {dark ? <Sun /> : <Moon />}
-          {dark ? "Light mode" : "Dark mode"}
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => void logout()}>
-          <LogOut />
-          Sign out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </SidebarInset>
+      <CommandMenu open={search} onOpenChange={setSearch} />
+    </SidebarProvider>
   )
 }

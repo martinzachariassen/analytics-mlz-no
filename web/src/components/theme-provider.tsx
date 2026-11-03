@@ -78,7 +78,7 @@ function isEditableTarget(target: EventTarget | null) {
 
 export function ThemeProvider({
   children,
-  defaultTheme = "system",
+  defaultTheme = "dark",
   storageKey = "theme",
   disableTransitionOnChange = true,
   ...props
@@ -109,8 +109,16 @@ export function ThemeProvider({
         ? disableTransitionsTemporarily()
         : null
 
-      root.classList.remove("light", "dark")
-      root.classList.add(resolvedTheme)
+      // The mlz brand keys dark mode off data-theme (see index.html).
+      root.setAttribute("data-theme", resolvedTheme)
+      for (const meta of document.querySelectorAll(
+        'meta[name="theme-color"]'
+      )) {
+        meta.setAttribute(
+          "content",
+          resolvedTheme === "dark" ? "#151619" : "#ebeff2"
+        )
+      }
 
       if (restoreTransitions) {
         restoreTransitions()

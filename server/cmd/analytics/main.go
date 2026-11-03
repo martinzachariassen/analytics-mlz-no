@@ -3,6 +3,7 @@
 //	analytics [serve]                         start the HTTP server (default)
 //	analytics sites add -domain mlz.no [-name "My site"]
 //	analytics sites list
+//	analytics seed [-days 730] [-scale 1] [-reset]   demo sites with synthetic data for local development
 package main
 
 import (
@@ -21,6 +22,7 @@ import (
 
 	"github.com/martinzachariassen/analytics-mlz-no/server/internal/auth"
 	"github.com/martinzachariassen/analytics-mlz-no/server/internal/config"
+	"github.com/martinzachariassen/analytics-mlz-no/server/internal/devdata"
 	"github.com/martinzachariassen/analytics-mlz-no/server/internal/geo"
 	"github.com/martinzachariassen/analytics-mlz-no/server/internal/server"
 	"github.com/martinzachariassen/analytics-mlz-no/server/internal/store"
@@ -49,8 +51,10 @@ func run(args []string, log *slog.Logger) error {
 		return serve(cfg, log)
 	case "sites":
 		return sites(cfg, args)
+	case "seed":
+		return seed(cfg, args)
 	default:
-		return fmt.Errorf("unknown command %q (want: serve, sites)", cmd)
+		return fmt.Errorf("unknown command %q (want: serve, sites, seed)", cmd)
 	}
 }
 
@@ -79,10 +83,16 @@ func serve(cfg config.Config, log *slog.Logger) error {
 		PublicURL: cfg.PublicURL,
 		Log:       log,
 	}
-	if cfg.GitHubEnabled() {
+	switch {
+	case cfg.DevLogin:
+		// config.Load only allows this on localhost.
+		authn.Provider = auth.Dev{}
+		authn.Allowed = []string{auth.DevLogin}
+		log.Warn("DEV_LOGIN=1: everyone who opens the dashboard is signed in as \"dev\"; local development only", "public_url", cfg.PublicURL)
+	case cfg.GitHubEnabled():
 		authn.Provider = &auth.GitHub{ClientID: cfg.GitHubClientID, ClientSecret: cfg.GitHubClientSecret}
 		log.Info("github sign-in enabled", "allowed", cfg.AllowedGitHubUsers, "callback", cfg.PublicURL+"/api/auth/github/callback")
-	} else {
+	default:
 		log.Warn("GITHUB_CLIENT_ID not set; dashboard sign-in is disabled")
 	}
 
@@ -176,4 +186,66 @@ func sites(cfg config.Config, args []string) error {
 	default:
 		return fmt.Errorf("unknown sites command %q", args[0])
 	}
+}
+
+// demoSites are the sites `seed` creates. The first is tracked by the demo page in dev/demo.
+var demoSites = []struct {
+	name, domain string
+	visits       int
+	profile      *devdata.Profile
+}{
+	{"Demo blog", "localhost", 80, devdata.Blog},
+	{"Demo docs", "docs.localhost", 35, devdata.Docs},
+}
+
+// seed fills demo sites with synthetic traffic for local development.
+// Existing demo sites are left alone unless -reset is given.
+func seed(cfg config.Config, args []string) error {
+	fs := flag.NewFlagSet("seed", flag.ExitOnError)
+	days := fs.Int("days", 730, "days of history")
+	scale := fs.Float64("scale", 1, "multiply the amount of traffic")
+	reset := fs.Bool("reset", false, "delete the demo sites and their events first")
+	_ = fs.Parse(args)
+
+	ctx := context.Background()
+	st, err := store.Open(ctx, cfg.DatabasePath)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = st.Close() }()
+
+	list, err := st.ListSites(ctx)
+	if err != nil {
+		return err
+	}
+	existing := map[string]string{} // domain -> id
+	for _, s := range list {
+		existing[s.Domain] = s.ID
+	}
+
+	for _, demo := range demoSites {
+		if id, ok := existing[demo.domain]; ok {
+			if !*reset {
+				fmt.Printf("%s (%s) already has data in %s; run with -reset to regenerate.\n", demo.name, id, cfg.DatabasePath)
+				continue
+			}
+			if err := st.DeleteSite(ctx, id); err != nil {
+				return err
+			}
+		}
+		site, err := st.CreateSite(ctx, demo.name, demo.domain)
+		if err != nil {
+			return err
+		}
+		start := time.Now()
+		n, err := devdata.Seed(ctx, st, site.ID, devdata.Options{
+			Days: *days, DailyVisits: int(float64(demo.visits) * *scale), Hostname: demo.domain, Profile: demo.profile,
+		})
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Seeded %s (%s, %s) with %d events over %d days in %.1fs.\n",
+			demo.name, site.ID, demo.domain, n, *days, time.Since(start).Seconds())
+	}
+	return nil
 }

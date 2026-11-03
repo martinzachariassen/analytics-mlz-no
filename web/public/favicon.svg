@@ -1,1 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#171717" stroke-width="2" stroke-linecap="round"><path d="M5 21v-6M12 21V3M19 21V9"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- GENERATED from tokens.json by scripts/brand.js — do not edit by hand. -->
+  <title>mlz</title>
+  <style>@media (prefers-color-scheme: dark) { path { fill: #e9ebef; } }</style>
+  <path fill="#101214" fill-rule="evenodd" d="M7 1h18a6 6 0 0 1 6 6v18a6 6 0 0 1-6 6H7a6 6 0 0 1-6-6V7a6 6 0 0 1 6-6ZM7 25V7h4.5L16 18.5 20.5 7H25v18Z"/>
+</svg>

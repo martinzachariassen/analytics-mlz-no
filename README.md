@@ -83,11 +83,34 @@ See [docs/API.md](docs/API.md).
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | – | GitHub OAuth App credentials (enables sign-in) |
 | `ALLOWED_GITHUB_USERS` | – | Comma-separated GitHub usernames allowed to sign in |
 | `LITESTREAM_REPLICA_URL` | – | Continuous backup, e.g. `gs://bucket/analytics` or `s3://bucket/analytics` |
+| `DEV_LOGIN` | – | `1` signs everyone in as `dev`, for local development only (requires a `localhost` `PUBLIC_URL`) |
 
 ## Development
 
-Run the API and the dashboard in two terminals. Create a GitHub OAuth App for local
-development with the callback `http://localhost:5173/api/auth/github/callback`.
+The quickest way to try everything locally is one command, with no sign-in or setup:
+
+```sh
+make dev
+```
+
+It starts the API (:8080), the dashboard (http://localhost:5173) and a small demo site
+(http://localhost:8081), and prints the links. It uses a separate database, `data/dev.db`,
+with two demo sites ("Demo blog" and "Demo docs") filled with two years of synthetic
+traffic: growth, weekends, seasonal dips, a couple of traffic spikes, returning visitors
+and custom events. The public home page (`/`) explains the product and has a one-click
+"Open demo dashboard" button, with no account or password. Clicking around the demo site sends real events through the tracking
+script, and they show up in the realtime counter and charts.
+
+- `make dev-reset` deletes `data/dev.db`, so the next `make dev` starts with fresh data.
+- `go run ./server/cmd/analytics seed -h` shows options (`-days`, `-scale`, `-reset`).
+- One-click sign-in is `DEV_LOGIN=1`. The server refuses it unless `PUBLIC_URL` is on
+  `localhost` and GitHub sign-in is off.
+
+### With GitHub sign-in
+
+To test the real sign-in flow, run the API and the dashboard in two terminals. Create a
+GitHub OAuth App for local development with the callback
+`http://localhost:5173/api/auth/github/callback`.
 
 ```sh
 # terminal 1 — API on :8080

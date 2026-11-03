@@ -56,7 +56,7 @@ var fixture = []ev{
 
 func TestSummary(t *testing.T) {
 	st, site := seed(t, fixture)
-	s, err := st.Summary(context.Background(), site, Range{From: t0, To: t0.Add(24 * time.Hour)})
+	s, err := st.Summary(context.Background(), site, Range{From: t0, To: t0.Add(24 * time.Hour)}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestSummary(t *testing.T) {
 		t.Fatalf("avg duration = %v", s.AvgDuration)
 	}
 
-	empty, err := st.Summary(context.Background(), site, Range{From: t0.Add(-48 * time.Hour), To: t0.Add(-24 * time.Hour)})
+	empty, err := st.Summary(context.Background(), site, Range{From: t0.Add(-48 * time.Hour), To: t0.Add(-24 * time.Hour)}, nil)
 	if err != nil || empty != (Summary{}) {
 		t.Fatalf("empty range = %+v, %v", empty, err)
 	}
@@ -81,7 +81,7 @@ func TestSummary(t *testing.T) {
 func TestTimeseries(t *testing.T) {
 	st, site := seed(t, fixture)
 	bounds := []time.Time{t0, t0.Add(time.Hour), t0.Add(2 * time.Hour), t0.Add(3 * time.Hour)}
-	b, err := st.Timeseries(context.Background(), site, bounds)
+	b, err := st.Timeseries(context.Background(), site, bounds, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,5 +173,106 @@ func TestLoginUser(t *testing.T) {
 	// The released old name can be taken by a new account.
 	if _, err := st.LoginUser(ctx, "github", "3", "martin", now); err != nil {
 		t.Fatalf("new account with released name: %v", err)
+	}
+}
+
+func TestFilters(t *testing.T) {
+	st, site := seed(t, fixture)
+	ctx := context.Background()
+	r := Range{From: t0, To: t0.Add(24 * time.Hour)}
+	sum := func(f ...Filter) Summary {
+		t.Helper()
+		s, err := st.Summary(ctx, site, r, f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+
+	// Page filter: page views of that page, visits that included it.
+	if s := sum(Filter{"path", "is", "/pricing"}); s.Pageviews != 1 || s.Visitors != 1 || s.Visits != 1 || s.AvgDuration != 240 {
+		t.Fatalf("path filter = %+v", s)
+	}
+	// Visit filter: the visit from google, all its page views.
+	if s := sum(Filter{"referrer", "is", "google.com"}); s.Pageviews != 3 || s.Visits != 1 {
+		t.Fatalf("referrer filter = %+v", s)
+	}
+	// Visitor filter.
+	if s := sum(Filter{"browser", "is_not", "Chrome"}); s.Pageviews != 2 || s.Visitors != 1 || s.Visits != 2 {
+		t.Fatalf("browser filter = %+v", s)
+	}
+	// Event filter: visits in which signup happened.
+	if s := sum(Filter{"event", "is", "signup"}); s.Visits != 1 || s.Pageviews != 3 {
+		t.Fatalf("event filter = %+v", s)
+	}
+	// Exit page, contains, and combined filters.
+	if s := sum(Filter{"exit", "is", "/thanks"}); s.Visits != 1 {
+		t.Fatalf("exit filter = %+v", s)
+	}
+	if s := sum(Filter{"path", "contains", "log"}, Filter{"browser", "is", "Safari"}); s.Pageviews != 1 || s.Visitors != 1 {
+		t.Fatalf("combined filters = %+v", s)
+	}
+	// LIKE wildcards in the value are literal.
+	if s := sum(Filter{"path", "contains", "%"}); s.Pageviews != 0 {
+		t.Fatalf("escaped contains = %+v", s)
+	}
+	// "is not" on a page means visits without it.
+	if s := sum(Filter{"path", "is_not", "/pricing"}); s.Visits != 2 {
+		t.Fatalf("path is_not = %+v", s)
+	}
+
+	rows, err := st.Breakdown(ctx, site, r, "referrer", BreakdownOptions{Filters: Filters{{"browser", "is", "Safari"}}})
+	if err != nil || len(rows) != 2 {
+		t.Fatalf("filtered breakdown = %+v, %v", rows, err)
+	}
+}
+
+func TestBreakdownExitValuesAndMetrics(t *testing.T) {
+	st, site := seed(t, fixture)
+	ctx := context.Background()
+	r := Range{From: t0, To: t0.Add(24 * time.Hour)}
+
+	exit, err := st.Breakdown(ctx, site, r, "exit", BreakdownOptions{})
+	if err != nil || len(exit) != 3 {
+		t.Fatalf("exit = %+v, %v", exit, err)
+	}
+
+	only, err := st.Breakdown(ctx, site, r, "path", BreakdownOptions{Values: []string{"/blog", "/nope"}})
+	if err != nil || len(only) != 1 || only[0].Value != "/blog" {
+		t.Fatalf("values = %+v, %v", only, err)
+	}
+
+	rows, err := st.Breakdown(ctx, site, r, "entry", BreakdownOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.VisitMetrics(ctx, site, r, "entry", nil, rows); err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range rows {
+		if row.Value == "/" && (*row.Visits != 2 || *row.BounceRate != 0.5 || *row.AvgDuration != 120) {
+			t.Fatalf("entry / metrics = %d %v %v", *row.Visits, *row.BounceRate, *row.AvgDuration)
+		}
+		if row.Value == "/blog" && *row.BounceRate != 1 {
+			t.Fatalf("entry /blog bounce = %v", *row.BounceRate)
+		}
+	}
+}
+
+func TestTimeseriesVisitsAndHistogram(t *testing.T) {
+	st, site := seed(t, fixture)
+	ctx := context.Background()
+	bounds := []time.Time{t0, t0.Add(time.Hour), t0.Add(2 * time.Hour), t0.Add(3 * time.Hour)}
+	b, err := st.Timeseries(ctx, site, bounds, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b[0].Visits != 2 || b[0].BounceRate != 0.5 || b[2].Visits != 1 || b[2].BounceRate != 1 {
+		t.Fatalf("visits per bucket = %+v", b)
+	}
+
+	h, err := st.Histogram(ctx, site, Range{From: t0, To: t0.Add(3 * time.Hour)}, nil, time.Hour)
+	if err != nil || len(h) != 2 || h[0].Pageviews != 4 || h[0].Visitors != 2 || !h[1].Start.Equal(t0.Add(2*time.Hour)) {
+		t.Fatalf("histogram = %+v, %v", h, err)
 	}
 }

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Link, useNavigate, useParams, useSearchParams } from "react-router"
-import { ArrowLeft, PartyPopper } from "lucide-react"
+import { useNavigate, useParams, useSearchParams } from "react-router"
+import { PartyPopper } from "lucide-react"
 import { toast } from "sonner"
 
 import { TrackingSnippet } from "@/components/tracking-snippet"
@@ -37,14 +37,7 @@ export function SettingsPage() {
   const site = useQuery({ queryKey: ["site", id], queryFn: () => api.site(id) })
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6">
-      <Button variant="ghost" size="sm" asChild className="self-start">
-        <Link to={`/sites/${id}`}>
-          <ArrowLeft />
-          Back to dashboard
-        </Link>
-      </Button>
-
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-4 sm:p-6 lg:py-10">
       {params.get("new") && (
         <Alert>
           <PartyPopper />
@@ -146,13 +139,13 @@ function DangerZone({ id, name }: { id: string; name: string }) {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["sites"] })
       toast.success(`Deleted ${name}`)
-      navigate("/")
+      navigate("/sites")
     },
     onError: (err) => toast.error(err.message),
   })
 
   return (
-    <Card className="border-destructive/40">
+    <Card className="shadow-[0_0_0_1px_color-mix(in_oklch,var(--destructive)_45%,transparent)]!">
       <CardHeader>
         <CardTitle>Delete site</CardTitle>
         <CardDescription>

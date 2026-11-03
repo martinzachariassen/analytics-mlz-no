@@ -22,14 +22,14 @@ export function CodeBlock({ code }: { code: string }) {
   }
 
   return (
-    <div className="relative rounded-lg border bg-muted/50">
-      <pre className="overflow-x-auto p-3 pr-12 font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
+    <div className="relative rounded-lg border bg-surface-2 text-fg">
+      <pre className="overflow-x-auto p-3.5 pr-12 font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
         {code}
       </pre>
       <Button
         variant="ghost"
         size="icon-sm"
-        className="absolute top-1.5 right-1.5"
+        className="absolute top-2 right-2 text-fg-muted hover:text-fg"
         onClick={() => void copy()}
         aria-label="Copy to clipboard"
       >
@@ -48,7 +48,7 @@ export function TrackingSnippet({ siteId }: { siteId: string }) {
           <code className="font-mono text-xs">&lt;head&gt;</code> of every page:
         </p>
         <CodeBlock code={snippetFor(siteId)} />
-        <p className="text-muted-foreground">
+        <p className="text-fg-muted">
           Page views (including client-side navigation) and outbound link clicks
           are tracked automatically. No cookies, no consent banner needed.
         </p>

@@ -1,0 +1,97 @@
+<!doctype html>
+<!--
+  Demo site for local development (`make dev`, served on http://localhost:8081).
+  Loads the real tracking script from the local server and sends events to the
+  "localhost" site created by `analytics seed`. Pass its id as ?site=<id>.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Demo site</title>
+  <style>
+    :root { color-scheme: light dark; --muted: #6b7280; --line: #e5e7eb; --accent: #2563eb; }
+    @media (prefers-color-scheme: dark) { :root { --muted: #9ca3af; --line: #374151; --accent: #60a5fa; } }
+    body { font: 16px/1.6 system-ui, sans-serif; max-width: 44rem; margin: 0 auto; padding: 1.5rem 1rem; }
+    nav { display: flex; gap: 1rem; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: .75rem; }
+    nav a { color: inherit; text-decoration: none; }
+    nav a[aria-current] { color: var(--accent); font-weight: 600; }
+    button { font: inherit; padding: .4rem .9rem; border-radius: .4rem; border: 1px solid var(--line); background: none; cursor: pointer; }
+    button:hover { border-color: var(--accent); }
+    .row { display: flex; gap: .5rem; flex-wrap: wrap; margin: 1rem 0; }
+    .note { color: var(--muted); font-size: .875rem; }
+    .warn { border: 1px solid #f59e0b; padding: .75rem 1rem; border-radius: .4rem; }
+    #log { font: 13px/1.5 ui-monospace, monospace; color: var(--muted); white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/blog">Blog</a>
+    <a href="/blog/sqlite-on-cloud-run">SQLite on Cloud Run</a>
+    <a href="/about">About</a>
+    <a href="/contact">Contact</a>
+  </nav>
+  <main id="page"></main>
+
+  <h3>Try the tracker</h3>
+  <div class="row">
+    <button data-track="newsletter-signup" data-track-position="demo">Newsletter signup</button>
+    <button data-track="copy-code" data-track-lang="go">Copy code</button>
+    <button id="custom">mlz.track("demo-click")</button>
+  </div>
+  <p>Outbound link: <a href="https://litestream.io/" target="_blank" rel="noopener">litestream.io</a></p>
+  <p class="note">Navigation above uses <code>history.pushState</code>, like a single-page app.
+    Every page view and click is sent to <code>http://localhost:8080/api/event</code>;
+    the dashboard's realtime counter and charts pick them up.</p>
+  <div id="log"></div>
+
+  <script>
+    const pages = {
+      "/": ["Home", "A small personal site used to try out the analytics dashboard."],
+      "/blog": ["Blog", "Notes on Go, SQLite and running things cheaply."],
+      "/blog/sqlite-on-cloud-run": ["SQLite on Cloud Run", "Litestream, scale to zero and one writer."],
+      "/about": ["About", "Who writes this, and why."],
+      "/contact": ["Contact", "Get in touch."],
+    };
+    const page = document.getElementById("page");
+    const log = (msg) => { document.getElementById("log").textContent = `${new Date().toLocaleTimeString()}  ${msg}\n` + document.getElementById("log").textContent; };
+
+    function render() {
+      const [title, text] = pages[location.pathname] ?? ["Not found", "This page does not exist."];
+      document.title = `${title} · Demo site`;
+      page.innerHTML = `<h1>${title}</h1><p>${text}</p>`;
+      for (const a of document.querySelectorAll("nav a")) a.toggleAttribute("aria-current", a.pathname === location.pathname);
+    }
+    document.querySelector("nav").addEventListener("click", (e) => {
+      const a = e.target.closest("a");
+      if (!a || e.metaKey || e.ctrlKey) return;
+      e.preventDefault();
+      if (a.pathname !== location.pathname) { history.pushState(null, "", a.pathname); render(); log(`pageview ${a.pathname}`); }
+    });
+    window.addEventListener("popstate", render);
+    document.addEventListener("click", (e) => {
+      const t = e.target.closest("[data-track]");
+      if (t) log(`event ${t.dataset.track}`);
+    });
+    render();
+
+    const site = new URLSearchParams(location.search).get("site");
+    if (!site) {
+      page.insertAdjacentHTML("beforeend", '<p class="warn">Add <code>?site=&lt;id&gt;</code> to the URL. <code>make dev</code> prints the full link.</p>');
+    } else {
+      // Remember the id, then drop it from the URL so tracked paths stay clean.
+      history.replaceState(null, "", location.pathname);
+      const s = document.createElement("script");
+      s.defer = true;
+      s.src = "http://localhost:8080/api/script.js";
+      s.dataset.site = site;
+      s.dataset.allowLocalhost = "true";
+      s.onload = () => log(`tracker loaded, site ${site}; pageview ${location.pathname}`);
+      s.onerror = () => log("could not load http://localhost:8080/api/script.js — is the server running?");
+      document.head.appendChild(s);
+      document.getElementById("custom").addEventListener("click", () => { window.mlz?.track("demo-click", { source: "button" }); log("event demo-click"); });
+    }
+  </script>
+</body>
+</html>

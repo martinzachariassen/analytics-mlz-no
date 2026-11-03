@@ -15,6 +15,11 @@ services:
     environment:
       # Number of reverse proxies in front of the server (0 = direct). Set to 1 behind nginx/Caddy/Traefik.
       PROXY_HOPS: "0"
+      # Dashboard sign-in via a GitHub OAuth App (callback: <PUBLIC_URL>/api/auth/github/callback).
+      PUBLIC_URL: "http://localhost:8080"
+      GITHUB_CLIENT_ID: ""
+      GITHUB_CLIENT_SECRET: ""
+      ALLOWED_GITHUB_USERS: ""
       # Delete events older than N days (0 = keep forever).
       RETENTION_DAYS: "0"
       # Optional off-site backup, e.g. s3://bucket/analytics or gs://bucket/analytics.

@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/martinzachariassen/analytics-mlz-no/server/internal/api"
+	"github.com/martinzachariassen/analytics-mlz-no/server/internal/auth"
 	"github.com/martinzachariassen/analytics-mlz-no/server/internal/config"
 	"github.com/martinzachariassen/analytics-mlz-no/server/internal/geo"
 	"github.com/martinzachariassen/analytics-mlz-no/server/internal/httpx"
@@ -17,7 +19,7 @@ import (
 )
 
 // New returns the root HTTP handler.
-func New(cfg config.Config, st *store.Store, loc *geo.Locator, log *slog.Logger) http.Handler {
+func New(cfg config.Config, st *store.Store, authn *auth.Service, loc *geo.Locator, log *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
 
 	events := &ingest.Handler{
@@ -31,6 +33,10 @@ func New(cfg config.Config, st *store.Store, loc *geo.Locator, log *slog.Logger)
 	mux.Handle("POST /api/event", events)
 	mux.Handle("OPTIONS /api/event", events)
 	mux.Handle("GET /api/script.js", tracker.Handler())
+
+	authn.Register(mux)
+
+	(&api.API{Store: st, Log: log}).Register(mux, authn.Require)
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)

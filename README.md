@@ -16,6 +16,16 @@ docker compose -f deploy/docker-compose.yml up -d --build
 docker compose -f deploy/docker-compose.yml exec analytics analytics sites add -domain example.com
 ```
 
+### Dashboard sign-in (GitHub)
+
+1. Create an OAuth App at <https://github.com/settings/developers>.
+   - Homepage URL: your `PUBLIC_URL`
+   - Authorization callback URL: `<PUBLIC_URL>/api/auth/github/callback`
+2. Set `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` and `ALLOWED_GITHUB_USERS` (comma-separated GitHub usernames).
+
+There are no passwords. On first sign-in a username is bound to its GitHub account id,
+so a renamed-and-reregistered username cannot take over access.
+
 Send a test event:
 
 ```sh
@@ -56,6 +66,10 @@ window.mlz.track("signup", { plan: "pro", seats: 3 });
 
 To exclude your own visits, run `localStorage.setItem("mlz_ignore", "true")` in the browser console on your site.
 
+## API
+
+See [docs/API.md](docs/API.md).
+
 ## Configuration
 
 | Variable | Default | Description |
@@ -65,6 +79,9 @@ To exclude your own visits, run `localStorage.setItem("mlz_ignore", "true")` in 
 | `GEOIP_DB_PATH` | bundled in Docker image | MaxMind-format country DB (DB-IP Lite) |
 | `PROXY_HOPS` | `0` | Trusted reverse proxies in front (1 = Cloud Run / nginx, 2 = Firebase → Cloud Run) |
 | `RETENTION_DAYS` | `0` | Delete events older than N days (0 = forever) |
+| `PUBLIC_URL` | `http://localhost:8080` | Dashboard URL; used for the OAuth callback. `https://` enables Secure cookies |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | – | GitHub OAuth App credentials (enables sign-in) |
+| `ALLOWED_GITHUB_USERS` | – | Comma-separated GitHub usernames allowed to sign in |
 | `LITESTREAM_REPLICA_URL` | – | Continuous backup, e.g. `gs://bucket/analytics` or `s3://bucket/analytics` |
 
 ## Development

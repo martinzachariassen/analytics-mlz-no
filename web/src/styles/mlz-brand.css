@@ -3,7 +3,7 @@
    Local changes, re-apply them after re-fetching:
    - Fonts: only IBM Plex Mono 700 is kept, for the "mlz." wordmark, served
      from /fonts/ (web/public/fonts) so there are no third-party requests.
-     The dashboard's own typefaces (Instrument Sans/Serif, Geist Mono) are
+     The dashboard's own typefaces (Geist, Geist Mono) are
      set in index.css.
    - --font-display / --font-mono are left to index.css; --font-brand is the
      wordmark face. */

@@ -45,17 +45,36 @@ export type Summary = {
   bounce_rate: number
   avg_duration: number
 }
-export type Interval = "hour" | "day" | "month"
+export type Interval = "hour" | "day" | "week" | "month"
+export type Bucket = {
+  t: string
+  pageviews: number
+  visitors: number
+  visits: number
+  bounce_rate: number
+  avg_duration: number
+}
+export type PeriodInfo = {
+  from: string
+  to: string
+  tz: string
+  interval: Interval
+}
 export type Stats = {
-  period: { from: string; to: string; tz: string; interval: Interval }
+  period: PeriodInfo
   summary: Summary
+  /** The comparison period (the one right before, or a year earlier). */
   previous: Summary
-  timeseries: { t: string; pageviews: number; visitors: number }[]
+  timeseries: Bucket[]
+  /** Only with compare: aligned with timeseries by index. */
+  previous_timeseries?: Bucket[]
+  compare?: PeriodInfo
 }
 
 export type Dimension =
   | "path"
   | "entry"
+  | "exit"
   | "hostname"
   | "referrer"
   | "utm_source"
@@ -68,14 +87,47 @@ export type Dimension =
   | "event"
   | "prop_key"
   | "prop"
-export type BreakdownRow = { value: string; visitors: number; count: number }
+export type BreakdownRow = {
+  value: string
+  visitors: number
+  count: number
+  /** With metrics=full. */
+  visits?: number
+  bounce_rate?: number
+  avg_duration?: number
+  /** With compare. */
+  previous_visitors?: number
+}
+
+export type FilterDim = Exclude<Dimension, "prop_key" | "prop">
+export type FilterOp = "is" | "is_not" | "contains"
+export type Filter = { dim: FilterDim; op: FilterOp; value: string }
+export type Compare = "previous" | "year"
 
 export type RangeParams = { from: string; to: string; tz: string }
+/** Everything a stats request is scoped by. */
+export type Scope = RangeParams & {
+  filters?: Filter[]
+  compare?: Compare
+}
 
-function query(params: Record<string, string | number | undefined>): string {
+export type Heatmap = { visitors: number[][]; pageviews: number[][] }
+export type Realtime = {
+  visitors: number
+  minutes?: { t: string; visitors: number; pageviews: number }[]
+  pages?: BreakdownRow[]
+  referrers?: BreakdownRow[]
+  countries?: BreakdownRow[]
+}
+
+type Params = Record<string, string | number | undefined>
+
+function query(s: Partial<Scope>, extra: Params = {}): string {
   const q = new URLSearchParams()
-  for (const [k, v] of Object.entries(params))
+  const { filters, ...rest } = s
+  for (const [k, v] of Object.entries({ ...rest, ...extra }))
     if (v !== undefined && v !== "") q.set(k, String(v))
+  for (const f of filters ?? []) q.append("f", `${f.dim}:${f.op}:${f.value}`)
   return q.toString()
 }
 
@@ -97,17 +149,26 @@ export const api = {
   deleteSite: (id: string) =>
     request<void>(`/api/sites/${id}`, { method: "DELETE" }),
 
-  stats: (id: string, r: RangeParams) =>
-    request<Stats>(`/api/sites/${id}/stats?${query(r)}`),
+  stats: (id: string, s: Scope, opts: { interval?: Interval } = {}) =>
+    request<Stats>(`/api/sites/${id}/stats?${query(s, opts)}`),
   breakdown: (
     id: string,
-    r: RangeParams,
+    s: Scope,
     dim: Dimension,
-    opts: { limit?: number; event?: string; key?: string } = {}
+    opts: {
+      limit?: number
+      event?: string
+      key?: string
+      metrics?: "full"
+    } = {}
   ) =>
     request<BreakdownRow[]>(
-      `/api/sites/${id}/breakdown?${query({ ...r, dim, ...opts })}`
+      `/api/sites/${id}/breakdown?${query(s, { dim, ...opts })}`
     ),
-  realtime: (id: string) =>
-    request<{ visitors: number }>(`/api/sites/${id}/realtime`),
+  heatmap: (id: string, s: Scope) =>
+    request<Heatmap>(
+      `/api/sites/${id}/heatmap?${query({ ...s, compare: undefined })}`
+    ),
+  realtime: (id: string, detail = false) =>
+    request<Realtime>(`/api/sites/${id}/realtime${detail ? "?detail=1" : ""}`),
 }

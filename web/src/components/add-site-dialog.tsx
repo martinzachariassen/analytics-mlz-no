@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { useNavigate } from "react-router"
+import { useNavigate, useSearchParams } from "react-router"
 import { Plus } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -17,8 +17,20 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { api } from "@/lib/api"
 
-export function AddSiteDialog() {
-  const [open, setOpen] = useState(false)
+/** The add-site button and form. `?add=1` in the URL opens it (from the sidebar). */
+export function AddSiteDialog({ fromUrl = false }: { fromUrl?: boolean }) {
+  const [params, setParams] = useSearchParams()
+  const [opened, setOpened] = useState(false)
+  const open = opened || (fromUrl && params.get("add") === "1")
+  const setOpen = (o: boolean) => {
+    setOpened(o)
+    if (!o && fromUrl && params.has("add"))
+      setParams((p) => {
+        const q = new URLSearchParams(p)
+        q.delete("add")
+        return q
+      })
+  }
   const [name, setName] = useState("")
   const [domain, setDomain] = useState("")
   const queryClient = useQueryClient()

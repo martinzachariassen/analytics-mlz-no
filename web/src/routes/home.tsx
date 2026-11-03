@@ -170,11 +170,11 @@ export function HomePage() {
               source
             </p>
             <h1
-              className="display rise text-[52px] text-balance sm:text-[76px] lg:text-[88px]"
+              className="display rise text-[44px] text-balance sm:text-[64px] lg:text-[76px]"
               style={{ "--i": 1 } as React.CSSProperties}
             >
-              Honest numbers,{" "}
-              <span className="text-accent-deep italic">nothing</span> more.
+              Honest numbers, <span className="text-accent-deep">nothing</span>{" "}
+              more.
             </h1>
             <p
               className="rise max-w-[46ch] text-[17px] leading-relaxed text-fg-secondary"
@@ -261,9 +261,7 @@ export function HomePage() {
             <p className="eyebrow">Your data, your server</p>
             <p className="display max-w-[22ch] text-[36px] text-balance sm:text-[48px]">
               One small Go binary and a SQLite file.{" "}
-              <span className="text-fg-muted italic">
-                Nothing shared with anyone.
-              </span>
+              <span className="text-fg-muted">Nothing shared with anyone.</span>
             </p>
             <p className="max-w-[56ch] text-fg-secondary">
               Backed up continuously. It runs for close to nothing on Cloud Run,
@@ -299,7 +297,7 @@ function SectionTitle({ eyebrow, title }: { eyebrow: string; title: string }) {
 
 function Code({ children }: { children: ReactNode }) {
   return (
-    <pre className="overflow-x-auto rounded-lg bg-fg p-4 font-mono text-xs leading-relaxed text-bg">
+    <pre className="overflow-x-auto rounded-lg border bg-surface-2 p-4 font-mono text-xs leading-relaxed text-fg">
       <code>{children}</code>
     </pre>
   )
@@ -322,7 +320,7 @@ function DashboardPreview() {
   return (
     <div
       aria-hidden
-      className="pointer-events-none overflow-hidden rounded-lg border-[1.5px] border-fg bg-surface shadow-[8px_8px_0_0_var(--accent-deep)] select-none"
+      className="pointer-events-none overflow-hidden rounded-xl border border-border-strong bg-surface shadow-(--shadow-pop) select-none"
     >
       <div className="flex items-center justify-between border-b px-5 py-4">
         <span className="display text-[26px]">example.com</span>

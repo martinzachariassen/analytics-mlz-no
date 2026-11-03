@@ -1,107 +1,83 @@
 import type { ReactNode } from "react"
-import { useQuery } from "@tanstack/react-query"
 import { format } from "date-fns"
+import { Sparkles } from "lucide-react"
 
-import { PAGE } from "@/components/breakdown-card"
-import { Skeleton } from "@/components/ui/skeleton"
-import { api, type RangeParams, type Stats, type Summary } from "@/lib/api"
+import type { Stats } from "@/lib/api"
 import { change, formatNumber, formatPercent } from "@/lib/format"
+import { useBreakdown } from "@/lib/queries"
+import { useScope } from "@/lib/use-scope"
 
-const BUSIEST_FORMAT = { hour: "HH:mm", day: "EEEE d MMM", month: "MMMM" }
+const BUSIEST_FORMAT = {
+  hour: "HH:mm",
+  day: "EEEE d MMM",
+  week: "'the week of' d MMM",
+  month: "MMMM",
+}
 
-/** A few plain-language sentences about the period, derived from data the dashboard loads anyway. */
-export function Insights({
-  siteId,
-  range,
-  stats,
-  previous,
-}: {
-  siteId: string
-  range: RangeParams
-  stats?: Stats
-  previous?: Summary
-}) {
-  // Same query keys as the breakdown cards, so these come from the cache.
-  const referrers = useQuery({
-    queryKey: ["breakdown", siteId, range, "referrer", PAGE],
-    queryFn: () => api.breakdown(siteId, range, "referrer", { limit: PAGE }),
-  })
-  const pages = useQuery({
-    queryKey: ["breakdown", siteId, range, "path", PAGE],
-    queryFn: () => api.breakdown(siteId, range, "path", { limit: PAGE }),
-  })
-
-  if (!stats || !previous || !referrers.data || !pages.data) {
-    return <Skeleton className="h-7 w-full max-w-2xl" />
-  }
+/** One or two plain-language sentences about the period, from data loaded anyway. */
+export function Insights({ stats }: { stats?: Stats }) {
+  const sc = useScope()
+  // Same query as the Sources card, so it comes from the cache.
+  const referrers = useBreakdown(sc.siteId, sc.scope, "referrer", { limit: 8 })
+  if (!stats || !referrers.data) return <div className="h-5" />
   const { visitors } = stats.summary
-  if (visitors === 0) return null
+  if (visitors === 0) return <div className="h-5" />
 
   const items: ReactNode[] = []
-
-  const delta = change(visitors, previous.visitors)
+  const delta = sc.compare ? change(visitors, stats.previous.visitors) : null
   if (delta !== null) {
     items.push(
       Math.abs(delta) < 0.02 ? (
-        <>Visitor numbers are about the same as the previous period.</>
+        <>Visitors are flat against the comparison period.</>
       ) : (
         <>
           Visitors are{" "}
           <Strong>
             {delta > 0 ? "up" : "down"} {formatPercent(Math.abs(delta))}
-          </Strong>{" "}
-          compared with the previous period ({formatNumber(visitors)} vs{" "}
-          {formatNumber(previous.visitors)}).
+          </Strong>
+          .
         </>
       )
     )
   }
-
-  const topSource = referrers.data.find((r) => r.value !== "")
-  if (topSource) {
+  const top = referrers.data.find((r) => r.value !== "")
+  if (top)
     items.push(
       <>
-        The top referring website is <Strong>{topSource.value}</Strong>,
-        bringing {formatPercent(topSource.visitors / visitors)} of all visitors.
+        <Strong>{top.value}</Strong> is the top referrer (
+        {formatPercent(top.visitors / visitors)} of visitors).
       </>
     )
-  }
-
   const busiest = stats.timeseries.reduce(
     (best, b) => (b.visitors > best.visitors ? b : best),
     stats.timeseries[0]!
   )
-  if (stats.timeseries.length > 1 && busiest.visitors > 0) {
+  if (stats.timeseries.length > 1 && busiest.visitors > 0)
     items.push(
       <>
-        The busiest {stats.period.interval} was{" "}
+        Busiest was{" "}
         <Strong>
           {format(new Date(busiest.t), BUSIEST_FORMAT[stats.period.interval])}
         </Strong>{" "}
         with {formatNumber(busiest.visitors)} visitors.
       </>
     )
-  } else if (pages.data[0]) {
-    items.push(
-      <>
-        The most viewed page is <Strong>{pages.data[0].value}</Strong>.
-      </>
-    )
-  }
 
-  // Read as the page's standfirst: a few sentences, not a widget.
   return (
-    <p className="max-w-[68ch] text-[15px] leading-relaxed text-pretty text-fg-secondary">
-      {items.map((it, i) => (
-        <span key={i}>
-          {it}
-          {i < items.length - 1 && " "}
-        </span>
-      ))}
+    <p className="flex items-start gap-2 text-[13px] text-pretty text-fg-secondary">
+      <Sparkles className="mt-0.5 size-3.5 shrink-0 text-accent" />
+      <span>
+        {items.map((it, i) => (
+          <span key={i}>
+            {it}
+            {i < items.length - 1 && " "}
+          </span>
+        ))}
+      </span>
     </p>
   )
 }
 
 function Strong({ children }: { children: ReactNode }) {
-  return <span className="text-fg">{children}</span>
+  return <span className="font-medium text-fg">{children}</span>
 }

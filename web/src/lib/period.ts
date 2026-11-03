@@ -9,7 +9,7 @@ import {
   subMonths,
 } from "date-fns"
 
-import type { RangeParams } from "@/lib/api"
+import type { Interval, RangeParams } from "@/lib/api"
 
 export const PERIODS = {
   today: "Today",
@@ -104,3 +104,38 @@ export function formatRange(r: Pick<RangeParams, "from" | "to">): string {
 export function endsToday(r: RangeParams, now = new Date()): boolean {
   return r.to === day(now)
 }
+
+/** Number of days in a range, inclusive. */
+export function rangeDays(r: Pick<RangeParams, "from" | "to">): number {
+  return differenceInCalendarDays(parseISO(r.to), parseISO(r.from)) + 1
+}
+
+/** Intervals the API allows for a range, and the one it picks by default. */
+export function intervalsFor(r: Pick<RangeParams, "from" | "to">): {
+  allowed: Interval[]
+  auto: Interval
+} {
+  const days = rangeDays(r)
+  const allowed: Interval[] = []
+  if (days <= 7) allowed.push("hour")
+  if (days <= 400) allowed.push("day")
+  if (days >= 14) allowed.push("week")
+  if (days >= 60) allowed.push("month")
+  const auto: Interval = days <= 2 ? "hour" : days <= 93 ? "day" : "month"
+  return { allowed, auto }
+}
+
+export const INTERVALS: Record<Interval, string> = {
+  hour: "Hourly",
+  day: "Daily",
+  week: "Weekly",
+  month: "Monthly",
+}
+
+export function isDay(v: string | null): v is string {
+  return (
+    v !== null && /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(parseISO(v).getTime())
+  )
+}
+
+export { day as formatDay }

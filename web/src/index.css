@@ -1,48 +1,57 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-/* mlz brand: --bg, --fg, --fg-secondary, --fg-muted, --border, --accent,
-   --accent-deep, the wordmark font and the data-theme="dark" variant. See
-   https://mlz.no/brand/BRAND.md. Everything below is derived from it. */
+/* mlz brand: only the "mlz." wordmark face, the dark variant selector and the
+   token names come from here. The colours are redefined below. */
 @import "./styles/mlz-brand.css";
-/* Typefaces: Instrument Sans for UI, body and numbers (tabular figures),
-   Instrument Serif for headlines, Geist Mono for small labels and code.
-   Self-hosted via Fontsource, so no third-party requests. */
-@import "@fontsource-variable/instrument-sans";
-@import "@fontsource/instrument-serif/400.css";
-@import "@fontsource/instrument-serif/400-italic.css";
+/* Typefaces: Geist for everything (UI, body, headlines, numbers), Geist Mono
+   for code. Self-hosted via Fontsource, so no third-party requests. */
+@import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
 
-/* shadcn/ui components read these names. They are mapped onto the brand
-   tokens rather than given colours of their own. Note that shadcn's
-   "accent" is a neutral hover tint, not the brand violet: the violet is
-   available as `violet` (decorative) and `accent-deep` (text, lines). */
+/* Design tokens. A neutral, slightly cool grey scale with one accent (violet,
+   the link back to mlz), dark first. shadcn/ui components read the names in
+   @theme; note that shadcn's "accent" is a neutral hover tint, the violet is
+   `violet` (fills) and `accent-deep` (text, lines). */
 @theme inline {
-  --font-sans: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-sans);
   --font-mono:
     "Geist Mono Variable", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  --font-heading: var(--font-display);
+  --font-heading: var(--font-sans);
+
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border-strong: var(--border-strong);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+  --color-violet: var(--accent);
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --color-series-3: var(--series-3);
+  --color-series-4: var(--series-4);
+  --color-series-5: var(--series-5);
+  --color-series-6: var(--series-6);
+
   --color-sidebar-ring: var(--ring);
   --color-sidebar-border: var(--border);
   --color-sidebar-accent-foreground: var(--fg);
   --color-sidebar-accent: var(--ui-accent);
   --color-sidebar-primary-foreground: var(--bg);
   --color-sidebar-primary: var(--fg);
-  --color-sidebar-foreground: var(--fg);
+  --color-sidebar-foreground: var(--fg-secondary);
   --color-sidebar: var(--bg);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
   --color-ring: var(--ring);
   --color-input: var(--border);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--fg);
   --color-accent: var(--ui-accent);
-  --color-violet: var(--accent);
   --color-muted-foreground: var(--fg-muted);
   --color-muted: var(--ui-muted);
   --color-secondary-foreground: var(--fg);
@@ -55,41 +64,87 @@
   --color-card: var(--surface);
   --color-foreground: var(--fg);
   --color-background: var(--bg);
-  --color-surface: var(--surface);
-  /* Brand: 4px on buttons and boxes, nothing rounder. */
-  --radius-sm: 2px;
-  --radius-md: 3px;
-  --radius-lg: 4px;
-  --radius-xl: 4px;
-  --radius-2xl: 4px;
-  --radius-3xl: 4px;
-  --radius-4xl: 4px;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-2xl: 12px;
+  --radius-3xl: 12px;
+  --radius-4xl: 12px;
   --ease-brand: var(--ease);
 }
 
+/* Light. */
 :root {
-  /* A panel sits a step off the page; mixed from tokens, not a new colour. */
-  --surface: color-mix(in oklch, var(--bg) 55%, white);
-  --ui-muted: color-mix(in oklch, var(--fg) 6%, transparent);
-  --ui-accent: color-mix(in oklch, var(--fg) 8%, transparent);
-  --ring: var(--accent-deep);
-  /* Not a brand colour (the brand has no "danger" yet): used only for errors
-     and deleting things. */
-  --destructive: oklch(0.55 0.19 27);
-  /* Charts: the series is a line, so accent-deep; the comparison is quiet. */
-  --chart-1: var(--accent-deep);
-  --chart-2: var(--fg-muted);
-  --chart-3: var(--fg-secondary);
-  --chart-4: color-mix(in oklch, var(--accent-deep) 55%, var(--bg));
-  --chart-5: var(--border);
-  --chart-fill: var(--accent);
-  --radius: 4px;
-  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --bg: oklch(0.985 0.002 270);
+  --surface: oklch(1 0 0);
+  --surface-2: oklch(0.967 0.003 270);
+  --fg: oklch(0.2 0.006 270);
+  --fg-secondary: oklch(0.42 0.008 270);
+  --fg-muted: oklch(0.55 0.01 270);
+  --border: oklch(0.92 0.004 270);
+  --border-strong: oklch(0.86 0.006 270);
+  --accent: #6250d6;
+  --accent-deep: #5443c4;
+  --positive: oklch(0.52 0.13 152);
+  --negative: oklch(0.55 0.18 25);
+  /* Categorical series, fixed order, validated (dataviz skill) on white. Three
+     of them are under 3:1 on white, so charts with them carry a legend and a
+     table. */
+  --series-1: #6250d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #2a78d6;
+  --shadow-pop:
+    0 1px 2px oklch(0 0 0 / 0.06), 0 8px 24px -6px oklch(0 0 0 / 0.12);
+  color-scheme: light;
 }
 
+/* Dark: the default (see theme-provider). Validated on --surface. */
 [data-theme="dark"] {
-  --surface: color-mix(in oklch, var(--bg) 88%, white);
-  --destructive: oklch(0.7 0.17 27);
+  --bg: oklch(0.145 0.004 270);
+  --surface: oklch(0.178 0.005 270);
+  --surface-2: oklch(0.215 0.006 270);
+  --fg: oklch(0.965 0.003 270);
+  --fg-secondary: oklch(0.79 0.006 270);
+  --fg-muted: oklch(0.62 0.01 270);
+  --border: oklch(0.255 0.006 270);
+  --border-strong: oklch(0.33 0.008 270);
+  --accent: #9085e9;
+  --accent-deep: #a59cf0;
+  --positive: oklch(0.76 0.15 152);
+  --negative: oklch(0.7 0.16 25);
+  --series-1: #9085e9;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #3987e5;
+  --shadow-pop:
+    0 0 0 1px oklch(1 0 0 / 0.04), 0 12px 32px -8px oklch(0 0 0 / 0.6);
+  color-scheme: dark;
+}
+
+:root,
+[data-theme="dark"] {
+  --ui-muted: color-mix(in oklch, var(--fg) 5%, transparent);
+  --ui-accent: color-mix(in oklch, var(--fg) 7%, transparent);
+  --ring: var(--accent);
+  --destructive: var(--negative);
+  /* Charts: the main series in the accent, the comparison quiet. */
+  --chart-1: var(--series-1);
+  --chart-2: var(--fg-muted);
+  --chart-3: var(--series-2);
+  --chart-4: var(--series-3);
+  --chart-5: var(--series-4);
+  --chart-fill: var(--accent);
+  --grid: color-mix(in oklch, var(--border) 70%, transparent);
+  --radius: 8px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 @layer base {
@@ -101,8 +156,9 @@
   }
   body {
     @apply bg-background font-sans text-foreground antialiased;
-    font-size: 14px;
-    font-feature-settings: "tnum" 1;
+    font-size: 13px;
+    line-height: 1.5;
+    font-feature-settings: "cv11" 1;
     transition:
       background-color 0.2s var(--ease),
       color 0.2s var(--ease);
@@ -111,7 +167,7 @@
     background: color-mix(in oklch, var(--accent) 30%, transparent);
   }
   :focus-visible {
-    outline: 2px solid var(--accent-deep);
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
   @media (prefers-reduced-motion: reduce) {
@@ -125,83 +181,72 @@
   }
 }
 
-/* shadcn buttons, restyled from the outside so the generated files stay
-   untouched: a 1.5px --fg border on outline controls, and the brand's hard
-   offset shadow on hover instead of a colour change. */
+/* shadcn components, restyled from the outside so the generated files stay
+   untouched. */
 @layer components {
   [data-slot="button"] {
     transition:
-      transform 0.4s var(--spring),
-      box-shadow 0.4s var(--spring),
-      background-color 0.2s var(--ease),
-      border-color 0.2s var(--ease),
-      color 0.2s var(--ease);
-  }
-  [data-slot="button"][data-variant="default"],
-  [data-slot="button"][data-variant="outline"] {
-    border-width: 1.5px;
-    border-color: var(--fg);
+      background-color 0.15s var(--ease),
+      border-color 0.15s var(--ease),
+      color 0.15s var(--ease);
   }
   [data-slot="button"][data-variant="outline"] {
-    background: transparent;
+    background: var(--surface);
+    border-color: var(--border-strong);
   }
   @media (hover: hover) {
-    [data-slot="button"][data-variant="default"]:hover,
     [data-slot="button"][data-variant="outline"]:hover {
-      background: var(--fg);
-      color: var(--bg);
-      transform: translate(-2px, -2px);
-      box-shadow: 4px 4px 0 0 var(--accent-deep);
-    }
-    [data-slot="button"][data-variant="outline"][data-size^="icon"]:hover {
-      background: transparent;
-      color: var(--fg);
+      background: var(--surface-2);
     }
   }
-  [data-slot="button"]:active {
-    transform: translate(0, 0);
-    box-shadow: none;
-  }
-  /* Cards (settings, dialogs): a hairline instead of a ring, more room. */
   [data-slot="card"] {
     --card-spacing: 1.25rem;
     background: var(--surface);
     box-shadow: 0 0 0 1px var(--border);
   }
   [data-slot="dialog-content"],
-  [data-slot="alert-dialog-content"] {
-    border: 1.5px solid var(--fg);
-    box-shadow: 6px 6px 0 0 var(--accent-deep);
+  [data-slot="alert-dialog-content"],
+  [data-slot="popover-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="select-content"],
+  [data-slot="hover-card-content"] {
+    border: 1px solid var(--border-strong);
+    box-shadow: var(--shadow-pop);
+  }
+  [data-slot="sheet-content"] {
+    background: var(--bg);
   }
   [data-slot="input"],
   [data-slot="select-trigger"] {
-    background: transparent;
+    background: var(--surface);
+  }
+  [data-slot="table-head"] {
+    height: 2.25rem;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--fg-muted);
   }
 }
 
 @layer utilities {
-  /* Labels: small uppercase mono, as on mlz.no. */
+  /* Small labels: quiet sans. */
   .eyebrow {
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    font-weight: 450;
+    font-size: 12px;
+    font-weight: 500;
     line-height: 1.2;
-    text-transform: uppercase;
-    letter-spacing: 0.16em;
     color: var(--fg-muted);
   }
-  /* Names and headlines: Instrument Serif. Add `italic` for emphasis. */
+  /* Headlines: Geist, semibold and tightly tracked. */
   .display {
     font-family: var(--font-display);
-    font-weight: 400;
-    letter-spacing: -0.015em;
-    line-height: 1;
-  }
-  /* Headline numbers: the sans, tight, with tabular figures. */
-  .figure {
-    font-family: var(--font-sans);
-    font-weight: 550;
+    font-weight: 600;
     letter-spacing: -0.03em;
+    line-height: 1.1;
+  }
+  /* Headline numbers. */
+  .figure {
+    font-weight: 600;
+    letter-spacing: -0.035em;
     line-height: 1;
     font-variant-numeric: tabular-nums;
   }
@@ -212,55 +257,44 @@
   .tnum {
     font-variant-numeric: tabular-nums;
   }
-  /* The brand hover: lift and a hard violet shadow, no blur. */
+  /* Subtle hover for cards that are links. */
   .hover-lift {
     transition:
-      transform 0.5s var(--spring),
-      box-shadow 0.5s var(--spring),
-      border-color 0.3s var(--ease);
+      border-color 0.2s var(--ease),
+      background-color 0.2s var(--ease);
   }
   @media (hover: hover) {
     .hover-lift:hover {
-      transform: translate(-3px, -3px);
-      box-shadow: 5px 5px 0 0 var(--accent-deep);
-      border-color: var(--fg);
+      border-color: var(--border-strong);
+      background-color: var(--surface-2);
     }
-  }
-  .hover-lift:active {
-    transform: translate(0, 0);
-    box-shadow: none;
   }
   /* Entrance: rise, staggered with --i. */
   .rise {
-    animation: rise 0.9s var(--ease) both;
-    animation-delay: calc(var(--i, 0) * 60ms);
+    animation: rise 0.6s var(--ease) both;
+    animation-delay: calc(var(--i, 0) * 40ms);
   }
 }
 
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(6px);
   }
 }
 
-/* Unlayered, so it beats the utility classes in the generated card: card
-   titles read like Panel titles (small uppercase mono), dialog titles use
-   the serif. */
 [data-slot="card-title"] {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  font-weight: 450;
-  line-height: 1.2;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  color: var(--fg-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 [data-slot="dialog-title"],
-[data-slot="alert-dialog-title"] {
-  font-size: 28px;
-  font-weight: 400;
-  line-height: 1.05;
+[data-slot="alert-dialog-title"],
+[data-slot="sheet-title"] {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 [data-slot="card-footer"] {
   background: transparent;

@@ -22,14 +22,14 @@ export function CodeBlock({ code }: { code: string }) {
   }
 
   return (
-    <div className="relative rounded-lg bg-fg text-bg">
+    <div className="relative rounded-lg border bg-surface-2 text-fg">
       <pre className="overflow-x-auto p-3.5 pr-12 font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
         {code}
       </pre>
       <Button
         variant="ghost"
         size="icon-sm"
-        className="absolute top-2 right-2 text-bg/70 hover:bg-bg/15! hover:text-bg!"
+        className="absolute top-2 right-2 text-fg-muted hover:text-fg"
         onClick={() => void copy()}
         aria-label="Copy to clipboard"
       >

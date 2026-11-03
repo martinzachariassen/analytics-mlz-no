@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Link, useNavigate, useParams, useSearchParams } from "react-router"
-import { ArrowLeft, PartyPopper } from "lucide-react"
+import { useNavigate, useParams, useSearchParams } from "react-router"
+import { PartyPopper } from "lucide-react"
 import { toast } from "sonner"
 
 import { TrackingSnippet } from "@/components/tracking-snippet"
@@ -37,18 +37,7 @@ export function SettingsPage() {
   const site = useQuery({ queryKey: ["site", id], queryFn: () => api.site(id) })
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6">
-      <header className="flex flex-col gap-3">
-        <Link
-          to={`/sites/${id}`}
-          className="eyebrow inline-flex items-center gap-1.5 self-start transition-colors hover:text-fg"
-        >
-          <ArrowLeft className="size-3" />
-          {site.data?.name ?? "Dashboard"}
-        </Link>
-        <h1 className="display text-[44px] sm:text-[56px]">Settings</h1>
-      </header>
-
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-4 sm:p-6 lg:py-10">
       {params.get("new") && (
         <Alert>
           <PartyPopper />

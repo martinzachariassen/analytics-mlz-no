@@ -17,8 +17,20 @@ import { HomePage } from "@/routes/home"
 import { SitesPage } from "@/routes/sites"
 
 // Charts (Recharts) are the bulk of the bundle; load them only when needed.
-const DashboardPage = lazy(() =>
-  import("@/routes/dashboard").then((m) => ({ default: m.DashboardPage }))
+const SiteLayout = lazy(() =>
+  import("@/routes/site/layout").then((m) => ({ default: m.SiteLayout }))
+)
+const OverviewPage = lazy(() =>
+  import("@/routes/site/overview").then((m) => ({ default: m.OverviewPage }))
+)
+const RealtimePage = lazy(() =>
+  import("@/routes/site/realtime").then((m) => ({ default: m.RealtimePage }))
+)
+const ReportPage = lazy(() =>
+  import("@/routes/site/report").then((m) => ({ default: m.ReportPage }))
+)
+const EventsPage = lazy(() =>
+  import("@/routes/site/report").then((m) => ({ default: m.EventsPage }))
 )
 const SettingsPage = lazy(() =>
   import("@/routes/settings").then((m) => ({ default: m.SettingsPage }))
@@ -59,8 +71,29 @@ const router = createBrowserRouter([
     element: <AppLayout />,
     children: [
       { path: "/sites", element: <SitesPage /> },
-      { path: "/sites/:id", element: <DashboardPage /> },
-      { path: "/sites/:id/settings", element: <SettingsPage /> },
+      {
+        path: "/sites/:id",
+        element: <SiteLayout />,
+        children: [
+          { index: true, element: <OverviewPage /> },
+          { path: "realtime", element: <RealtimePage /> },
+          { path: "pages", element: <ReportPage key="pages" report="pages" /> },
+          {
+            path: "sources",
+            element: <ReportPage key="sources" report="sources" />,
+          },
+          {
+            path: "locations",
+            element: <ReportPage key="locations" report="locations" />,
+          },
+          {
+            path: "devices",
+            element: <ReportPage key="devices" report="devices" />,
+          },
+          { path: "events", element: <EventsPage /> },
+          { path: "settings", element: <SettingsPage /> },
+        ],
+      },
       { path: "*", element: <Navigate to="/sites" replace /> },
     ],
   },

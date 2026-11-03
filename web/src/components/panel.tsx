@@ -3,13 +3,14 @@ import type { ReactNode } from "react"
 import { cn } from "@/lib/utils"
 
 /**
- * A flat section of the dashboard: hairline border, 4px corners, a small
- * uppercase title. Inside a PanelGrid the borders are shared, like a data sheet.
+ * A card on the dashboard: hairline border, title row with optional tabs and
+ * actions, and a body.
  */
 export function Panel({
   title,
   description,
   action,
+  tabs,
   children,
   className,
   bodyClassName,
@@ -17,6 +18,8 @@ export function Panel({
   title?: ReactNode
   description?: ReactNode
   action?: ReactNode
+  /** Rendered under the title row, flush with the body. */
+  tabs?: ReactNode
   children: ReactNode
   className?: string
   bodyClassName?: string
@@ -24,49 +27,40 @@ export function Panel({
   return (
     <section
       className={cn(
-        "flex min-w-0 flex-col rounded-lg border bg-surface",
+        "flex min-w-0 flex-col overflow-hidden rounded-lg border bg-surface",
         className
       )}
     >
-      {(title || action) && (
-        <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-4 pt-4 sm:px-5">
-          <div className="flex min-w-0 flex-col gap-1.5">
-            {title && <h2 className="eyebrow text-fg-secondary">{title}</h2>}
-            {description && (
-              <p className="text-xs text-fg-muted">{description}</p>
+      {(title || action || tabs) && (
+        <header className="flex flex-col gap-2 border-b px-4 pt-3">
+          <div className="flex min-h-7 items-center justify-between gap-3">
+            <div className="flex min-w-0 items-baseline gap-2">
+              {title && (
+                <h2 className="truncate text-[13px] font-semibold tracking-[-0.01em] text-fg">
+                  {title}
+                </h2>
+              )}
+              {description && (
+                <p className="truncate text-xs text-fg-muted max-sm:hidden">
+                  {description}
+                </p>
+              )}
+            </div>
+            {action && (
+              <div className="flex shrink-0 items-center gap-1">{action}</div>
             )}
           </div>
-          {action}
+          {tabs ?? <div className="h-1" />}
         </header>
       )}
-      <div className={cn("flex flex-1 flex-col p-4 sm:p-5", bodyClassName)}>
+      <div className={cn("flex flex-1 flex-col p-4", bodyClassName)}>
         {children}
       </div>
     </section>
   )
 }
 
-/** Panels sharing their borders: the grid gap is a 1px line of --border. */
-export function PanelGrid({
-  children,
-  className,
-}: {
-  children: ReactNode
-  className?: string
-}) {
-  return (
-    <div
-      className={cn(
-        "grid gap-px overflow-hidden rounded-lg border bg-border [&>*]:min-w-0 [&>*]:rounded-none [&>*]:border-0",
-        className
-      )}
-    >
-      {children}
-    </div>
-  )
-}
-
-/** Text tabs: uppercase labels, the active one underlined in accent-deep. */
+/** Text tabs: the active one underlined in the accent. */
 export function TextTabs<T extends string>({
   value,
   onChange,
@@ -82,7 +76,7 @@ export function TextTabs<T extends string>({
     <div
       role="tablist"
       aria-label={label}
-      className="-mb-px flex gap-4 overflow-x-auto"
+      className="-mb-px flex [scrollbar-width:none] gap-4 overflow-x-auto"
     >
       {items.map((it) => {
         const active = it.value === value
@@ -94,10 +88,10 @@ export function TextTabs<T extends string>({
             aria-selected={active}
             onClick={() => onChange(it.value)}
             className={cn(
-              "eyebrow shrink-0 border-b-2 pb-1.5 tracking-[0.14em] whitespace-nowrap transition-colors",
+              "shrink-0 border-b-2 pb-2 text-xs font-medium whitespace-nowrap transition-colors",
               active
-                ? "border-accent-deep text-fg"
-                : "border-transparent hover:text-fg"
+                ? "border-accent text-fg"
+                : "border-transparent text-fg-muted hover:text-fg"
             )}
           >
             {it.label}

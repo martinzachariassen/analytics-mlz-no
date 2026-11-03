@@ -25,7 +25,7 @@ Lightweight, privacy-friendly, self-hostable web analytics (inspired by Umami/Pl
 2. ✅ **Tracker** — `script.js`: page views, SPA navigation, outbound links, `data-track`, `mlz.track()`.
 3. ✅ **Stats API + auth** — GitHub sign-in, sites CRUD, stats + breakdown endpoints.
 4. ✅ **Dashboard** — React + Vite + shadcn/ui.
-5. **Terraform** — Artifact Registry, Cloud Run, GCS, Secret Manager, Firebase Hosting.
+5. ✅ **Terraform** — Artifact Registry, Cloud Run, GCS, Secret Manager, Firebase Hosting.
 6. **Contributor-friendliness** — README, CONTRIBUTING, issue templates, good-first-issues.
 
 ## Open items

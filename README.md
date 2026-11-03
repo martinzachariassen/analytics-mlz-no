@@ -5,7 +5,7 @@ Lightweight, privacy-friendly, self-hostable web analytics written in Go.
 - Cookie-free, anonymous visitor counting (no IP addresses stored)
 - Page views, SPA navigation, outbound links and custom events
 - SQLite storage (with optional Litestream replication)
-- React + shadcn/ui dashboard
+- React + Vite + shadcn/ui dashboard, GitHub sign-in
 
 > 🚧 Early development — not ready for production yet. See [docs/PLAN.md](docs/PLAN.md).
 
@@ -85,6 +85,18 @@ See [docs/API.md](docs/API.md).
 | `LITESTREAM_REPLICA_URL` | – | Continuous backup, e.g. `gs://bucket/analytics` or `s3://bucket/analytics` |
 
 ## Development
+
+Run the API and the dashboard in two terminals. Create a GitHub OAuth App for local
+development with the callback `http://localhost:5173/api/auth/github/callback`.
+
+```sh
+# terminal 1 — API on :8080
+PUBLIC_URL=http://localhost:5173 GITHUB_CLIENT_ID=… GITHUB_CLIENT_SECRET=… \
+  ALLOWED_GITHUB_USERS=your-github-username make run
+
+# terminal 2 — dashboard on http://localhost:5173 (proxies /api to :8080)
+make dev-web
+```
 
 ```sh
 make test     # Go + tracker tests

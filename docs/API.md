@@ -81,6 +81,7 @@ Returns `[{ "value": "...", "visitors": 10, "count": 14 }]`, sorted by visitors.
 | `country` | ISO code | visits |
 | `browser`, `os`, `device` | | visits |
 | `event` | custom event name | events |
+| `prop_key` (+ `event`) | property key used by that event | events |
 | `prop` (+ `event`, `key`) | property value | events |
 
 ### `GET /api/sites/{id}/realtime`

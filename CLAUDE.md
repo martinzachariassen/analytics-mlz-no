@@ -9,13 +9,15 @@ Self-hostable, cookie-free web analytics. Plan and all architectural decisions: 
 - API reference: `docs/API.md`
 - `deploy/` — Dockerfile, docker-compose, Litestream config, entrypoint
 - `tracker/` — TypeScript tracking script (`src/core.ts` logic, `src/index.ts` entry). Built with esbuild into `server/internal/tracker/script.js`, which is committed and embedded in the Go binary. Run `make tracker` after changes; CI fails if it's stale.
-- `web/`, `infra/` — coming in later milestones
+- `web/` — dashboard: React 19 + Vite + Tailwind v4 + shadcn/ui (radix-nova), TanStack Query, React Router. `src/lib/api.ts` is the typed API client; `src/routes/` pages; `src/components/ui/` is shadcn-generated (add with `npx shadcn@latest add <name>`, avoid hand-editing). Dev server proxies `/api` to :8080, same as Firebase Hosting in production.
+- `infra/` — coming in milestone 5
 
 ## Commands
 
 - `make test` — Go tests + tracker tests (vitest + happy-dom)
 - `make lint` — `golangci-lint run`
 - `make run` — run the server locally on :8080 (data in `./data`)
+- `make dev-web` — dashboard on :5173; set `PUBLIC_URL=http://localhost:5173` for the server
 - `docker compose -f deploy/docker-compose.yml up --build`
 
 ## Conventions

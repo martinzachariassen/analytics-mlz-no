@@ -137,6 +137,11 @@ func TestBreakdown(t *testing.T) {
 		t.Fatalf("events = %+v", events)
 	}
 
+	keys := get("prop_key", BreakdownOptions{Event: "signup"})
+	if len(keys) != 1 || keys[0].Value != "plan" {
+		t.Fatalf("prop keys = %+v", keys)
+	}
+
 	props := get("prop", BreakdownOptions{Event: "signup", PropKey: "plan"})
 	if len(props) != 1 || props[0].Value != "pro" {
 		t.Fatalf("props = %+v", props)

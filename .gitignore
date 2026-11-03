@@ -1,0 +1,28 @@
+# Go
+/server/bin/
+*.test
+*.out
+
+# Data
+*.db
+*.db-shm
+*.db-wal
+*.mmdb
+/data/
+
+# Node
+node_modules/
+dist/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+
+# Env / OS
+.env
+.env.*
+!.env.example
+.DS_Store

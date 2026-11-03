@@ -20,6 +20,11 @@ dist/
 *.tfstate.*
 *.tfvars
 !*.tfvars.example
+tfplan
+*.tfplan
+
+# Firebase CLI
+.firebase/
 
 # Env / OS
 .env

@@ -112,12 +112,12 @@ type BreakdownRow struct {
 // Dimensions supported by Breakdown.
 var Dimensions = []string{
 	"path", "entry", "hostname", "referrer", "utm_source", "utm_medium", "utm_campaign",
-	"country", "browser", "os", "device", "event", "prop",
+	"country", "browser", "os", "device", "event", "prop_key", "prop",
 }
 
 // BreakdownOptions narrows a breakdown.
 type BreakdownOptions struct {
-	Event   string // required for "prop": event name
+	Event   string // required for "prop" and "prop_key": event name
 	PropKey string // required for "prop": property key
 	Limit   int
 }
@@ -157,6 +157,16 @@ func (s *Store) Breakdown(ctx context.Context, siteID string, r Range, dim strin
 	case "event":
 		query = `SELECT name, COUNT(DISTINCT visitor_id), COUNT(*)
 			FROM events WHERE ` + inRange + ` AND type = 'event' GROUP BY 1`
+
+	case "prop_key":
+		if opt.Event == "" {
+			return nil, fmt.Errorf("prop_key breakdown requires event")
+		}
+		query = `SELECT p.key, COUNT(DISTINCT e.visitor_id), COUNT(*)
+			FROM events e JOIN event_props p ON p.event_id = e.id
+			WHERE e.site_id = ? AND e.ts >= ? AND e.ts < ? AND e.type = 'event' AND e.name = ?
+			GROUP BY 1`
+		args = append(args, opt.Event)
 
 	case "prop":
 		if opt.Event == "" || opt.PropKey == "" {

@@ -194,6 +194,10 @@ func (a *API) breakdown(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "dim=prop requires event and key")
 		return
 	}
+	if dim == "prop_key" && opt.Event == "" {
+		httpx.Error(w, http.StatusBadRequest, "dim=prop_key requires event")
+		return
+	}
 	if l := q.Get("limit"); l != "" {
 		n, err := strconv.Atoi(l)
 		if err != nil || n < 1 || n > maxBreakdownLimit {

@@ -16,8 +16,8 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      - run: go vet ./...
-      - run: go test -race ./...
+      - run: go vet ./server/...
+      - run: go test -race ./server/...
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.14
@@ -50,3 +50,19 @@ jobs:
             echo "::error::server/internal/tracker/script.js is stale. Run 'npm run build' in tracker/ and commit."
             exit 1
           }
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build

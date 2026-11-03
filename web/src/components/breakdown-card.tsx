@@ -1,11 +1,13 @@
 import { useState, type ReactNode } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { Inbox } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
   Card,
   CardAction,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -17,7 +19,7 @@ import {
   type Dimension,
   type RangeParams,
 } from "@/lib/api"
-import { formatNumber } from "@/lib/format"
+import { formatNumber, formatPercent } from "@/lib/format"
 
 export type BreakdownTab = {
   dim: Dimension
@@ -26,23 +28,28 @@ export type BreakdownTab = {
   countLabel: string
   /** Renders a value; empty values usually mean "none". */
   render?: (value: string) => ReactNode
-  empty?: string
+  empty?: ReactNode
 }
 
-const PAGE = 10
+export const PAGE = 10
 const MORE = 100
 
 /** A card with tabs, each showing the top values of a dimension as proportional bars. */
 export function BreakdownCard({
   title,
+  description,
   siteId,
   range,
   tabs,
+  totalVisitors,
 }: {
   title: string
+  description?: string
   siteId: string
   range: RangeParams
   tabs: BreakdownTab[]
+  /** Visitors in the whole period, for the share column. */
+  totalVisitors?: number
 }) {
   const [active, setActive] = useState(tabs[0]!.dim)
   const [expanded, setExpanded] = useState(false)
@@ -74,25 +81,31 @@ export function BreakdownCard({
     ) : null
 
   return (
-    <Card>
+    <Card className="min-w-0">
       <CardHeader>
         <CardTitle>{title}</CardTitle>
+        {description && <CardDescription>{description}</CardDescription>}
         {/* Wide cards: tabs beside the title. */}
         {tabSwitcher && (
           <CardAction className="max-sm:hidden">{tabSwitcher}</CardAction>
         )}
       </CardHeader>
-      <CardContent className="flex flex-col gap-2">
+      <CardContent className="flex flex-1 flex-col gap-2">
         {/* Phones: tabs on their own row so labels don't get clipped. */}
         {tabSwitcher && (
           <div className="overflow-x-auto sm:hidden">{tabSwitcher}</div>
         )}
-        <BarList rows={rows.data} tab={tab} loading={rows.isPending} />
+        <BarList
+          rows={rows.data}
+          tab={tab}
+          loading={rows.isPending}
+          total={totalVisitors}
+        />
         {rows.data && rows.data.length === limit && !expanded && (
           <Button
             variant="ghost"
             size="sm"
-            className="self-center"
+            className="mt-auto self-center text-muted-foreground"
             onClick={() => setExpanded(true)}
           >
             Show more
@@ -109,38 +122,48 @@ export function BarList({
   loading,
   onSelect,
   selected,
+  total,
+  shareLabel = "Share",
 }: {
   rows?: BreakdownRow[]
   tab: Pick<BreakdownTab, "countLabel" | "render" | "empty">
   loading?: boolean
   onSelect?: (value: string) => void
   selected?: string
+  /** Visitors in the whole period; adds a column with each row's share of them. */
+  total?: number
+  shareLabel?: string
 }) {
   if (loading || !rows) {
     return (
       <div className="flex flex-col gap-1.5">
-        {[0, 1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-8" />
+        {[0, 1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-9" />
         ))}
       </div>
     )
   }
   if (rows.length === 0) {
     return (
-      <p className="py-8 text-center text-sm text-muted-foreground">
+      <div className="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+        <Inbox className="size-6 opacity-60" />
         No data for this period
-      </p>
+      </div>
     )
   }
 
   const max = Math.max(...rows.map((r) => r.visitors), 1)
+  const showShare = total !== undefined && total > 0
   return (
     <div className="flex flex-col gap-1 text-sm">
-      <div className="flex justify-between px-2 text-xs text-muted-foreground">
+      <div className="flex justify-between px-2 pb-1 text-xs text-muted-foreground">
         <span />
-        <span className="flex gap-4">
+        <span className="flex gap-3">
           <span className="w-14 text-right">Visitors</span>
-          <span className="w-14 text-right">{tab.countLabel}</span>
+          <span className="w-14 text-right max-sm:hidden">
+            {tab.countLabel}
+          </span>
+          {showShare && <span className="w-12 text-right">{shareLabel}</span>}
         </span>
       </div>
       {rows.map((r) => {
@@ -152,24 +175,33 @@ export function BarList({
         return (
           <Row
             key={r.value}
+            type={onSelect ? "button" : undefined}
             onClick={onSelect ? () => onSelect(r.value) : undefined}
-            className="relative flex h-8 items-center justify-between rounded-md px-2 text-left enabled:hover:bg-muted data-[selected=true]:ring-1 data-[selected=true]:ring-ring"
+            className="group relative flex h-9 items-center justify-between rounded-md px-2 text-left transition-colors hover:bg-muted/60 data-[selected=true]:bg-muted data-[selected=true]:ring-1 data-[selected=true]:ring-chart-1/50"
             data-selected={selected === r.value}
           >
             <span
-              className="absolute inset-y-0 left-0 rounded-md bg-chart-1/12"
-              style={{ width: `${(r.visitors / max) * 100}%` }}
+              className="absolute inset-y-0.5 left-0 rounded-md bg-chart-1/14 transition-colors group-hover:bg-chart-1/20"
+              style={{ width: `${Math.max((r.visitors / max) * 100, 1)}%` }}
             />
-            <span className="relative truncate pr-4" title={r.value}>
+            <span
+              className="relative flex min-w-0 items-center gap-2 truncate pr-4"
+              title={r.value}
+            >
               {label}
             </span>
-            <span className="relative flex shrink-0 gap-4 tabular-nums">
+            <span className="relative flex shrink-0 gap-3 tabular-nums">
               <span className="w-14 text-right font-medium">
                 {formatNumber(r.visitors)}
               </span>
-              <span className="w-14 text-right text-muted-foreground">
+              <span className="w-14 text-right text-muted-foreground max-sm:hidden">
                 {formatNumber(r.count)}
               </span>
+              {showShare && (
+                <span className="w-12 text-right text-muted-foreground">
+                  {formatPercent(Math.min(r.visitors / total, 1))}
+                </span>
+              )}
             </span>
           </Row>
         )

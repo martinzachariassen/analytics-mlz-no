@@ -1,4 +1,13 @@
-import { format, startOfMonth, subDays, subMonths, endOfMonth } from "date-fns"
+import {
+  differenceInCalendarDays,
+  endOfMonth,
+  format,
+  isSameYear,
+  parseISO,
+  startOfMonth,
+  subDays,
+  subMonths,
+} from "date-fns"
 
 import type { RangeParams } from "@/lib/api"
 
@@ -56,4 +65,42 @@ export function periodRange(p: Period, now = new Date()): RangeParams {
         tz: timeZone,
       }
   }
+}
+
+/**
+ * The period to compare r with: the same-length period right before it, or for
+ * "Last 12 months" the 12 calendar months before, so month buckets line up.
+ */
+export function previousRange(r: RangeParams, p?: Period): RangeParams {
+  const from = parseISO(r.from)
+  if (p === "12m") {
+    return {
+      from: day(subMonths(from, 12)),
+      to: day(subDays(from, 1)),
+      tz: r.tz,
+    }
+  }
+  const days = differenceInCalendarDays(parseISO(r.to), from) + 1
+  return {
+    from: day(subDays(from, days)),
+    to: day(subDays(from, 1)),
+    tz: r.tz,
+  }
+}
+
+/** "28 Oct – 3 Nov 2026", or "Tue 3 Nov 2026" for a single day. */
+export function formatRange(r: Pick<RangeParams, "from" | "to">): string {
+  const from = parseISO(r.from)
+  const to = parseISO(r.to)
+  if (r.from === r.to) return format(from, "EEE d MMM yyyy")
+  if (!isSameYear(from, to))
+    return `${format(from, "d MMM yyyy")} – ${format(to, "d MMM yyyy")}`
+  if (from.getMonth() === to.getMonth())
+    return `${format(from, "d")}–${format(to, "d MMM yyyy")}`
+  return `${format(from, "d MMM")} – ${format(to, "d MMM yyyy")}`
+}
+
+/** True when the range ends today, so its last bucket is still filling up. */
+export function endsToday(r: RangeParams, now = new Date()): boolean {
+  return r.to === day(now)
 }

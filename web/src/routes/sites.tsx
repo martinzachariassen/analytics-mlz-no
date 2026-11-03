@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "react-router"
-import { Globe } from "lucide-react"
+import { ArrowRight, Globe } from "lucide-react"
 
 import { AddSiteDialog } from "@/components/add-site-dialog"
 import {
@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { api, type Site } from "@/lib/api"
-import { formatNumber } from "@/lib/format"
+import { change, formatNumber, formatSignedPercent } from "@/lib/format"
 import { periodRange } from "@/lib/period"
 
 export function SitesPage() {
@@ -24,7 +24,7 @@ export function SitesPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Sites</h1>
           <p className="text-sm text-muted-foreground">
-            Visitors in the last 7 days
+            Your websites and how they are doing this week
           </p>
         </div>
         <AddSiteDialog />
@@ -69,25 +69,85 @@ function SiteCard({ site }: { site: Site }) {
     queryKey: ["stats", site.id, range],
     queryFn: () => api.stats(site.id, range),
   })
+  const delta = stats.data
+    ? change(stats.data.summary.visitors, stats.data.previous.visitors)
+    : null
 
   return (
     <Link to={`/sites/${site.id}`} className="group">
-      <Card className="h-full transition-colors group-hover:border-foreground/20">
+      <Card className="h-full transition-all group-hover:-translate-y-0.5 group-hover:shadow-md">
         <CardHeader>
-          <CardTitle className="truncate">{site.name}</CardTitle>
+          <CardTitle className="flex items-center justify-between gap-2">
+            <span className="truncate">{site.name}</span>
+            <ArrowRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+          </CardTitle>
           <CardDescription className="truncate">{site.domain}</CardDescription>
         </CardHeader>
-        <CardContent>
-          {stats.data ? (
-            <p className="text-3xl font-semibold tabular-nums">
-              {formatNumber(stats.data.summary.visitors)}
+        <CardContent className="flex items-end justify-between gap-4">
+          <div>
+            {stats.data ? (
+              <p className="text-3xl font-semibold tracking-tight tabular-nums">
+                {formatNumber(stats.data.summary.visitors)}
+              </p>
+            ) : (
+              <Skeleton className="h-9 w-16" />
+            )}
+            <p className="text-xs text-muted-foreground">
+              visitors, last 7 days
+              {delta !== null && Math.abs(delta) >= 0.005 && (
+                <span
+                  className={
+                    delta > 0
+                      ? "ml-1.5 font-medium text-emerald-700 dark:text-emerald-400"
+                      : "ml-1.5 font-medium text-rose-700 dark:text-rose-400"
+                  }
+                >
+                  {formatSignedPercent(delta)}
+                </span>
+              )}
             </p>
-          ) : (
-            <Skeleton className="h-9 w-16" />
+          </div>
+          {stats.data && (
+            <Sparkline values={stats.data.timeseries.map((b) => b.visitors)} />
           )}
-          <p className="text-xs text-muted-foreground">visitors</p>
         </CardContent>
       </Card>
     </Link>
+  )
+}
+
+/** A tiny trend line; no axes, the number beside it carries the meaning. */
+function Sparkline({ values }: { values: number[] }) {
+  const w = 96
+  const h = 36
+  if (values.length < 2) return null
+  const max = Math.max(...values, 1)
+  const pts = values.map(
+    (v, i) =>
+      [(i / (values.length - 1)) * w, h - 2 - (v / max) * (h - 4)] as const
+  )
+  const line = pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ")
+  return (
+    <svg
+      width={w}
+      height={h}
+      viewBox={`0 0 ${w} ${h}`}
+      className="shrink-0 overflow-visible text-chart-1"
+      aria-hidden
+    >
+      <polygon
+        points={`0,${h} ${line} ${w},${h}`}
+        fill="currentColor"
+        opacity={0.12}
+      />
+      <polyline
+        points={line}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </svg>
   )
 }

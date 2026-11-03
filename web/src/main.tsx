@@ -13,7 +13,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "@/components/ui/sonner"
 import { ApiError } from "@/lib/api"
 import { AppLayout } from "@/routes/app-layout"
-import { LoginPage } from "@/routes/login"
+import { HomePage } from "@/routes/home"
 import { SitesPage } from "@/routes/sites"
 
 // Charts (Recharts) are the bulk of the bundle; load them only when needed.
@@ -26,9 +26,15 @@ const SettingsPage = lazy(() =>
 
 const queryClient: QueryClient = new QueryClient({
   queryCache: new QueryCache({
-    // A 401 anywhere means the session ended: re-check who we are, which redirects to /login.
-    onError: (err) => {
-      if (err instanceof ApiError && err.status === 401) {
+    // A 401 anywhere means the session ended: re-check who we are, which redirects home.
+    // Not for the "me" query itself: re-checking it on its own 401 would loop forever,
+    // and the page would never leave its loading state.
+    onError: (err, query) => {
+      if (
+        err instanceof ApiError &&
+        err.status === 401 &&
+        query.queryKey[0] !== "me"
+      ) {
         void queryClient.invalidateQueries({ queryKey: ["me"] })
       }
     },
@@ -36,6 +42,9 @@ const queryClient: QueryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
+      // The API is same-origin (often localhost). Don't pause requests when the browser
+      // thinks it is offline (VPNs, extensions); just try, and show an error if it fails.
+      networkMode: "always",
       retry: (count, err) =>
         !(err instanceof ApiError && err.status < 500) && count < 2,
     },
@@ -43,14 +52,16 @@ const queryClient: QueryClient = new QueryClient({
 })
 
 const router = createBrowserRouter([
-  { path: "/login", element: <LoginPage /> },
+  // Public: what this is, and sign-in. Signed-in visitors go on to /sites.
+  { path: "/", element: <HomePage /> },
+  { path: "/login", element: <Navigate to="/" replace /> },
   {
     element: <AppLayout />,
     children: [
-      { path: "/", element: <SitesPage /> },
+      { path: "/sites", element: <SitesPage /> },
       { path: "/sites/:id", element: <DashboardPage /> },
       { path: "/sites/:id/settings", element: <SettingsPage /> },
-      { path: "*", element: <Navigate to="/" replace /> },
+      { path: "*", element: <Navigate to="/sites" replace /> },
     ],
   },
 ])

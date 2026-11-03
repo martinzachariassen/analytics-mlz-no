@@ -146,7 +146,7 @@ function DangerZone({ id, name }: { id: string; name: string }) {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["sites"] })
       toast.success(`Deleted ${name}`)
-      navigate("/")
+      navigate("/sites")
     },
     onError: (err) => toast.error(err.message),
   })

@@ -28,6 +28,7 @@ func (a *API) Register(mux *http.ServeMux, protect func(http.Handler) http.Handl
 		"DELETE /api/sites/{id}":        a.deleteSite,
 		"GET /api/sites/{id}/stats":     a.stats,
 		"GET /api/sites/{id}/breakdown": a.breakdown,
+		"GET /api/sites/{id}/heatmap":   a.heatmap,
 		"GET /api/sites/{id}/realtime":  a.realtime,
 	}
 	for pattern, h := range routes {

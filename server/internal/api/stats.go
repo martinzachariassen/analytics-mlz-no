@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/martinzachariassen/analytics-mlz-no/server/internal/httpx"
@@ -20,6 +21,8 @@ const (
 	maxDailyDays      = 400
 	realtimeWindow    = 5 * time.Minute
 	maxBreakdownLimit = 1000
+	maxFilters        = 10
+	realtimeMinutes   = 30
 )
 
 // period is a parsed date range in a time zone.
@@ -27,7 +30,7 @@ type period struct {
 	From     string // YYYY-MM-DD, inclusive
 	To       string // YYYY-MM-DD, inclusive
 	TZ       string
-	Interval string // hour | day | month
+	Interval string // hour | day | week | month
 	loc      *time.Location
 	start    time.Time
 	end      time.Time // exclusive: midnight after To
@@ -90,9 +93,9 @@ func parsePeriod(q url.Values, now time.Time) (period, error) {
 		if days > maxDailyDays {
 			return p, fmt.Errorf("daily interval supports at most %d days", maxDailyDays)
 		}
-	case "month":
+	case "week", "month":
 	default:
-		return p, errors.New("interval must be hour, day or month")
+		return p, errors.New("interval must be hour, day, week or month")
 	}
 	return p, nil
 }
@@ -108,6 +111,9 @@ func (p period) bounds() []time.Time {
 			t = t.Add(time.Hour)
 		case "day":
 			t = time.Date(t.Year(), t.Month(), t.Day()+1, 0, 0, 0, 0, p.loc)
+		case "week":
+			// Weeks start on Monday; the first bucket may be shorter.
+			t = time.Date(t.Year(), t.Month(), t.Day()+daysToMonday(t.Weekday()), 0, 0, 0, 0, p.loc)
 		default: // month
 			t = time.Date(t.Year(), t.Month()+1, 1, 0, 0, 0, 0, p.loc)
 		}
@@ -119,11 +125,91 @@ func (p period) bounds() []time.Time {
 	return out
 }
 
+// daysToMonday is the number of days from a weekday to the next Monday.
+func daysToMonday(d time.Weekday) int {
+	return (int(time.Monday)-int(d)+6)%7 + 1
+}
+
+// comparison returns the period to compare p with: "previous" is the
+// same-length period immediately before (whole calendar months shift by
+// months, so last month compares with the month before), "year" is the same
+// dates a year earlier.
+func (p period) comparison(mode string) period {
+	c := p
+	switch {
+	case mode == "year":
+		c.start, c.end = p.start.AddDate(-1, 0, 0), p.end.AddDate(-1, 0, 0)
+	case p.start.Day() == 1 && p.end.Day() == 1:
+		months := (p.end.Year()-p.start.Year())*12 + int(p.end.Month()-p.start.Month())
+		c.start, c.end = p.start.AddDate(0, -months, 0), p.start
+	default:
+		days := int(p.end.Sub(p.start).Hours()/24 + 0.5)
+		c.start, c.end = p.start.AddDate(0, 0, -days), p.start
+	}
+	c.From = c.start.Format(time.DateOnly)
+	c.To = c.end.AddDate(0, 0, -1).Format(time.DateOnly)
+	return c
+}
+
+// parseCompare reads the compare parameter: "", "previous" or "year".
+func parseCompare(q url.Values) (string, error) {
+	switch c := q.Get("compare"); c {
+	case "", "previous", "year":
+		return c, nil
+	default:
+		return "", errors.New("compare must be previous or year")
+	}
+}
+
+// parseFilters reads repeated f=dim:op:value parameters.
+func parseFilters(q url.Values) (store.Filters, error) {
+	var fs store.Filters
+	for _, raw := range q["f"] {
+		dim, rest, ok1 := strings.Cut(raw, ":")
+		op, value, ok2 := strings.Cut(rest, ":")
+		if !ok1 || !ok2 {
+			return nil, fmt.Errorf("filter %q must be dim:op:value", raw)
+		}
+		fs = append(fs, store.Filter{Dim: dim, Op: op, Value: value})
+	}
+	if len(fs) > maxFilters {
+		return nil, fmt.Errorf("at most %d filters", maxFilters)
+	}
+	return fs, fs.Validate()
+}
+
+// query is the common part of a stats request.
+type query struct {
+	period
+	filters store.Filters
+	compare string
+}
+
+func (a *API) parseQuery(w http.ResponseWriter, r *http.Request) (query, bool) {
+	q := r.URL.Query()
+	p, err := parsePeriod(q, a.now())
+	if err == nil {
+		var out query
+		out.period = p
+		if out.filters, err = parseFilters(q); err == nil {
+			if out.compare, err = parseCompare(q); err == nil {
+				return out, true
+			}
+		}
+	}
+	httpx.Error(w, http.StatusBadRequest, err.Error())
+	return query{}, false
+}
+
 type statsResponse struct {
 	Period     periodJSON     `json:"period"`
 	Summary    store.Summary  `json:"summary"`
-	Previous   store.Summary  `json:"previous"` // same-length period immediately before
+	Previous   store.Summary  `json:"previous"` // the comparison period (default: the one immediately before)
 	Timeseries []store.Bucket `json:"timeseries"`
+	// Set when compare is given: the comparison period's buckets, aligned by
+	// index with timeseries (cut or padded to the same length).
+	PreviousTimeseries []store.Bucket `json:"previous_timeseries,omitempty"`
+	Compare            *periodJSON    `json:"compare,omitempty"`
 }
 
 type periodJSON struct {
@@ -133,44 +219,59 @@ type periodJSON struct {
 	Interval string `json:"interval"`
 }
 
+func (p period) json() periodJSON {
+	return periodJSON{From: p.From, To: p.To, TZ: p.TZ, Interval: p.Interval}
+}
+
 func (a *API) stats(w http.ResponseWriter, r *http.Request) {
 	site, ok := a.site(w, r)
 	if !ok {
 		return
 	}
-	p, err := parsePeriod(r.URL.Query(), a.now())
-	if err != nil {
-		httpx.Error(w, http.StatusBadRequest, err.Error())
+	q, ok := a.parseQuery(w, r)
+	if !ok {
 		return
 	}
 	ctx := r.Context()
+	cmp := q.comparison(q.compare)
 
-	summary, err := a.Store.Summary(ctx, site.ID, p.rng())
+	summary, err := a.Store.Summary(ctx, site.ID, q.rng(), q.filters)
 	if err != nil {
 		a.internal(w, "summary", err)
 		return
 	}
-	length := p.end.Sub(p.start)
-	previous, err := a.Store.Summary(ctx, site.ID, store.Range{From: p.start.Add(-length), To: p.start})
+	previous, err := a.Store.Summary(ctx, site.ID, cmp.rng(), q.filters)
 	if err != nil {
 		a.internal(w, "previous summary", err)
 		return
 	}
-	series, err := a.Store.Timeseries(ctx, site.ID, p.bounds())
+	series, err := a.Store.Timeseries(ctx, site.ID, q.bounds(), q.filters)
 	if err != nil {
 		a.internal(w, "timeseries", err)
 		return
 	}
 	for i := range series {
-		series[i].Start = series[i].Start.In(p.loc)
+		series[i].Start = series[i].Start.In(q.loc)
 	}
+	resp := statsResponse{Period: q.json(), Summary: summary, Previous: previous, Timeseries: series}
 
-	httpx.WriteJSON(w, http.StatusOK, statsResponse{
-		Period:     periodJSON{From: p.From, To: p.To, TZ: p.TZ, Interval: p.Interval},
-		Summary:    summary,
-		Previous:   previous,
-		Timeseries: series,
-	})
+	if q.compare != "" {
+		prev, err := a.Store.Timeseries(ctx, site.ID, cmp.bounds(), q.filters)
+		if err != nil {
+			a.internal(w, "previous timeseries", err)
+			return
+		}
+		aligned := make([]store.Bucket, len(series))
+		for i := range aligned {
+			if i < len(prev) {
+				aligned[i] = prev[i]
+				aligned[i].Start = prev[i].Start.In(q.loc)
+			}
+		}
+		pj := cmp.json()
+		resp.PreviousTimeseries, resp.Compare = aligned, &pj
+	}
+	httpx.WriteJSON(w, http.StatusOK, resp)
 }
 
 func (a *API) breakdown(w http.ResponseWriter, r *http.Request) {
@@ -178,18 +279,17 @@ func (a *API) breakdown(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	q := r.URL.Query()
-	p, err := parsePeriod(q, a.now())
-	if err != nil {
-		httpx.Error(w, http.StatusBadRequest, err.Error())
+	q, ok := a.parseQuery(w, r)
+	if !ok {
 		return
 	}
-	dim := q.Get("dim")
+	v := r.URL.Query()
+	dim := v.Get("dim")
 	if !slices.Contains(store.Dimensions, dim) {
 		httpx.Error(w, http.StatusBadRequest, "unknown dim")
 		return
 	}
-	opt := store.BreakdownOptions{Event: q.Get("event"), PropKey: q.Get("key"), Limit: 10}
+	opt := store.BreakdownOptions{Event: v.Get("event"), PropKey: v.Get("key"), Limit: 10, Filters: q.filters}
 	if dim == "prop" && (opt.Event == "" || opt.PropKey == "") {
 		httpx.Error(w, http.StatusBadRequest, "dim=prop requires event and key")
 		return
@@ -198,7 +298,7 @@ func (a *API) breakdown(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "dim=prop_key requires event")
 		return
 	}
-	if l := q.Get("limit"); l != "" {
+	if l := v.Get("limit"); l != "" {
 		n, err := strconv.Atoi(l)
 		if err != nil || n < 1 || n > maxBreakdownLimit {
 			httpx.Error(w, http.StatusBadRequest, fmt.Sprintf("limit must be 1-%d", maxBreakdownLimit))
@@ -206,13 +306,91 @@ func (a *API) breakdown(w http.ResponseWriter, r *http.Request) {
 		}
 		opt.Limit = n
 	}
+	full := v.Get("metrics") == "full"
+	if m := v.Get("metrics"); m != "" && !full {
+		httpx.Error(w, http.StatusBadRequest, "metrics must be full")
+		return
+	}
 
-	rows, err := a.Store.Breakdown(r.Context(), site.ID, p.rng(), dim, opt)
+	ctx := r.Context()
+	rows, err := a.Store.Breakdown(ctx, site.ID, q.rng(), dim, opt)
 	if err != nil {
 		a.internal(w, "breakdown", err)
 		return
 	}
+	if full {
+		if err := a.Store.VisitMetrics(ctx, site.ID, q.rng(), dim, q.filters, rows); err != nil {
+			a.internal(w, "visit metrics", err)
+			return
+		}
+	}
+	if q.compare != "" && len(rows) > 0 {
+		popt := opt
+		popt.Limit = len(rows)
+		for _, row := range rows {
+			popt.Values = append(popt.Values, row.Value)
+		}
+		prev, err := a.Store.Breakdown(ctx, site.ID, q.comparison(q.compare).rng(), dim, popt)
+		if err != nil {
+			a.internal(w, "previous breakdown", err)
+			return
+		}
+		byValue := make(map[string]int64, len(prev))
+		for _, p := range prev {
+			byValue[p.Value] = p.Visitors
+		}
+		for i := range rows {
+			n := byValue[rows[i].Value]
+			rows[i].PreviousVisitors = &n
+		}
+	}
 	httpx.WriteJSON(w, http.StatusOK, rows)
+}
+
+type heatmapResponse struct {
+	// Visitors and Pageviews are indexed [weekday][hour], Monday first, in
+	// the period's time zone. Visitors are distinct per hour, summed.
+	Visitors  [7][24]int64 `json:"visitors"`
+	Pageviews [7][24]int64 `json:"pageviews"`
+}
+
+func (a *API) heatmap(w http.ResponseWriter, r *http.Request) {
+	site, ok := a.site(w, r)
+	if !ok {
+		return
+	}
+	q, ok := a.parseQuery(w, r)
+	if !ok {
+		return
+	}
+	counts, err := a.Store.Histogram(r.Context(), site.ID, q.rng(), q.filters, time.Hour)
+	if err != nil {
+		a.internal(w, "heatmap", err)
+		return
+	}
+	var out heatmapResponse
+	for _, c := range counts {
+		t := c.Start.In(q.loc)
+		d := (int(t.Weekday()) + 6) % 7
+		out.Visitors[d][t.Hour()] += c.Visitors
+		out.Pageviews[d][t.Hour()] += c.Pageviews
+	}
+	httpx.WriteJSON(w, http.StatusOK, out)
+}
+
+type realtimeResponse struct {
+	Visitors int64 `json:"visitors"` // last 5 minutes
+	// One entry per minute for the last 30 minutes, oldest first.
+	Minutes   []minuteJSON         `json:"minutes"`
+	Pages     []store.BreakdownRow `json:"pages"`
+	Referrers []store.BreakdownRow `json:"referrers"`
+	Countries []store.BreakdownRow `json:"countries"`
+}
+
+type minuteJSON struct {
+	T         time.Time `json:"t"`
+	Visitors  int64     `json:"visitors"`
+	Pageviews int64     `json:"pageviews"`
 }
 
 func (a *API) realtime(w http.ResponseWriter, r *http.Request) {
@@ -220,10 +398,43 @@ func (a *API) realtime(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	n, err := a.Store.CurrentVisitors(r.Context(), site.ID, a.now().Add(-realtimeWindow))
+	ctx := r.Context()
+	now := a.now()
+	n, err := a.Store.CurrentVisitors(ctx, site.ID, now.Add(-realtimeWindow))
 	if err != nil {
 		a.internal(w, "realtime", err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]int64{"visitors": n})
+	out := realtimeResponse{Visitors: n}
+	if r.URL.Query().Get("detail") == "" {
+		httpx.WriteJSON(w, http.StatusOK, out)
+		return
+	}
+
+	end := now.Truncate(time.Minute).Add(time.Minute)
+	rng := store.Range{From: end.Add(-realtimeMinutes * time.Minute), To: end}
+	counts, err := a.Store.Histogram(ctx, site.ID, rng, nil, time.Minute)
+	if err != nil {
+		a.internal(w, "realtime minutes", err)
+		return
+	}
+	out.Minutes = make([]minuteJSON, realtimeMinutes)
+	for i := range out.Minutes {
+		out.Minutes[i].T = rng.From.Add(time.Duration(i) * time.Minute).UTC()
+	}
+	for _, c := range counts {
+		i := int(c.Start.Sub(rng.From) / time.Minute)
+		if i >= 0 && i < realtimeMinutes {
+			out.Minutes[i].Visitors, out.Minutes[i].Pageviews = c.Visitors, c.Pageviews
+		}
+	}
+	for dim, dst := range map[string]*[]store.BreakdownRow{"path": &out.Pages, "referrer": &out.Referrers, "country": &out.Countries} {
+		rows, err := a.Store.Breakdown(ctx, site.ID, rng, dim, store.BreakdownOptions{Limit: 10})
+		if err != nil {
+			a.internal(w, "realtime "+dim, err)
+			return
+		}
+		*dst = rows
+	}
+	httpx.WriteJSON(w, http.StatusOK, out)
 }

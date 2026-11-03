@@ -36,7 +36,7 @@ func TestSeed(t *testing.T) {
 	}
 
 	// Some visitors come back the same day, so there are more visits than visitors.
-	sum, err := st.Summary(ctx, site.ID, store.Range{From: now.AddDate(0, 0, -7), To: now})
+	sum, err := st.Summary(ctx, site.ID, store.Range{From: now.AddDate(0, 0, -7), To: now}, nil)
 	if err != nil || sum.Visitors >= sum.Visits {
 		t.Fatalf("Summary = %+v, %v; want fewer visitors than visits", sum, err)
 	}

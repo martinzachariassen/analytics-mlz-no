@@ -1,22 +1,11 @@
 import type { ReactNode } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Link, Navigate, useSearchParams } from "react-router"
-import {
-  Activity,
-  ArrowRight,
-  ChartNoAxesColumn,
-  CircleAlert,
-  Cookie,
-  EyeOff,
-  Feather,
-  FlaskConical,
-  MousePointerClick,
-  Route,
-  Server,
-} from "lucide-react"
+import { ArrowRight, CircleAlert } from "lucide-react"
+
+import { Wordmark } from "@/components/brand-mark"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { api } from "@/lib/api"
@@ -33,32 +22,26 @@ const AUTH_ERRORS: Record<string, string> = {
 
 const FEATURES = [
   {
-    icon: Cookie,
     title: "No cookies, no banner",
     text: "Visitors are counted anonymously with a daily rotating hash, so there is nothing to consent to.",
   },
   {
-    icon: EyeOff,
     title: "No personal data",
     text: "IP addresses and user agents are never stored. Only coarse country, browser and device.",
   },
   {
-    icon: Activity,
     title: "Realtime",
     text: "See who is on your site right now, and how today compares with yesterday.",
   },
   {
-    icon: MousePointerClick,
     title: "Goals and events",
     text: "Track sign-ups, downloads and outbound links with one HTML attribute.",
   },
   {
-    icon: Route,
     title: "Works with SPAs",
     text: "Page changes in React, Vue and other single-page apps are picked up automatically.",
   },
   {
-    icon: Feather,
     title: "Tiny script",
     text: "About 1 KB gzipped. It won't slow your site down.",
   },
@@ -145,141 +128,157 @@ export function HomePage() {
         )}
       </div>
       {dev && (
-        <p className="text-xs text-muted-foreground">
+        <p className="max-w-[52ch] text-xs leading-relaxed text-fg-muted">
           No account or password needed: you will be signed in as{" "}
           <span className="font-medium">dev</span>. This only works when the
           server runs with{" "}
-          <code className="rounded bg-muted px-1 py-0.5">DEV_LOGIN=1</code> on
-          localhost.
+          <code className="rounded-sm bg-accent px-1 py-0.5 font-mono">
+            DEV_LOGIN=1
+          </code>{" "}
+          on localhost.
         </p>
       )}
     </div>
   )
 
   return (
-    <div className="min-h-svh bg-background">
-      <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <Brand />
-          <div className="flex items-center gap-3">
-            {dev && (
-              <Badge
-                variant="outline"
-                className="border-amber-500/40 bg-amber-500/10 text-amber-700 max-sm:hidden dark:text-amber-400"
-              >
-                <FlaskConical />
-                Local development
-              </Badge>
-            )}
-            {(dev || github) && (
-              <Button asChild size="sm" variant="outline">
-                <a
-                  href={dev ? "/api/auth/dev/login" : "/api/auth/github/login"}
-                >
-                  Sign in
-                </a>
-              </Button>
-            )}
-          </div>
+    <div className="flex min-h-svh flex-col bg-background">
+      <header className="mx-auto flex w-full max-w-[1200px] items-center justify-between px-4 pt-7 pb-4 sm:px-8">
+        <Link to="/" aria-label="Home">
+          <Wordmark />
+        </Link>
+        <div className="flex items-center gap-3">
+          {dev && (
+            <span className="eyebrow max-sm:hidden">Local development</span>
+          )}
+          {(dev || github) && (
+            <Button asChild size="sm" variant="outline">
+              <a href={dev ? "/api/auth/dev/login" : "/api/auth/github/login"}>
+                Sign in
+              </a>
+            </Button>
+          )}
         </div>
       </header>
 
-      <main>
-        <section className="relative overflow-hidden border-b">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(50rem_30rem_at_80%_-10%,color-mix(in_oklab,var(--chart-1)_18%,transparent),transparent_70%)]"
-          />
-          <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:py-24">
-            <div className="flex flex-col gap-6">
-              <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-                Simple, honest numbers about your websites.
-              </h1>
-              <p className="max-w-lg text-lg text-muted-foreground">
-                See how many people visit, where they come from and what they
-                read, without cookies and without tracking anyone. Self-hosted,
-                so the data stays yours.
-              </p>
+      <main className="flex-1">
+        <section className="mx-auto grid max-w-[1200px] items-center gap-14 px-4 pt-14 pb-20 sm:px-8 lg:grid-cols-[1.1fr_1fr] lg:pt-24 lg:pb-28">
+          <div className="flex flex-col gap-7">
+            <p className="eyebrow rise">
+              Cookie-free <span className="text-accent-deep">/</span>{" "}
+              self-hosted <span className="text-accent-deep">/</span> open
+              source
+            </p>
+            <h1
+              className="display rise text-[52px] text-balance sm:text-[76px] lg:text-[88px]"
+              style={{ "--i": 1 } as React.CSSProperties}
+            >
+              Honest numbers,{" "}
+              <span className="text-accent-deep italic">nothing</span> more.
+            </h1>
+            <p
+              className="rise max-w-[46ch] text-[17px] leading-relaxed text-fg-secondary"
+              style={{ "--i": 2 } as React.CSSProperties}
+            >
+              See how many people visit, where they come from and what they
+              read, without cookies and without tracking anyone. Self-hosted, so
+              the data stays yours.
+            </p>
+            <div className="rise" style={{ "--i": 3 } as React.CSSProperties}>
               {signIn}
             </div>
+          </div>
+          <div className="rise" style={{ "--i": 4 } as React.CSSProperties}>
             <DashboardPreview />
           </div>
         </section>
 
-        <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-          <SectionTitle
-            title="Everything you need, nothing you don't"
-            text="The numbers that matter for a website, on one page that is easy to read."
-          />
-          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map(({ icon: Icon, title, text }) => (
-              <div key={title} className="flex gap-4">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-chart-1/10 text-chart-1">
-                  <Icon className="size-5" />
-                </span>
-                <div>
-                  <h3 className="font-medium">{title}</h3>
-                  <p className="text-sm text-muted-foreground">{text}</p>
-                </div>
-              </div>
-            ))}
+        <section className="border-t">
+          <div className="mx-auto grid max-w-[1200px] gap-10 px-4 py-20 sm:px-8 lg:grid-cols-[1fr_2fr]">
+            <SectionTitle
+              eyebrow="What you get"
+              title="Everything you need, nothing you don't"
+            />
+            <ol className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2">
+              {FEATURES.map(({ title, text }, i) => (
+                <li
+                  key={title}
+                  className="flex flex-col gap-2 bg-background p-6"
+                >
+                  <span className="eyebrow text-accent-deep">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <h3 className="display text-[26px]">{title}</h3>
+                  <p className="text-sm leading-relaxed text-fg-secondary">
+                    {text}
+                  </p>
+                </li>
+              ))}
+            </ol>
           </div>
         </section>
 
-        <section className="border-y bg-muted/40">
-          <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-2">
-            <div className="flex flex-col gap-8">
-              <SectionTitle
-                title="Up and running in a minute"
-                text="One script tag. No cookie banner, no configuration."
-              />
-              <ol className="flex flex-col gap-5">
-                {STEPS.map((s, i) => (
-                  <li key={s.title} className="flex gap-4">
-                    <span className="flex size-7 shrink-0 items-center justify-center rounded-full border bg-card text-sm font-medium">
+        <section className="border-t">
+          <div className="mx-auto grid max-w-[1200px] gap-10 px-4 py-20 sm:px-8 lg:grid-cols-[1fr_2fr]">
+            <SectionTitle eyebrow="Setup" title="Up and running in a minute" />
+            <div className="grid gap-10 md:grid-cols-2">
+              <ol className="flex flex-col">
+                {STEPS.map((st, i) => (
+                  <li
+                    key={st.title}
+                    className="flex gap-5 border-b py-5 first:pt-0 last:border-0"
+                  >
+                    <span className="display text-[36px] text-accent-deep">
                       {i + 1}
                     </span>
-                    <div>
-                      <h3 className="font-medium">{s.title}</h3>
-                      <p className="text-sm text-muted-foreground">{s.text}</p>
+                    <div className="flex flex-col gap-1">
+                      <h3 className="font-medium">{st.title}</h3>
+                      <p className="text-sm text-fg-secondary">{st.text}</p>
                     </div>
                   </li>
                 ))}
               </ol>
-            </div>
-            <div className="flex flex-col justify-center gap-3">
-              <Code>
-                <span className="text-zinc-500">{"<!-- in <head> -->"}</span>
-                {"\n"}
-                {'<script defer src="https://t.example.com/api/script.js"'}
-                {"\n"}
-                {'        data-site="SITE_ID"></script>'}
-              </Code>
-              <Code>
-                <span className="text-zinc-500">{"<!-- a goal -->"}</span>
-                {"\n"}
-                {'<button data-track="signup">Sign up</button>'}
-              </Code>
+              <div className="flex flex-col justify-center gap-3">
+                <Code>
+                  <span className="opacity-55">{"<!-- in <head> -->"}</span>
+                  {"\n"}
+                  {'<script defer src="https://t.example.com/api/script.js"'}
+                  {"\n"}
+                  {'        data-site="SITE_ID"></script>'}
+                </Code>
+                <Code>
+                  <span className="opacity-55">{"<!-- a goal -->"}</span>
+                  {"\n"}
+                  {'<button data-track="signup">Sign up</button>'}
+                </Code>
+              </div>
             </div>
           </div>
         </section>
 
-        <section className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-4 py-16 text-center sm:px-6">
-          <Server className="size-8 text-chart-1" />
-          <h2 className="text-2xl font-semibold tracking-tight">
-            Your data, your server
-          </h2>
-          <p className="max-w-xl text-muted-foreground">
-            One small Go binary and a SQLite file, backed up continuously. It
-            runs for close to nothing on Cloud Run, a VPS or a Raspberry Pi, and
-            nothing is shared with third parties.
-          </p>
+        <section className="border-t">
+          <div className="mx-auto flex max-w-[1200px] flex-col items-start gap-5 px-4 py-20 sm:px-8">
+            <p className="eyebrow">Your data, your server</p>
+            <p className="display max-w-[22ch] text-[36px] text-balance sm:text-[48px]">
+              One small Go binary and a SQLite file.{" "}
+              <span className="text-fg-muted italic">
+                Nothing shared with anyone.
+              </span>
+            </p>
+            <p className="max-w-[56ch] text-fg-secondary">
+              Backed up continuously. It runs for close to nothing on Cloud Run,
+              a VPS or a Raspberry Pi.
+            </p>
+          </div>
         </section>
       </main>
 
       <footer className="border-t">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-6 text-xs text-muted-foreground sm:px-6">
-          <span>Self-hosted analytics · open source</span>
+        <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-2 px-4 py-6 text-[11px] text-fg-muted sm:px-8">
+          <span>
+            mlz<span className="text-accent-deep">.</span> analytics —
+            self-hosted, open source
+          </span>
           <span>IP geolocation by DB-IP (CC BY 4.0)</span>
         </div>
       </footer>
@@ -287,18 +286,20 @@ export function HomePage() {
   )
 }
 
-function SectionTitle({ title, text }: { title: string; text: string }) {
+function SectionTitle({ eyebrow, title }: { eyebrow: string; title: string }) {
   return (
-    <div className="flex flex-col gap-2">
-      <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
-      <p className="text-muted-foreground">{text}</p>
+    <div className="flex flex-col gap-3">
+      <p className="eyebrow">{eyebrow}</p>
+      <h2 className="display max-w-[14ch] text-[40px] text-balance sm:text-[48px]">
+        {title}
+      </h2>
     </div>
   )
 }
 
 function Code({ children }: { children: ReactNode }) {
   return (
-    <pre className="overflow-x-auto rounded-xl bg-zinc-950 p-4 text-sm leading-relaxed text-zinc-100 ring-1 ring-white/10">
+    <pre className="overflow-x-auto rounded-lg bg-fg p-4 font-mono text-xs leading-relaxed text-bg">
       <code>{children}</code>
     </pre>
   )
@@ -307,90 +308,93 @@ function Code({ children }: { children: ReactNode }) {
 /** A static picture of the dashboard, so visitors know what they will get. Not real data. */
 function DashboardPreview() {
   const values = [42, 48, 45, 60, 55, 50, 64, 70, 66, 61, 75, 82, 78, 90]
+  const prev = [38, 40, 44, 41, 47, 45, 50, 52, 49, 55, 54, 58, 60, 62]
   const w = 400
   const h = 120
-  const max = 100
-  const pts = values
-    .map(
-      (v, i) =>
-        `${((i / (values.length - 1)) * w).toFixed(1)},${(h - (v / max) * h).toFixed(1)}`
-    )
-    .join(" ")
+  const toPts = (vs: number[]) =>
+    vs
+      .map(
+        (v, i) =>
+          `${((i / (vs.length - 1)) * w).toFixed(1)},${(h - (v / 100) * h).toFixed(1)}`
+      )
+      .join(" ")
+  const pts = toPts(values)
   return (
     <div
       aria-hidden
-      className="pointer-events-none rounded-2xl border bg-card p-5 shadow-xl shadow-chart-1/5 select-none"
+      className="pointer-events-none overflow-hidden rounded-lg border-[1.5px] border-fg bg-surface shadow-[8px_8px_0_0_var(--accent-deep)] select-none"
     >
-      <div className="flex items-center justify-between">
-        <span className="font-semibold">example.com</span>
-        <span className="flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs">
-          <span className="size-1.5 rounded-full bg-emerald-500" />
-          12 online now
+      <div className="flex items-center justify-between border-b px-5 py-4">
+        <span className="display text-[26px]">example.com</span>
+        <span className="eyebrow flex items-center gap-2 text-fg">
+          <span className="size-1.5 rounded-full bg-accent-deep" />
+          12 online
         </span>
       </div>
-      <div className="mt-4 grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 border-b">
         {[
-          ["Visitors", "2,481", "+18%"],
-          ["Page views", "6,904", "+12%"],
-          ["Bounce rate", "41%", "−4%"],
-        ].map(([label, value, delta]) => (
-          <div key={label} className="rounded-lg border p-3">
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="text-lg font-semibold tabular-nums">{value}</p>
-            <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
-              {delta}
-            </p>
+          ["Visitors", "2,481", "▲ +18%"],
+          ["Page views", "6,904", "▲ +12%"],
+          ["Bounce", "41%", "▼ −4%"],
+        ].map(([label, value, delta], i) => (
+          <div
+            key={label}
+            className={"flex flex-col gap-2 p-4 " + (i < 2 ? "border-r" : "")}
+          >
+            <span className="eyebrow">{label}</span>
+            <span className="figure text-[26px]">{value}</span>
+            <span className="text-[11px] text-accent-deep">{delta}</span>
           </div>
         ))}
       </div>
-      <svg
-        viewBox={`0 0 ${w} ${h}`}
-        className="mt-4 h-28 w-full text-chart-1"
-        preserveAspectRatio="none"
-      >
-        <polygon
-          points={`0,${h} ${pts} ${w},${h}`}
-          fill="currentColor"
-          opacity={0.12}
-        />
-        <polyline
-          points={pts}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          vectorEffect="non-scaling-stroke"
-        />
-      </svg>
-      <div className="mt-4 flex flex-col gap-1.5 text-sm">
+      <div className="px-5 pt-5">
+        <svg
+          viewBox={`0 0 ${w} ${h}`}
+          className="h-28 w-full"
+          preserveAspectRatio="none"
+        >
+          <polygon
+            points={`0,${h} ${pts} ${w},${h}`}
+            fill="var(--accent)"
+            opacity={0.16}
+          />
+          <polyline
+            points={toPts(prev)}
+            fill="none"
+            stroke="var(--fg-muted)"
+            strokeWidth={1.5}
+            strokeDasharray="4 4"
+            vectorEffect="non-scaling-stroke"
+          />
+          <polyline
+            points={pts}
+            fill="none"
+            stroke="var(--accent-deep)"
+            strokeWidth={2}
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+      </div>
+      <div className="flex flex-col p-5 text-[13px]">
         {[
-          ["google.com", 82],
-          ["news.ycombinator.com", 54],
-          ["github.com", 31],
-        ].map(([name, pct]) => (
-          <div key={name} className="relative flex h-7 items-center px-2">
-            <span
-              className="absolute inset-y-0 left-0 rounded-md bg-chart-1/14"
-              style={{ width: `${pct}%` }}
-            />
-            <span className="relative">{name}</span>
+          ["google.com", 82, "1,204"],
+          ["news.ycombinator.com", 54, "788"],
+          ["github.com", 31, "452"],
+        ].map(([name, pct, n], i) => (
+          <div key={name} className="flex h-8 items-center gap-2">
+            <span className="w-6 text-[11px] text-fg-muted">0{i + 1}</span>
+            <span className="relative flex h-full flex-1 items-center">
+              <span
+                className="absolute inset-y-1 left-0 rounded-r-sm border-l-2 border-accent-deep bg-violet/15"
+                style={{ width: `${pct}%` }}
+              />
+              <span className="relative px-2">{name}</span>
+            </span>
+            <span className="tnum w-12 text-right">{n}</span>
           </div>
         ))}
       </div>
-      <p className="mt-3 text-center text-[11px] text-muted-foreground">
-        Example data
-      </p>
     </div>
-  )
-}
-
-function Brand() {
-  return (
-    <Link to="/" className="flex items-center gap-2 font-semibold">
-      <span className="flex size-7 items-center justify-center rounded-md bg-chart-1 text-white">
-        <ChartNoAxesColumn className="size-4" />
-      </span>
-      analytics
-    </Link>
   )
 }
 

@@ -1,13 +1,9 @@
 import { Suspense } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link, Navigate, Outlet, useLocation } from "react-router"
-import {
-  ChartNoAxesColumn,
-  FlaskConical,
-  LogOut,
-  Moon,
-  Sun,
-} from "lucide-react"
+import { LogOut, Moon, Sun } from "lucide-react"
+
+import { Wordmark } from "@/components/brand-mark"
 
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -30,8 +26,8 @@ export function AppLayout() {
 
   if (me.isPending) {
     return (
-      <div className="mx-auto max-w-6xl p-6">
-        <Skeleton className="h-8 w-48" />
+      <div className="mx-auto max-w-[1200px] px-4 py-6 sm:px-8">
+        <Skeleton className="h-6 w-32" />
       </div>
     )
   }
@@ -50,29 +46,61 @@ export function AppLayout() {
   const dev = me.data.provider === "dev"
   return (
     <div className="min-h-svh bg-background">
-      <header className="sticky top-0 z-30 border-b bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        {dev && (
-          <div className="flex items-center justify-center gap-1.5 bg-amber-500/10 px-4 py-1 text-xs text-amber-800 dark:text-amber-300">
-            <FlaskConical className="size-3.5" />
-            Local development · demo data, automatic sign-in
+      {dev && (
+        <div className="eyebrow border-b py-1.5 text-center text-[10px]">
+          Local development <span className="text-accent-deep">/</span> demo
+          data, automatic sign-in
+        </div>
+      )}
+      <header className="sticky top-0 z-30 border-b bg-background/85 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-[1200px] items-center justify-between gap-4 px-4 sm:px-8">
+          <div className="flex items-center gap-6">
+            <Link to="/sites" aria-label="All sites" className="group">
+              <Wordmark />
+            </Link>
+            <nav className="flex items-center gap-4">
+              <NavLink to="/sites" active={location.pathname === "/sites"}>
+                Sites
+              </NavLink>
+            </nav>
           </div>
-        )}
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <Link to="/sites" className="flex items-center gap-2 font-semibold">
-            <span className="flex size-7 items-center justify-center rounded-md bg-chart-1 text-white">
-              <ChartNoAxesColumn className="size-4" />
-            </span>
-            analytics
-          </Link>
           <UserMenu user={me.data} />
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      <main className="mx-auto max-w-[1200px] px-4 py-8 sm:px-8 sm:py-10">
         <Suspense fallback={<Skeleton className="h-96" />}>
           <Outlet />
         </Suspense>
       </main>
+      <footer className="mx-auto flex max-w-[1200px] flex-wrap justify-between gap-2 px-4 pt-4 pb-10 text-[11px] text-fg-muted sm:px-8">
+        <span>Cookie-free. No IPs or user agents stored.</span>
+        <span>
+          Press <kbd className="text-fg-secondary">D</kbd> to switch theme
+        </span>
+      </footer>
     </div>
+  )
+}
+
+function NavLink({
+  to,
+  active,
+  children,
+}: {
+  to: string
+  active: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <Link
+      to={to}
+      className={
+        "eyebrow tracking-[0.14em] transition-colors hover:text-fg " +
+        (active ? "text-fg" : "")
+      }
+    >
+      {children}
+    </Link>
   )
 }
 
@@ -94,8 +122,8 @@ function UserMenu({ user }: { user: User }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="gap-2">
-          <Avatar className="size-6">
+        <Button variant="ghost" size="sm" className="gap-2 px-1.5">
+          <Avatar className="size-6 rounded-sm after:rounded-sm">
             {/* GitHub avatars are public; only loaded for the signed-in admin. */}
             {github && (
               <AvatarImage
@@ -103,11 +131,11 @@ function UserMenu({ user }: { user: User }) {
                 alt=""
               />
             )}
-            <AvatarFallback className="text-[10px]">
+            <AvatarFallback className="rounded-sm text-[10px]">
               {user.login.slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          <span className="hidden sm:inline">{user.login}</span>
+          <span className="hidden text-xs sm:inline">{user.login}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

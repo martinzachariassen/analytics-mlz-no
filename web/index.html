@@ -2,10 +2,25 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Analytics</title>
+    <title>mlz. analytics</title>
     <meta name="robots" content="noindex" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="theme-color" content="#ebeff2" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#151619" media="(prefers-color-scheme: dark)" />
+    <script>
+      // Set the theme before first paint, so dark mode never flashes light.
+      // Same logic as mlz.no's theme-init.js; ThemeProvider takes over after.
+      ;(function () {
+        var t = null
+        try {
+          t = localStorage.getItem("theme")
+        } catch (e) {}
+        if (t !== "light" && t !== "dark")
+          t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+        document.documentElement.setAttribute("data-theme", t)
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

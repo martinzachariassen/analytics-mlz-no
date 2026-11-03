@@ -10,7 +10,7 @@ Self-hostable, cookie-free web analytics. Plan and all architectural decisions: 
 - `server/internal/devdata` — synthetic traffic for `analytics seed`; `dev/demo/` — demo site for `make dev`
 - `deploy/` — Dockerfile, docker-compose, Litestream config, entrypoint
 - `tracker/` — TypeScript tracking script (`src/core.ts` logic, `src/index.ts` entry). Built with esbuild into `server/internal/tracker/script.js`, which is committed and embedded in the Go binary. Run `make tracker` after changes; CI fails if it's stale.
-- `web/` — dashboard: React 19 + Vite + Tailwind v4 + shadcn/ui (radix-nova), TanStack Query, React Router. `src/lib/api.ts` is the typed API client; `src/routes/` pages; `src/components/ui/` is shadcn-generated (add with `npx shadcn@latest add <name>`, avoid hand-editing). Dev server proxies `/api` to :8080, same as Firebase Hosting in production.
+- `web/` — dashboard: React 19 + Vite + Tailwind v4 + shadcn/ui (radix-nova), TanStack Query, React Router. `src/lib/api.ts` is the typed API client; `src/routes/` pages; `src/components/ui/` is shadcn-generated (add with `npx shadcn@latest add <name>`, avoid hand-editing). Dev server proxies `/api` to :8080, same as Firebase Hosting in production. Look: mlz brand colours (`src/styles/mlz-brand.css`, vendored from mlz.no, see its header) mapped onto shadcn tokens in `src/index.css`; type is Instrument Sans (UI, numbers), Instrument Serif (headlines), Geist Mono (labels); shadcn components are restyled from `index.css` via `data-slot`, not by editing them. App primitives: `panel.tsx`, `delta.tsx`, `segmented.tsx`, `brand-mark.tsx`.
 - `infra/` — coming in milestone 5
 
 ## Commands

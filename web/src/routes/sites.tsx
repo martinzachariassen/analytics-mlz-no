@@ -1,124 +1,120 @@
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "react-router"
-import { ArrowRight, Globe } from "lucide-react"
 
 import { AddSiteDialog } from "@/components/add-site-dialog"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Delta } from "@/components/delta"
 import { Skeleton } from "@/components/ui/skeleton"
 import { api, type Site } from "@/lib/api"
-import { change, formatNumber, formatSignedPercent } from "@/lib/format"
+import { formatNumber } from "@/lib/format"
 import { periodRange } from "@/lib/period"
 
 export function SitesPage() {
   const sites = useQuery({ queryKey: ["sites"], queryFn: api.sites })
+  const count = sites.data?.length
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Sites</h1>
-          <p className="text-sm text-muted-foreground">
-            Your websites and how they are doing this week
+    <div className="flex flex-col gap-8">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-col gap-3">
+          <p className="eyebrow">
+            {count === undefined
+              ? " "
+              : `${count} ${count === 1 ? "site" : "sites"}`}{" "}
+            <span className="text-accent-deep">/</span> last 7 days
           </p>
+          <h1 className="display text-[44px] sm:text-[60px]">Sites</h1>
         </div>
         <AddSiteDialog />
-      </div>
+      </header>
 
       {sites.isPending && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="flex flex-col gap-px overflow-hidden rounded-lg border bg-border">
           {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-32" />
+            <div key={i} className="bg-surface p-5">
+              <Skeleton className="h-10" />
+            </div>
           ))}
         </div>
       )}
       {sites.isError && (
-        <p className="text-destructive">{sites.error.message}</p>
+        <p className="text-sm text-destructive">{sites.error.message}</p>
       )}
-      {sites.data?.length === 0 && (
-        <Card className="items-center py-12 text-center">
-          <Globe className="size-10 text-muted-foreground" />
-          <CardHeader className="w-full">
-            <CardTitle>No sites yet</CardTitle>
-            <CardDescription>
-              Add your first website to get a tracking snippet.
-            </CardDescription>
-          </CardHeader>
+      {count === 0 && (
+        <div className="flex flex-col items-start gap-4 rounded-lg border border-dashed px-6 py-14 sm:px-10">
+          <p className="display text-4xl">No sites yet</p>
+          <p className="max-w-[48ch] text-fg-secondary">
+            Add your first website to get a tracking snippet. Numbers show up
+            within seconds of the first visit.
+          </p>
           <AddSiteDialog />
-        </Card>
+        </div>
       )}
       {sites.data && sites.data.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {sites.data.map((s) => (
-            <SiteCard key={s.id} site={s} />
-          ))}
+        <div className="flex flex-col">
+          <div className="eyebrow hidden grid-cols-[1fr_10rem_7rem_5rem] gap-6 px-5 pb-2 text-[10px] sm:grid">
+            <span>Site</span>
+            <span>Trend</span>
+            <span className="text-right">Visitors</span>
+            <span className="text-right">Change</span>
+          </div>
+          <ul className="flex flex-col gap-3">
+            {sites.data.map((s, i) => (
+              <SiteRow key={s.id} site={s} index={i} />
+            ))}
+          </ul>
         </div>
       )}
     </div>
   )
 }
 
-function SiteCard({ site }: { site: Site }) {
+function SiteRow({ site, index }: { site: Site; index: number }) {
   const range = periodRange("7d")
   const stats = useQuery({
     queryKey: ["stats", site.id, range],
     queryFn: () => api.stats(site.id, range),
   })
-  const delta = stats.data
-    ? change(stats.data.summary.visitors, stats.data.previous.visitors)
-    : null
 
   return (
-    <Link to={`/sites/${site.id}`} className="group">
-      <Card className="h-full transition-all group-hover:-translate-y-0.5 group-hover:shadow-md">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between gap-2">
-            <span className="truncate">{site.name}</span>
-            <ArrowRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-          </CardTitle>
-          <CardDescription className="truncate">{site.domain}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex items-end justify-between gap-4">
-          <div>
-            {stats.data ? (
-              <p className="text-3xl font-semibold tracking-tight tabular-nums">
-                {formatNumber(stats.data.summary.visitors)}
-              </p>
-            ) : (
-              <Skeleton className="h-9 w-16" />
-            )}
-            <p className="text-xs text-muted-foreground">
-              visitors, last 7 days
-              {delta !== null && Math.abs(delta) >= 0.005 && (
-                <span
-                  className={
-                    delta > 0
-                      ? "ml-1.5 font-medium text-emerald-700 dark:text-emerald-400"
-                      : "ml-1.5 font-medium text-rose-700 dark:text-rose-400"
-                  }
-                >
-                  {formatSignedPercent(delta)}
-                </span>
-              )}
-            </p>
-          </div>
-          {stats.data && (
+    <li className="rise" style={{ "--i": index } as React.CSSProperties}>
+      <Link
+        to={`/sites/${site.id}`}
+        className="hover-lift grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-3 rounded-lg border bg-surface px-5 py-4 sm:grid-cols-[1fr_10rem_7rem_5rem]"
+      >
+        <span className="flex min-w-0 flex-col gap-1">
+          <span className="display truncate text-[28px]">{site.name}</span>
+          <span className="truncate text-xs text-fg-muted">{site.domain}</span>
+        </span>
+        <span className="max-sm:order-last max-sm:col-span-2">
+          {stats.data ? (
             <Sparkline values={stats.data.timeseries.map((b) => b.visitors)} />
+          ) : (
+            <Skeleton className="h-9 w-full" />
           )}
-        </CardContent>
-      </Card>
-    </Link>
+        </span>
+        <span className="figure text-right text-[26px]">
+          {stats.data ? (
+            formatNumber(stats.data.summary.visitors)
+          ) : (
+            <Skeleton className="ml-auto h-7 w-14" />
+          )}
+        </span>
+        <span className="text-right max-sm:hidden">
+          {stats.data && (
+            <Delta
+              current={stats.data.summary.visitors}
+              previous={stats.data.previous.visitors}
+            />
+          )}
+        </span>
+      </Link>
+    </li>
   )
 }
 
 /** A tiny trend line; no axes, the number beside it carries the meaning. */
 function Sparkline({ values }: { values: number[] }) {
-  const w = 96
+  const w = 160
   const h = 36
   if (values.length < 2) return null
   const max = Math.max(...values, 1)
@@ -129,24 +125,24 @@ function Sparkline({ values }: { values: number[] }) {
   const line = pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ")
   return (
     <svg
-      width={w}
-      height={h}
       viewBox={`0 0 ${w} ${h}`}
-      className="shrink-0 overflow-visible text-chart-1"
+      className="h-9 w-full overflow-visible"
+      preserveAspectRatio="none"
       aria-hidden
     >
       <polygon
         points={`0,${h} ${line} ${w},${h}`}
-        fill="currentColor"
-        opacity={0.12}
+        fill="var(--accent)"
+        opacity={0.16}
       />
       <polyline
         points={line}
         fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
+        stroke="var(--accent-deep)"
+        strokeWidth={1.5}
         strokeLinejoin="round"
         strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
       />
     </svg>
   )

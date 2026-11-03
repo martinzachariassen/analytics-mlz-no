@@ -1,7 +1,6 @@
 import type { ReactNode } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { format } from "date-fns"
-import { Lightbulb } from "lucide-react"
 
 import { PAGE } from "@/components/breakdown-card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -33,7 +32,7 @@ export function Insights({
   })
 
   if (!stats || !previous || !referrers.data || !pages.data) {
-    return <Skeleton className="h-14" />
+    return <Skeleton className="h-7 w-full max-w-2xl" />
   }
   const { visitors } = stats.summary
   if (visitors === 0) return null
@@ -90,18 +89,19 @@ export function Insights({
     )
   }
 
+  // Read as the page's standfirst: a few sentences, not a widget.
   return (
-    <div className="flex gap-3 rounded-xl border border-chart-1/20 bg-chart-1/5 px-4 py-3 text-sm">
-      <Lightbulb className="mt-0.5 size-4 shrink-0 text-chart-1" />
-      <ul className="flex flex-col gap-1 text-muted-foreground">
-        {items.map((it, i) => (
-          <li key={i}>{it}</li>
-        ))}
-      </ul>
-    </div>
+    <p className="max-w-[68ch] text-[15px] leading-relaxed text-pretty text-fg-secondary">
+      {items.map((it, i) => (
+        <span key={i}>
+          {it}
+          {i < items.length - 1 && " "}
+        </span>
+      ))}
+    </p>
   )
 }
 
 function Strong({ children }: { children: ReactNode }) {
-  return <span className="font-medium text-foreground">{children}</span>
+  return <span className="text-fg">{children}</span>
 }

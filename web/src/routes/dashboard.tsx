@@ -1,20 +1,14 @@
+import { useEffect, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router"
-import {
-  ArrowRightLeft,
-  CalendarDays,
-  Globe,
-  Monitor,
-  Settings,
-  Smartphone,
-  Tablet,
-} from "lucide-react"
+import { Settings } from "lucide-react"
 
 import { BreakdownCard, type BreakdownTab } from "@/components/breakdown-card"
 import { EventsCard } from "@/components/events-card"
 import { Insights } from "@/components/insights"
-import { KpiCards } from "@/components/kpi-cards"
-import { VisitorsChart } from "@/components/visitors-chart"
+import { Overview, type Series } from "@/components/overview"
+import { PanelGrid } from "@/components/panel"
+import { Segmented } from "@/components/segmented"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -39,23 +33,11 @@ import {
   previousRange,
   type Period,
 } from "@/lib/period"
-
-const withIcon = (Icon: typeof Globe) => (v: string) => (
-  <>
-    <Icon className="size-4 shrink-0 text-muted-foreground" />
-    <span className="truncate">{v}</span>
-  </>
-)
-
-const DEVICE_ICONS: Record<string, typeof Globe> = {
-  desktop: Monitor,
-  mobile: Smartphone,
-  tablet: Tablet,
-}
+import { cn } from "@/lib/utils"
 
 const PAGES: BreakdownTab[] = [
   { dim: "path", label: "Top pages", countLabel: "Views" },
-  { dim: "entry", label: "Landing pages", countLabel: "Visits" },
+  { dim: "entry", label: "Landing", countLabel: "Visits" },
 ]
 const SOURCES: BreakdownTab[] = [
   {
@@ -63,10 +45,9 @@ const SOURCES: BreakdownTab[] = [
     label: "Websites",
     countLabel: "Visits",
     // No favicons: fetching them would tell a third party which sites link here.
-    render: withIcon(Globe),
-    empty: withIcon(ArrowRightLeft)("Direct / bookmark"),
+    empty: <span className="text-fg-secondary">Direct / bookmark</span>,
   },
-  { dim: "utm_source", label: "Campaign source", countLabel: "Visits" },
+  { dim: "utm_source", label: "Source", countLabel: "Visits" },
   { dim: "utm_medium", label: "Medium", countLabel: "Visits" },
   { dim: "utm_campaign", label: "Campaign", countLabel: "Visits" },
 ]
@@ -76,6 +57,7 @@ const LOCATIONS: BreakdownTab[] = [
     label: "Countries",
     countLabel: "Visits",
     render: formatCountry,
+    text: formatCountry,
     empty: "Unknown",
   },
 ]
@@ -84,8 +66,10 @@ const DEVICES: BreakdownTab[] = [
     dim: "device",
     label: "Device",
     countLabel: "Visits",
-    render: (v) => withIcon(DEVICE_ICONS[v] ?? Monitor)(capitalize(v)),
+    render: capitalize,
+    text: capitalize,
     empty: "Unknown",
+    strip: true,
   },
   { dim: "browser", label: "Browser", countLabel: "Visits", empty: "Unknown" },
   { dim: "os", label: "OS", countLabel: "Visits", empty: "Unknown" },
@@ -95,14 +79,58 @@ function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
+/** The periods with a button of their own; the rest are under "More". */
+const QUICK: { value: Period; label: string; key: string }[] = [
+  { value: "today", label: "Today", key: "t" },
+  { value: "7d", label: "7D", key: "7" },
+  { value: "30d", label: "30D", key: "3" },
+  { value: "month", label: "MTD", key: "m" },
+  { value: "12m", label: "12M", key: "a" },
+]
+const MORE: { value: Period; key: string }[] = [
+  { value: "yesterday", key: "y" },
+  { value: "last_month", key: "l" },
+]
+const SHORTCUTS: Record<string, Period> = Object.fromEntries(
+  [...QUICK, ...MORE].map((p) => [p.key, p.value])
+)
+
+/** Single-key period shortcuts (t, y, 7, 3, m, l, a), ignored while typing. */
+function usePeriodShortcuts(onPeriod: (p: Period) => void) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return
+      const t = e.target
+      if (
+        t instanceof HTMLElement &&
+        (t.isContentEditable ||
+          t.closest("input, textarea, select, [role=dialog]"))
+      )
+        return
+      const p = SHORTCUTS[e.key.toLowerCase()]
+      if (p) onPeriod(p)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [onPeriod])
+}
+
 export function DashboardPage() {
   const { id = "" } = useParams()
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
+  const [series, setSeries] = useState<Series>("visitors")
   const periodParam = params.get("period")
   const period: Period = isPeriod(periodParam) ? periodParam : DEFAULT_PERIOD
   const range = periodRange(period)
   const prevRange = previousRange(range, period)
+
+  const setPeriod = (v: Period) =>
+    setParams((p) => {
+      p.set("period", v)
+      return p
+    })
+  usePeriodShortcuts(setPeriod)
 
   const sites = useQuery({ queryKey: ["sites"], queryFn: api.sites })
   const stats = useQuery({
@@ -120,110 +148,132 @@ export function DashboardPage() {
 
   if (stats.error instanceof ApiError && stats.error.status === 404) {
     return (
-      <p className="text-muted-foreground">
-        This site does not exist.{" "}
-        <Link to="/sites" className="underline">
-          Back to sites
+      <div className="flex flex-col items-start gap-3 py-16">
+        <p className="display text-4xl">No such site</p>
+        <Link to="/sites" className="text-sm text-accent-deep underline">
+          ← Back to sites
         </Link>
-      </p>
+      </div>
     )
   }
 
+  const isQuick = QUICK.some((q) => q.value === period)
+
   return (
-    <div className="flex min-w-0 flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex min-w-0 flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-3">
-            <Select
-              value={id}
-              onValueChange={(v) =>
-                navigate(`/sites/${v}?${params.toString()}`)
-              }
-            >
-              <SelectTrigger
-                aria-label="Site"
-                className="h-auto! max-w-72 border-none bg-transparent! px-0 py-0 text-2xl font-semibold tracking-tight shadow-none"
+    <div className="flex min-w-0 flex-col gap-6 sm:gap-8">
+      <header className="flex flex-col gap-5">
+        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+          <div className="flex min-w-0 flex-col gap-3">
+            <p className="eyebrow flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="tracking-[0.06em] normal-case">
+                {site?.domain ?? "\u00a0"}
+              </span>
+              <span className="text-accent-deep" aria-hidden>
+                /
+              </span>
+              <Realtime siteId={id} />
+            </p>
+            <div className="flex items-center justify-between gap-3">
+              <Select
+                value={id}
+                onValueChange={(v) =>
+                  navigate(`/sites/${v}?${params.toString()}`)
+                }
               >
-                <SelectValue placeholder="Site">{site?.name}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {sites.data?.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}
-                    <span className="text-muted-foreground">{s.domain}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Realtime siteId={id} />
+                <SelectTrigger
+                  aria-label="Site"
+                  className="display h-auto! max-w-full gap-3 border-none bg-transparent! p-0 text-[44px] leading-none shadow-none sm:text-[60px] [&>svg]:size-6! [&>svg]:text-fg-muted"
+                >
+                  <SelectValue placeholder="Site">{site?.name}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {sites.data?.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                      <span className="text-fg-muted">{s.domain}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <SettingsButton id={id} className="sm:hidden" />
+            </div>
           </div>
-          <p className="text-sm text-muted-foreground">
-            {site?.domain && <>{site.domain} · </>}
-            <span className="text-foreground">{formatRange(range)}</span>
-            <span className="max-sm:hidden">
-              {" "}
-              · compared with {formatRange(prevRange)}
-            </span>
-          </p>
+          <div className="flex flex-col items-start gap-2 sm:items-end">
+            <div className="flex flex-wrap items-center gap-2">
+              <Segmented
+                label="Period"
+                value={isQuick ? period : undefined}
+                onChange={setPeriod}
+                items={QUICK.map((q) => ({
+                  value: q.value,
+                  label: q.label,
+                  title: `${PERIODS[q.value]} (${q.key.toUpperCase()})`,
+                }))}
+              />
+              <Select
+                value={isQuick ? "" : period}
+                onValueChange={(v) => setPeriod(v as Period)}
+              >
+                <SelectTrigger
+                  size="sm"
+                  aria-label="More periods"
+                  className={cn(
+                    "h-8! rounded-lg border-[1.5px] text-[11px] tracking-[0.14em] uppercase",
+                    isQuick
+                      ? "border-fg/30 text-fg-secondary"
+                      : "border-fg bg-fg! text-bg [&>svg]:text-bg!"
+                  )}
+                >
+                  <SelectValue placeholder="More">
+                    {isQuick ? "More" : PERIODS[period]}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent align="end">
+                  {MORE.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {PERIODS[m.value]}
+                      <kbd className="ml-auto text-[10px] text-fg-muted uppercase">
+                        {m.key}
+                      </kbd>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <SettingsButton id={id} className="max-sm:hidden" />
+            </div>
+            <p className="text-[11px] text-fg-muted">
+              <span className="text-fg-secondary">{formatRange(range)}</span>
+              <span className="max-sm:hidden">
+                {" "}
+                vs {formatRange(prevRange)}
+              </span>
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Select
-            value={period}
-            onValueChange={(v) =>
-              setParams((p) => {
-                p.set("period", v)
-                return p
-              })
-            }
-          >
-            <SelectTrigger className="w-44 bg-card" aria-label="Period">
-              <CalendarDays className="text-muted-foreground" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent align="end">
-              {Object.entries(PERIODS).map(([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline"
-            size="icon"
-            className="bg-card"
-            asChild
-            aria-label="Site settings"
-          >
-            <Link to={`/sites/${id}/settings`}>
-              <Settings />
-            </Link>
-          </Button>
-        </div>
-      </div>
+        <Insights
+          siteId={id}
+          range={range}
+          stats={stats.data}
+          previous={prevSummary}
+        />
+      </header>
 
       {stats.isError &&
         !(stats.error instanceof ApiError && stats.error.status === 404) && (
-          <p className="text-destructive">{stats.error.message}</p>
+          <p className="text-sm text-destructive">{stats.error.message}</p>
         )}
 
-      <Insights
-        siteId={id}
-        range={range}
-        stats={stats.data}
-        previous={prevSummary}
-      />
-      <KpiCards summary={stats.data?.summary} previous={prevSummary} />
-      <VisitorsChart
+      <Overview
         stats={stats.data}
         previous={previous.data}
         now={stats.dataUpdatedAt}
+        series={series}
+        onSeriesChange={setSeries}
       />
 
-      <div className="grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
+      <PanelGrid className="lg:grid-cols-2">
         <BreakdownCard
           title="Pages"
-          description="What people read"
           siteId={id}
           range={range}
           tabs={PAGES}
@@ -231,7 +281,6 @@ export function DashboardPage() {
         />
         <BreakdownCard
           title="Sources"
-          description="Where visitors came from"
           siteId={id}
           range={range}
           tabs={SOURCES}
@@ -239,7 +288,7 @@ export function DashboardPage() {
         />
         <BreakdownCard
           title="Locations"
-          description="Country, based on IP (the IP itself is never stored)"
+          description="Country from IP. The IP itself is never stored."
           siteId={id}
           range={range}
           tabs={LOCATIONS}
@@ -247,13 +296,12 @@ export function DashboardPage() {
         />
         <BreakdownCard
           title="Devices"
-          description="What visitors use to browse"
           siteId={id}
           range={range}
           tabs={DEVICES}
           totalVisitors={visitors}
         />
-      </div>
+      </PanelGrid>
 
       <EventsCard siteId={id} range={range} totalVisitors={visitors} />
     </div>
@@ -270,21 +318,40 @@ function Realtime({ siteId }: { siteId: string }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="flex shrink-0 items-center gap-2 rounded-full border bg-card px-2.5 py-1 text-xs font-medium">
+        <span className="inline-flex cursor-default items-center gap-2">
           <span className="relative flex size-2">
             {n > 0 && (
-              <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-violet opacity-75" />
             )}
             <span
-              className={`relative inline-flex size-2 rounded-full ${n > 0 ? "bg-emerald-500" : "bg-muted-foreground/40"}`}
+              className={cn(
+                "relative inline-flex size-2 rounded-full",
+                n > 0 ? "bg-accent-deep" : "bg-fg-muted/40"
+              )}
             />
           </span>
-          {n} online now
+          <span className={n > 0 ? "text-fg" : undefined}>{n} online</span>
         </span>
       </TooltipTrigger>
       <TooltipContent>
         Visitors active in the last 5 minutes. Updates every 15 seconds.
       </TooltipContent>
     </Tooltip>
+  )
+}
+
+function SettingsButton({ id, className }: { id: string; className?: string }) {
+  return (
+    <Button
+      variant="outline"
+      size="icon"
+      asChild
+      aria-label="Site settings"
+      className={className}
+    >
+      <Link to={`/sites/${id}/settings`}>
+        <Settings />
+      </Link>
+    </Button>
   )
 }

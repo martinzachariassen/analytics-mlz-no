@@ -1,15 +1,7 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { MousePointerClick } from "lucide-react"
-
 import { BarList } from "@/components/breakdown-card"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Panel } from "@/components/panel"
 import {
   Select,
   SelectContent,
@@ -57,77 +49,66 @@ export function EventsCard({
   })
 
   return (
-    <Card className="min-w-0">
-      <CardHeader>
-        <CardTitle>Goals & events</CardTitle>
-        <CardDescription>
-          Actions visitors took, such as sign-ups or clicks on outbound links.
-          Conversion is the share of all visitors who did it. Select an event to
-          see its details.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-6 md:grid-cols-2">
-        <BarList
-          rows={events.data}
-          loading={events.isPending}
-          tab={{
-            countLabel: "Events",
-            render: (v) => (
-              <>
-                <MousePointerClick className="size-4 shrink-0 text-muted-foreground" />
-                {humanize(v)}
-              </>
-            ),
-          }}
-          total={totalVisitors}
-          shareLabel="Conv."
-          selected={event}
-          onSelect={(v) => {
-            setEvent(v === event ? undefined : v)
-            setKey(undefined)
-          }}
-        />
-        {event ? (
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="truncate text-sm font-medium">{humanize(event)}</p>
-              {keys.data && keys.data.length > 0 && (
-                <Select value={activeKey} onValueChange={setKey}>
-                  <SelectTrigger size="sm" className="w-40">
-                    <SelectValue placeholder="Property" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {keys.data.map((k) => (
-                      <SelectItem key={k.value} value={k.value}>
-                        {k.value}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-            {keys.data?.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                This event has no properties
-              </p>
-            ) : (
-              <BarList
-                rows={values.data}
-                loading={keys.isPending || values.isPending}
-                tab={{ countLabel: "Events" }}
-              />
+    <Panel
+      title="Goals & events"
+      description="Actions visitors took, such as sign-ups or outbound clicks. Conversion is the share of all visitors who did it."
+      bodyClassName="grid gap-8 md:grid-cols-2"
+    >
+      <BarList
+        rows={events.data}
+        loading={events.isPending}
+        tab={{ countLabel: "Events", render: humanize }}
+        total={totalVisitors}
+        shareLabel="Conv."
+        selected={event}
+        onSelect={(v) => {
+          setEvent(v === event ? undefined : v)
+          setKey(undefined)
+        }}
+      />
+      {event ? (
+        <div className="flex min-w-0 flex-col gap-3 md:border-l md:pl-8">
+          <div className="flex items-center justify-between gap-2">
+            <p className="display truncate text-2xl">{humanize(event)}</p>
+            {keys.data && keys.data.length > 0 && (
+              <Select value={activeKey} onValueChange={setKey}>
+                <SelectTrigger size="sm" className="w-40" aria-label="Property">
+                  <SelectValue placeholder="Property" />
+                </SelectTrigger>
+                <SelectContent>
+                  {keys.data.map((k) => (
+                    <SelectItem key={k.value} value={k.value}>
+                      {k.value}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
           </div>
-        ) : (
-          events.data &&
-          events.data.length > 0 && (
-            <div className="flex items-center justify-center rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground max-md:hidden">
-              Select an event on the left to see a breakdown of its properties,
-              for example which links were clicked.
-            </div>
-          )
-        )}
-      </CardContent>
-    </Card>
+          {keys.data?.length === 0 ? (
+            <p className="py-8 text-center text-xs text-fg-muted">
+              This event has no properties.
+            </p>
+          ) : (
+            <BarList
+              rows={values.data}
+              loading={keys.isPending || values.isPending}
+              tab={{ countLabel: "Events" }}
+            />
+          )}
+        </div>
+      ) : (
+        events.data &&
+        events.data.length > 0 && (
+          <div className="flex flex-col items-start justify-center gap-2 border-l pl-8 max-md:hidden">
+            <p className="display text-2xl text-fg-secondary">Pick an event</p>
+            <p className="max-w-[40ch] text-xs leading-relaxed text-fg-muted">
+              Select one on the left to break it down by its properties, for
+              example which links were clicked.
+            </p>
+          </div>
+        )
+      )}
+    </Panel>
   )
 }

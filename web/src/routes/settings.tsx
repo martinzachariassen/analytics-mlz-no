@@ -38,12 +38,16 @@ export function SettingsPage() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
-      <Button variant="ghost" size="sm" asChild className="self-start">
-        <Link to={`/sites/${id}`}>
-          <ArrowLeft />
-          Back to dashboard
+      <header className="flex flex-col gap-3">
+        <Link
+          to={`/sites/${id}`}
+          className="eyebrow inline-flex items-center gap-1.5 self-start transition-colors hover:text-fg"
+        >
+          <ArrowLeft className="size-3" />
+          {site.data?.name ?? "Dashboard"}
         </Link>
-      </Button>
+        <h1 className="display text-[44px] sm:text-[56px]">Settings</h1>
+      </header>
 
       {params.get("new") && (
         <Alert>
@@ -152,7 +156,7 @@ function DangerZone({ id, name }: { id: string; name: string }) {
   })
 
   return (
-    <Card className="border-destructive/40">
+    <Card className="shadow-[0_0_0_1px_color-mix(in_oklch,var(--destructive)_45%,transparent)]!">
       <CardHeader>
         <CardTitle>Delete site</CardTitle>
         <CardDescription>

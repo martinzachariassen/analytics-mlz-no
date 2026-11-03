@@ -1,130 +1,267 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+/* mlz brand: --bg, --fg, --fg-secondary, --fg-muted, --border, --accent,
+   --accent-deep, the wordmark font and the data-theme="dark" variant. See
+   https://mlz.no/brand/BRAND.md. Everything below is derived from it. */
+@import "./styles/mlz-brand.css";
+/* Typefaces: Instrument Sans for UI, body and numbers (tabular figures),
+   Instrument Serif for headlines, Geist Mono for small labels and code.
+   Self-hosted via Fontsource, so no third-party requests. */
+@import "@fontsource-variable/instrument-sans";
+@import "@fontsource/instrument-serif/400.css";
+@import "@fontsource/instrument-serif/400-italic.css";
+@import "@fontsource-variable/geist-mono";
 
-@custom-variant dark (&:is(.dark *));
-
+/* shadcn/ui components read these names. They are mapped onto the brand
+   tokens rather than given colours of their own. Note that shadcn's
+   "accent" is a neutral hover tint, not the brand violet: the violet is
+   available as `violet` (decorative) and `accent-deep` (text, lines). */
 @theme inline {
-    --font-heading: var(--font-sans);
-    --font-sans: 'Geist Variable', sans-serif;
-    --color-sidebar-ring: var(--sidebar-ring);
-    --color-sidebar-border: var(--sidebar-border);
-    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-    --color-sidebar-accent: var(--sidebar-accent);
-    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-    --color-sidebar-primary: var(--sidebar-primary);
-    --color-sidebar-foreground: var(--sidebar-foreground);
-    --color-sidebar: var(--sidebar);
-    --color-chart-5: var(--chart-5);
-    --color-chart-4: var(--chart-4);
-    --color-chart-3: var(--chart-3);
-    --color-chart-2: var(--chart-2);
-    --color-chart-1: var(--chart-1);
-    --color-ring: var(--ring);
-    --color-input: var(--input);
-    --color-border: var(--border);
-    --color-destructive: var(--destructive);
-    --color-accent-foreground: var(--accent-foreground);
-    --color-accent: var(--accent);
-    --color-muted-foreground: var(--muted-foreground);
-    --color-muted: var(--muted);
-    --color-secondary-foreground: var(--secondary-foreground);
-    --color-secondary: var(--secondary);
-    --color-primary-foreground: var(--primary-foreground);
-    --color-primary: var(--primary);
-    --color-popover-foreground: var(--popover-foreground);
-    --color-popover: var(--popover);
-    --color-card-foreground: var(--card-foreground);
-    --color-card: var(--card);
-    --color-foreground: var(--foreground);
-    --color-background: var(--background);
-    --radius-sm: calc(var(--radius) * 0.6);
-    --radius-md: calc(var(--radius) * 0.8);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) * 1.4);
-    --radius-2xl: calc(var(--radius) * 1.8);
-    --radius-3xl: calc(var(--radius) * 2.2);
-    --radius-4xl: calc(var(--radius) * 2.6);
+  --font-sans: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --font-mono:
+    "Geist Mono Variable", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-heading: var(--font-display);
+  --color-sidebar-ring: var(--ring);
+  --color-sidebar-border: var(--border);
+  --color-sidebar-accent-foreground: var(--fg);
+  --color-sidebar-accent: var(--ui-accent);
+  --color-sidebar-primary-foreground: var(--bg);
+  --color-sidebar-primary: var(--fg);
+  --color-sidebar-foreground: var(--fg);
+  --color-sidebar: var(--bg);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--border);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--fg);
+  --color-accent: var(--ui-accent);
+  --color-violet: var(--accent);
+  --color-muted-foreground: var(--fg-muted);
+  --color-muted: var(--ui-muted);
+  --color-secondary-foreground: var(--fg);
+  --color-secondary: var(--ui-muted);
+  --color-primary-foreground: var(--bg);
+  --color-primary: var(--fg);
+  --color-popover-foreground: var(--fg);
+  --color-popover: var(--surface);
+  --color-card-foreground: var(--fg);
+  --color-card: var(--surface);
+  --color-foreground: var(--fg);
+  --color-background: var(--bg);
+  --color-surface: var(--surface);
+  /* Brand: 4px on buttons and boxes, nothing rounder. */
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-xl: 4px;
+  --radius-2xl: 4px;
+  --radius-3xl: 4px;
+  --radius-4xl: 4px;
+  --ease-brand: var(--ease);
 }
 
 :root {
-    --background: oklch(0.985 0.002 260);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: #2a78d6;
-    --chart-2: #a3a29c;
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+  /* A panel sits a step off the page; mixed from tokens, not a new colour. */
+  --surface: color-mix(in oklch, var(--bg) 55%, white);
+  --ui-muted: color-mix(in oklch, var(--fg) 6%, transparent);
+  --ui-accent: color-mix(in oklch, var(--fg) 8%, transparent);
+  --ring: var(--accent-deep);
+  /* Not a brand colour (the brand has no "danger" yet): used only for errors
+     and deleting things. */
+  --destructive: oklch(0.55 0.19 27);
+  /* Charts: the series is a line, so accent-deep; the comparison is quiet. */
+  --chart-1: var(--accent-deep);
+  --chart-2: var(--fg-muted);
+  --chart-3: var(--fg-secondary);
+  --chart-4: color-mix(in oklch, var(--accent-deep) 55%, var(--bg));
+  --chart-5: var(--border);
+  --chart-fill: var(--accent);
+  --radius: 4px;
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.dark {
-    --background: oklch(0.13 0.004 260);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.18 0.004 260);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: #3987e5;
-    --chart-2: #6f6e69;
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+[data-theme="dark"] {
+  --surface: color-mix(in oklch, var(--bg) 88%, white);
+  --destructive: oklch(0.7 0.17 27);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    }
-  body {
-    @apply bg-background text-foreground;
-    }
+  }
   html {
-    @apply font-sans;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+    font-size: 14px;
+    font-feature-settings: "tnum" 1;
+    transition:
+      background-color 0.2s var(--ease),
+      color 0.2s var(--ease);
+  }
+  ::selection {
+    background: color-mix(in oklch, var(--accent) 30%, transparent);
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent-deep);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
     }
+  }
+}
+
+/* shadcn buttons, restyled from the outside so the generated files stay
+   untouched: a 1.5px --fg border on outline controls, and the brand's hard
+   offset shadow on hover instead of a colour change. */
+@layer components {
+  [data-slot="button"] {
+    transition:
+      transform 0.4s var(--spring),
+      box-shadow 0.4s var(--spring),
+      background-color 0.2s var(--ease),
+      border-color 0.2s var(--ease),
+      color 0.2s var(--ease);
+  }
+  [data-slot="button"][data-variant="default"],
+  [data-slot="button"][data-variant="outline"] {
+    border-width: 1.5px;
+    border-color: var(--fg);
+  }
+  [data-slot="button"][data-variant="outline"] {
+    background: transparent;
+  }
+  @media (hover: hover) {
+    [data-slot="button"][data-variant="default"]:hover,
+    [data-slot="button"][data-variant="outline"]:hover {
+      background: var(--fg);
+      color: var(--bg);
+      transform: translate(-2px, -2px);
+      box-shadow: 4px 4px 0 0 var(--accent-deep);
+    }
+    [data-slot="button"][data-variant="outline"][data-size^="icon"]:hover {
+      background: transparent;
+      color: var(--fg);
+    }
+  }
+  [data-slot="button"]:active {
+    transform: translate(0, 0);
+    box-shadow: none;
+  }
+  /* Cards (settings, dialogs): a hairline instead of a ring, more room. */
+  [data-slot="card"] {
+    --card-spacing: 1.25rem;
+    background: var(--surface);
+    box-shadow: 0 0 0 1px var(--border);
+  }
+  [data-slot="dialog-content"],
+  [data-slot="alert-dialog-content"] {
+    border: 1.5px solid var(--fg);
+    box-shadow: 6px 6px 0 0 var(--accent-deep);
+  }
+  [data-slot="input"],
+  [data-slot="select-trigger"] {
+    background: transparent;
+  }
+}
+
+@layer utilities {
+  /* Labels: small uppercase mono, as on mlz.no. */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 450;
+    line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--fg-muted);
+  }
+  /* Names and headlines: Instrument Serif. Add `italic` for emphasis. */
+  .display {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: -0.015em;
+    line-height: 1;
+  }
+  /* Headline numbers: the sans, tight, with tabular figures. */
+  .figure {
+    font-family: var(--font-sans);
+    font-weight: 550;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  /* The "mlz." wordmark keeps the brand face. */
+  .font-brand {
+    font-family: var(--font-brand);
+  }
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+  /* The brand hover: lift and a hard violet shadow, no blur. */
+  .hover-lift {
+    transition:
+      transform 0.5s var(--spring),
+      box-shadow 0.5s var(--spring),
+      border-color 0.3s var(--ease);
+  }
+  @media (hover: hover) {
+    .hover-lift:hover {
+      transform: translate(-3px, -3px);
+      box-shadow: 5px 5px 0 0 var(--accent-deep);
+      border-color: var(--fg);
+    }
+  }
+  .hover-lift:active {
+    transform: translate(0, 0);
+    box-shadow: none;
+  }
+  /* Entrance: rise, staggered with --i. */
+  .rise {
+    animation: rise 0.9s var(--ease) both;
+    animation-delay: calc(var(--i, 0) * 60ms);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* Unlayered, so it beats the utility classes in the generated card: card
+   titles read like Panel titles (small uppercase mono), dialog titles use
+   the serif. */
+[data-slot="card-title"] {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 450;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--fg-secondary);
+}
+[data-slot="dialog-title"],
+[data-slot="alert-dialog-title"] {
+  font-size: 28px;
+  font-weight: 400;
+  line-height: 1.05;
+}
+[data-slot="card-footer"] {
+  background: transparent;
 }

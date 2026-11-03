@@ -1,0 +1,7 @@
+# Environment variables are expanded by Litestream.
+# On GCP, credentials come from the Cloud Run service account (Application Default Credentials).
+dbs:
+  - path: ${DATABASE_PATH}
+    replica:
+      url: ${LITESTREAM_REPLICA_URL}
+      sync-interval: 1s

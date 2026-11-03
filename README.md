@@ -22,6 +22,40 @@ Send a test event:
 curl -A "Mozilla/5.0" --data '{"site":"<site-id>","url":"https://example.com/"}' http://localhost:8080/api/event
 ```
 
+## Tracking your site
+
+Add the script to every page (replace the host and site id):
+
+```html
+<script defer src="https://analytics.example.com/api/script.js" data-site="SITE_ID"></script>
+```
+
+That's it — page views (including SPA navigation via `history.pushState`) and clicks on
+outbound links are tracked automatically. The script is ~1.2 KB gzipped and sets no cookies.
+
+**Custom events**
+
+```html
+<button data-track="signup" data-track-plan="pro">Sign up</button>
+```
+
+```js
+window.mlz.track("signup", { plan: "pro", seats: 3 });
+```
+
+**Script options**
+
+| Attribute | Description |
+|---|---|
+| `data-site` | Site id (required) |
+| `data-api` | Collection endpoint, if not on the same host as the script |
+| `data-auto="false"` | Disable automatic page views; call `mlz.pageview()` yourself |
+| `data-hash="true"` | Include `#hash` in paths (hash-based routers) |
+| `data-allow-localhost="true"` | Also track on `localhost` |
+| `data-respect-dnt="true"` | Don't track visitors with Do Not Track enabled |
+
+To exclude your own visits, run `localStorage.setItem("mlz_ignore", "true")` in the browser console on your site.
+
 ## Configuration
 
 | Variable | Default | Description |
@@ -36,7 +70,8 @@ curl -A "Mozilla/5.0" --data '{"site":"<site-id>","url":"https://example.com/"}'
 ## Development
 
 ```sh
-make test   # go test -race ./...
+make test     # Go + tracker tests
+make tracker  # rebuild server/internal/tracker/script.js after editing tracker/src
 make lint   # golangci-lint
 make run    # local server on :8080
 ```

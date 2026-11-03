@@ -27,3 +27,26 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: docker build -f deploy/Dockerfile -t analytics-mlz-no:ci .
+
+  tracker:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tracker
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: tracker/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Check that the embedded script.js is up to date
+        run: |
+          npm run build
+          git diff --exit-code -- ../server/internal/tracker/script.js || {
+            echo "::error::server/internal/tracker/script.js is stale. Run 'npm run build' in tracker/ and commit."
+            exit 1
+          }

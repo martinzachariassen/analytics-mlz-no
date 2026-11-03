@@ -31,6 +31,10 @@ type Config struct {
 	GitHubClientID     string
 	GitHubClientSecret string
 	AllowedGitHubUsers []string
+
+	// DevLogin signs every visitor in as a local "dev" user without a provider.
+	// Only allowed when PUBLIC_URL points to localhost, and not together with GitHub.
+	DevLogin bool
 }
 
 // GitHubEnabled reports whether GitHub login is configured.
@@ -49,6 +53,7 @@ func Load() (Config, error) {
 		GitHubClientID:     os.Getenv("GITHUB_CLIENT_ID"),
 		GitHubClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
 		AllowedGitHubUsers: splitList(os.Getenv("ALLOWED_GITHUB_USERS")),
+		DevLogin:           os.Getenv("DEV_LOGIN") == "1",
 	}
 	var err error
 	if c.ProxyHops, err = envInt("PROXY_HOPS", 0); err != nil {
@@ -66,7 +71,28 @@ func Load() (Config, error) {
 	if c.GitHubEnabled() && len(c.AllowedGitHubUsers) == 0 {
 		return c, errors.New("ALLOWED_GITHUB_USERS must list at least one GitHub username")
 	}
+	if c.DevLogin {
+		if !isLocalhost(c.PublicURL) {
+			return c, fmt.Errorf("DEV_LOGIN=1 requires PUBLIC_URL on localhost, got %q", c.PublicURL)
+		}
+		if c.GitHubEnabled() {
+			return c, errors.New("DEV_LOGIN=1 cannot be combined with GitHub sign-in")
+		}
+	}
 	return c, nil
+}
+
+// isLocalhost reports whether rawURL is a plain-HTTP URL on the loopback interface.
+func isLocalhost(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Scheme != "http" {
+		return false
+	}
+	switch u.Hostname() {
+	case "localhost", "127.0.0.1", "::1":
+		return true
+	}
+	return false
 }
 
 func splitList(s string) []string {

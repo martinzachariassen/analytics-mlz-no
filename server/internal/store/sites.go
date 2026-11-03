@@ -5,13 +5,16 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 )
 
-// ErrNotFound is returned when a record does not exist.
-var ErrNotFound = errors.New("not found")
+// Errors returned by the store.
+var (
+	ErrNotFound       = errors.New("not found")
+	ErrDomainTaken    = errors.New("a site with this domain already exists")
+	ErrDomainRequired = errors.New("domain is required")
+)
 
 // Site is a tracked website.
 type Site struct {
@@ -40,7 +43,7 @@ func NormalizeDomain(in string) string {
 func (s *Store) CreateSite(ctx context.Context, name, domain string) (Site, error) {
 	domain = NormalizeDomain(domain)
 	if domain == "" {
-		return Site{}, errors.New("domain is required")
+		return Site{}, ErrDomainRequired
 	}
 	if strings.TrimSpace(name) == "" {
 		name = domain
@@ -51,7 +54,7 @@ func (s *Store) CreateSite(ctx context.Context, name, domain string) (Site, erro
 		site.ID, site.Name, site.Domain, site.CreatedAt.UnixMilli())
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE") {
-			return Site{}, fmt.Errorf("a site with domain %q already exists", domain)
+			return Site{}, ErrDomainTaken
 		}
 		return Site{}, err
 	}
@@ -106,4 +109,38 @@ func newID(n int) string {
 		b[i] = idAlphabet[int(b[i])%len(idAlphabet)]
 	}
 	return string(b)
+}
+
+// UpdateSite changes a site's name and domain.
+func (s *Store) UpdateSite(ctx context.Context, id, name, domain string) (Site, error) {
+	domain = NormalizeDomain(domain)
+	if domain == "" {
+		return Site{}, ErrDomainRequired
+	}
+	if strings.TrimSpace(name) == "" {
+		name = domain
+	}
+	res, err := s.db.ExecContext(ctx, `UPDATE sites SET name = ?, domain = ? WHERE id = ?`, name, domain, id)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE") {
+			return Site{}, ErrDomainTaken
+		}
+		return Site{}, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return Site{}, ErrNotFound
+	}
+	return s.GetSite(ctx, id)
+}
+
+// DeleteSite removes a site and all its events.
+func (s *Store) DeleteSite(ctx context.Context, id string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM sites WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }

@@ -17,7 +17,9 @@ import (
 	"syscall"
 	"text/tabwriter"
 	"time"
+	_ "time/tzdata" // embed time zones so stats work on minimal hosts
 
+	"github.com/martinzachariassen/analytics-mlz-no/server/internal/auth"
 	"github.com/martinzachariassen/analytics-mlz-no/server/internal/config"
 	"github.com/martinzachariassen/analytics-mlz-no/server/internal/geo"
 	"github.com/martinzachariassen/analytics-mlz-no/server/internal/server"
@@ -71,13 +73,26 @@ func serve(cfg config.Config, log *slog.Logger) error {
 		log.Warn("GEOIP_DB_PATH not set; country will not be recorded")
 	}
 
+	authn := &auth.Service{
+		Store:     st,
+		Allowed:   cfg.AllowedGitHubUsers,
+		PublicURL: cfg.PublicURL,
+		Log:       log,
+	}
+	if cfg.GitHubEnabled() {
+		authn.Provider = &auth.GitHub{ClientID: cfg.GitHubClientID, ClientSecret: cfg.GitHubClientSecret}
+		log.Info("github sign-in enabled", "allowed", cfg.AllowedGitHubUsers, "callback", cfg.PublicURL+"/api/auth/github/callback")
+	} else {
+		log.Warn("GITHUB_CLIENT_ID not set; dashboard sign-in is disabled")
+	}
+
 	if cfg.RetentionDays > 0 {
 		go retentionLoop(ctx, st, cfg.RetentionDays, log)
 	}
 
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           server.New(cfg, st, loc, log),
+		Handler:           server.New(cfg, st, authn, loc, log),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      30 * time.Second,

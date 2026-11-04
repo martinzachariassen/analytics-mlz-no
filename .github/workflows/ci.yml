@@ -4,9 +4,14 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_call: # reused by release.yml as a gate before publishing
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   go:
@@ -64,5 +69,24 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm ci
+      - run: npm run typecheck
       - run: npm run lint
+      - run: npm test
       - run: npm run build
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Known vulnerabilities in Go dependencies and the standard library
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./server/...
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+      # Only what ships to users: production dependencies of the dashboard.
+      - name: npm audit (web)
+        working-directory: web
+        run: npm audit --audit-level=high --omit=dev

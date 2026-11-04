@@ -16,8 +16,9 @@ Lightweight, privacy-friendly, self-hostable web analytics (inspired by Umami/Pl
 | Events (v1) | Page views, SPA navigation (pushState/popstate), outbound links (auto), custom events via `data-mlz-event` attributes and `window.mlz.track(name, props)`. |
 | Dimensions (v1) | Views, uniques, bounce rate, top pages, referrer + UTM, browser/OS/device, country (DB-IP Lite, CC BY 4.0). |
 | Retention | Keep forever by default; `RETENTION_DAYS` deletes older events. |
-| Infra | Terraform, new GCP project. |
-| CI | GitHub Actions: Go test + golangci-lint + web build. |
+| Infra | Terraform, new GCP project. `plan`/`apply` by hand, never from CI. |
+| Tooling | Tools pinned in `mise.toml`; Bun workspace; Biome; `scripts/verify.sh` is the one quality gate for CI (`lint`, `go`, `tracker`, `web`, `infra`, `docker`, `security`, CodeQL) and for `make verify`. |
+| Supply chain | Digest-pinned images, commit-pinned Actions, Trivy, CodeQL, SBOM and signed provenance on releases, Dependabot. |
 
 ## Milestones
 
@@ -27,10 +28,22 @@ Lightweight, privacy-friendly, self-hostable web analytics (inspired by Umami/Pl
 4. ✅ **Dashboard** — React + Vite + shadcn/ui.
 5. ✅ **Terraform** — Artifact Registry, Cloud Run, GCS, Secret Manager, Firebase Hosting.
 6. ✅ **Contributor-friendliness** — README, CONTRIBUTING, SECURITY, issue/PR templates (good-first-issues: label some once the repo is public).
-7. **Release** — CI hardening, versioned builds, GHCR image + binaries on tag (`.github/workflows/release.yml`), privacy/upgrade docs. Code is ready; the first tag waits for the production checks in [RELEASING.md](RELEASING.md).
+7. ✅ **Release pipeline** — versioned builds, GHCR image + binaries on tag, SBOM and provenance (`.github/workflows/release.yml`). The first tag waits for the checklist in [RELEASING.md](RELEASING.md).
+8. ✅ **Hardening audit (November 2026)** — server, tracker, dashboard, tooling, infrastructure and docs reviewed and fixed in one series of pull requests; see the "Unreleased" section of the changelog.
 
 ## Open items
 
 - ✅ Production domain: `analytics.mlz.no` (dashboard and API), `t.mlz.no` (tracking script).
 - ✅ `PROXY_HOPS=2` on Cloud Run behind Firebase Hosting: production events carry the right country and one visitor per person.
-- Decide how self-hosters get the dashboard (embed `apps/web/dist` or a reverse-proxy recipe; see RELEASING.md) before 1.0.
+- Tag the first release (`v0.2.0`: the audited state; `v0.1.0` in the changelog was never tagged).
+
+## Before 1.0
+
+- **Dashboard for self-hosters.** The Docker image serves the API only. Embed `apps/web/dist` in the
+  Go binary (simplest for self-hosting) or document a reverse-proxy recipe.
+- **Site ownership.** The dashboard is single-tenant: every allowlisted user can read and change
+  every site. Fine for one person or one team; a `site_users` table would be needed for more.
+- **A second identity provider.** The `auth.Provider` interface is there; OIDC (Google, Keycloak)
+  would make self-hosting without GitHub possible.
+- **Schema freeze.** After 1.0 migrations stay additive and minor versions never break
+  configuration.

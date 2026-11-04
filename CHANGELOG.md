@@ -51,6 +51,7 @@ All notable changes are documented here. The format follows
 - More `golangci-lint` linters (`gocritic`, `noctx`, `sqlclosecheck`, `rowserrcheck`, `nilerr`, `usestdlibvars`, `unparam`, `perfsprint`, `exhaustive`, `contextcheck`).
 
 ### Added
+- `docs/ARCHITECTURE.md`: the parts, a page view end to end, where the data lives and where each limit is. The README is restructured around what the project is and how to work on it; `docs/PLAN.md` lists what is left before 1.0.
 - Terraform: `require_replica` (see Fixed), labels on every resource, lock files for Linux and macOS, `terraform_version < 2.0`, and an outputs table plus restore runbook in `docs/DEPLOY.md`. The Docker image records which DB-IP month it carries in `/usr/share/geoip/VERSION`.
 - Terraform: an alert (`alert_email`) when the server logs an error, at most one email per hour. `docs/DEPLOY.md` lists useful Logs Explorer filters.
 - `LOG_LEVEL` (`debug`, `info`, `warn`, `error`; Terraform `log_level`). Rejected events log why (`event rejected` with a `reason`, never the IP or user agent): bad payloads at `INFO`, rate limits, bots and load shedding at `DEBUG`.

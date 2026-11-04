@@ -142,11 +142,18 @@ describe("events", () => {
     expect(sent).toHaveLength(0);
   });
 
-  it("tracks clicks on data-track elements, including nested targets", () => {
-    document.body.innerHTML = `<button data-track="signup" data-track-plan="pro" data-track-billing-cycle="yearly"><span id="inner">Go</span></button>`;
+  it("tracks clicks on data-mlz-event elements, including nested targets", () => {
+    document.body.innerHTML = `<button data-mlz-event="signup" data-mlz-event-plan="pro" data-mlz-event-billing-cycle="yearly"><span id="inner">Go</span></button>`;
     start({ ...base, auto: false });
     document.getElementById("inner")!.click();
     expect(sent[0]).toMatchObject({ name: "signup", props: { plan: "pro", billingCycle: "yearly" } });
+  });
+
+  it("ignores the old data-track attribute", () => {
+    document.body.innerHTML = `<button id="b" data-track="signup" data-track-plan="pro">Go</button>`;
+    start({ ...base, auto: false });
+    document.getElementById("b")!.click();
+    expect(sent).toHaveLength(0);
   });
 
   it("tracks outbound links but not internal ones", () => {
@@ -178,8 +185,8 @@ describe("events", () => {
     expect(sent).toHaveLength(0);
   });
 
-  it("prefers data-track over outbound tracking on the same link", () => {
-    document.body.innerHTML = `<a id="l" href="https://github.com/x" data-track="github">GitHub</a>`;
+  it("prefers data-mlz-event over outbound tracking on the same link", () => {
+    document.body.innerHTML = `<a id="l" href="https://github.com/x" data-mlz-event="github">GitHub</a>`;
     start({ ...base, auto: false });
     document.getElementById("l")!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
     expect(sent.map((p) => p.name)).toEqual(["github"]);
@@ -217,17 +224,17 @@ describe("disabling", () => {
 });
 
 describe("dataProps", () => {
-  it("maps data-track-* to camelCase props and skips data-track itself", () => {
+  it("maps data-mlz-event-* to camelCase props and skips data-mlz-event itself", () => {
     const el = document.createElement("div");
-    el.dataset.track = "x";
-    el.dataset.trackPlan = "pro";
+    el.dataset.mlzEvent = "x";
+    el.dataset.mlzEventPlan = "pro";
     el.dataset.other = "nope";
     expect(dataProps(el)).toEqual({ plan: "pro" });
   });
 
   it("returns undefined when there are no props", () => {
     const el = document.createElement("div");
-    el.dataset.track = "x";
+    el.dataset.mlzEvent = "x";
     expect(dataProps(el)).toBeUndefined();
   });
 });

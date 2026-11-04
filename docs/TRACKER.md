@@ -27,6 +27,18 @@ script-src  https://analytics.example.com;
 connect-src https://analytics.example.com;
 ```
 
+## Events from HTML
+
+```html
+<button data-mlz-event="signup" data-mlz-event-plan="pro">Sign up</button>
+```
+
+A click on the element (or anything inside it) sends the event `signup` with the property
+`plan: "pro"`. Further `data-mlz-event-*` attributes become more properties in camelCase. The
+prefix keeps the attributes apart from your own and from other tools, which is also what makes it
+safe to run two analytics tools side by side. An element with `data-mlz-event` is not also counted
+as an outbound link. From JavaScript, use `window.mlz.track("signup", { plan: "pro" })`.
+
 ## Bots and automation
 
 The script does nothing when `navigator.webdriver` is set and does not count prerendered pages.

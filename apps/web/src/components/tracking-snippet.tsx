@@ -56,7 +56,7 @@ export function TrackingSnippet({ siteId }: { siteId: string }) {
       <div className="flex flex-col gap-2">
         <p>Track custom events with an attribute or from JavaScript:</p>
         <CodeBlock
-          code={`<button data-track="signup" data-track-plan="pro">Sign up</button>`}
+          code={`<button data-mlz-event="signup" data-mlz-event-plan="pro">Sign up</button>`}
         />
         <CodeBlock code={`window.mlz?.track("signup", { plan: "pro" })`} />
       </div>

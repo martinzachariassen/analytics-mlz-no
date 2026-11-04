@@ -249,7 +249,7 @@ export function HomePage() {
                 <Code>
                   <span className="opacity-55">{"<!-- a goal -->"}</span>
                   {"\n"}
-                  {'<button data-track="signup">Sign up</button>'}
+                  {'<button data-mlz-event="signup">Sign up</button>'}
                 </Code>
               </div>
             </div>

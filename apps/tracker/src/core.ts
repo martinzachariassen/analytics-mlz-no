@@ -70,8 +70,8 @@ export function init(cfg: Config): Api & { stop?(): void } {
     if (e.type === "auxclick" && e.button !== 1) return; // only middle-click
     const target = e.target as Element | null;
 
-    const tracked = target?.closest?.<HTMLElement>("[data-track]");
-    if (tracked) return track(tracked.dataset.track!, dataProps(tracked));
+    const tracked = target?.closest?.<HTMLElement>("[data-mlz-event]");
+    if (tracked) return track(tracked.dataset.mlzEvent!, dataProps(tracked));
 
     const link = target?.closest?.<HTMLAnchorElement>("a[href]");
     if (link && /^https?:$/.test(link.protocol) && link.host !== location.host) {
@@ -117,12 +117,12 @@ export function init(cfg: Config): Api & { stop?(): void } {
     : { track, pageview };
 }
 
-/** Collects data-track-* attributes as props: data-track-plan="pro" -> { plan: "pro" }. */
+/** Collects data-mlz-event-* attributes as props: data-mlz-event-plan="pro" -> { plan: "pro" }. */
 export function dataProps(el: HTMLElement): Props | undefined {
   let props: Props | undefined;
   for (const key in el.dataset) {
-    if (key.length > 5 && key.startsWith("track")) {
-      (props ??= {})[key[5]!.toLowerCase() + key.slice(6)] = el.dataset[key]!;
+    if (key.length > 8 && key.startsWith("mlzEvent")) {
+      (props ??= {})[key[8]!.toLowerCase() + key.slice(9)] = el.dataset[key]!;
     }
   }
   return props;

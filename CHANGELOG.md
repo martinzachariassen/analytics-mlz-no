@@ -22,6 +22,7 @@ All notable changes are documented here. The format follows
 - Repository restructured: `server/`, `web/`, `tracker/` moved to `apps/`, `deploy/` to `infra/docker/`, Terraform to `infra/terraform/`. Self-hosters now use `infra/docker/docker-compose.yml`. The Go module path is now `github.com/martinzachariassen/analytics-mlz-no/apps/server`.
 
 ### Added
+- Terraform: with `alert_email` and `domain` set, an uptime check on `/api/script.js` emails you when the service is unreachable.
 - Terraform: `extra_domains` serves the dashboard site on additional hostnames (for example a short host for the tracking script), without redirects. See docs/DEPLOY.md.
 - Standalone database backups: a Cloud Run Job restores the Litestream replica every hour and every day, gzips it and writes it to a separate bucket (`<project>-backups`), with retention and a failure alert. `infra/docker/backup.sh`, `infra/docker/test-backup.sh`.
 - `analytics version` and version information in the startup log.

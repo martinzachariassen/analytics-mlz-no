@@ -186,3 +186,31 @@ resource "google_monitoring_alert_policy" "uptime" {
     content = "The tracking script is not reachable on the public hostname. Check Cloud Run (service logs, revisions) and Firebase Hosting. Events sent while the service is down are lost."
   }
 }
+
+# The server logged an error (failed inserts, database over MAX_DATABASE_MB, OAuth failures).
+# Only the app's own log lines count, not Cloud Run's request log (5xx there is covered above).
+# At most one email per hour while errors keep coming.
+resource "google_monitoring_alert_policy" "app_errors" {
+  count        = local.alerts
+  display_name = "Analytics: server logged an error"
+  combiner     = "OR"
+
+  conditions {
+    display_name = "Error log line"
+    condition_matched_log {
+      filter = "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${var.service_name}\" AND log_id(\"run.googleapis.com/stdout\") AND severity>=ERROR"
+    }
+  }
+
+  alert_strategy {
+    notification_rate_limit {
+      period = "3600s"
+    }
+    auto_close = "1800s"
+  }
+
+  notification_channels = [google_monitoring_notification_channel.email[0].id]
+  documentation {
+    content = "The analytics server logged an error. In Logs Explorer: resource.type=\"cloud_run_revision\" resource.labels.service_name=\"${var.service_name}\" severity>=ERROR."
+  }
+}

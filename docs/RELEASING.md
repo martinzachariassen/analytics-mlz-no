@@ -6,10 +6,10 @@ Releases are cut by pushing a version tag. The pipeline in `.github/workflows/re
 
 Code and docs are ready; these steps need real infrastructure and are not automated.
 
-- [ ] **Production domain** chosen and DNS pointed at Firebase Hosting ([DEPLOY.md](DEPLOY.md)).
-- [ ] **`PROXY_HOPS` verified** on Cloud Run behind Firebase Hosting. Log `X-Forwarded-For` for a
-      request, count the proxies, and confirm the stored country and visitor hash match your own
-      IP. A wrong value breaks rate limiting and visitor counting.
+- [x] **Production domain** chosen and DNS pointed at Firebase Hosting ([DEPLOY.md](DEPLOY.md)):
+      `analytics.mlz.no` and `t.mlz.no`.
+- [x] **`PROXY_HOPS` verified** on Cloud Run behind Firebase Hosting (`2`): the stored country
+      and visitor hash match a real visitor. A wrong value breaks rate limiting and visitor counting.
 - [ ] **End-to-end smoke test in production:** GitHub sign-in works, the tracking script on a real
       page produces an event in the dashboard, and the Litestream restore log line appears after a
       redeploy.
@@ -23,22 +23,28 @@ Code and docs are ready; these steps need real infrastructure and are not automa
 The Docker image contains the API only. The dashboard (`apps/web/`) is deployed to Firebase Hosting and
 reaches the API through a same-origin rewrite. Someone running `docker compose` therefore has a
 working collector but no dashboard unless they serve `apps/web/dist` themselves behind the same
-origin. Decide before 1.0 whether to embed `apps/web/dist` in the Go binary (simplest for
-self-hosting) or document a reverse-proxy recipe.
+origin, with headers equivalent to `apps/web/firebase.json`. The server sends its own security
+headers for `/api`, but the dashboard's CSP comes from the host that serves the static files.
+Whether to embed `apps/web/dist` in the Go binary is tracked in [PLAN.md](PLAN.md#before-10).
 
 ## Cutting a release
 
+Releases follow [Semantic Versioning](https://semver.org/). `CHANGELOG.md` is the source: move
+"Unreleased" under the new version heading with today's date, add the compare link, commit as
+`release: vX.Y.Z` on a `release/vX.Y.Z` branch and merge it through a pull request. Then tag the
+merge commit:
+
 ```sh
 git checkout main && git pull
-git tag v0.1.0            # pre-release: v0.1.0-rc.1
-git push origin v0.1.0
+git tag -a v0.2.0 -m "v0.2.0"   # pre-release: v0.2.0-rc.1
+git push origin v0.2.0
 ```
 
 The workflow then:
 
 1. runs the full CI workflow as a gate,
 2. builds and pushes `ghcr.io/martinzachariassen/analytics-mlz-no` for linux/amd64 and
-   linux/arm64, tagged `0.1.0`, `0.1` and `latest` (pre-releases get only their own tag), with an
+   linux/arm64, tagged `0.2.0`, `0.2` and `latest` (pre-releases get only their own tag), with an
    SBOM and a signed build provenance attestation; the GeoIP month is pinned to the release month,
 3. cross-compiles static binaries for Linux and macOS (amd64, arm64) with `checksums.txt` and a
    provenance attestation (`gh attestation verify <file> --owner martinzachariassen`),
@@ -48,7 +54,7 @@ Edit the generated notes afterwards if needed, copying the relevant part of the 
 
 ## After the release
 
-- `docker run --rm ghcr.io/martinzachariassen/analytics-mlz-no:0.1.0 version` prints the tag.
+- `docker run --rm ghcr.io/martinzachariassen/analytics-mlz-no:0.2.0 version` prints the tag.
 - Deploy to Cloud Run with `make deploy` (the version is taken from `git describe`).
 - The first push of the package to GHCR is private by default: set its visibility to public under
   the repository's Packages settings once.

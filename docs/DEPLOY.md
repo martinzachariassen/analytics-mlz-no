@@ -10,7 +10,9 @@ Self-hosting without GCP? Use `docker compose -f infra/docker/docker-compose.yml
 
 - `gcloud`, signed in as an account that can create projects and use a billing account:
   `gcloud auth login && gcloud auth application-default login`
-- Terraform ≥ 1.9, Docker with `buildx`, Node (for the dashboard build), and the Firebase CLI (`firebase login`)
+- The repo's tools: `mise install` (Terraform, Go, Bun and the linters from `mise.toml`) and
+  `bun install` (the Firebase CLI is a dev dependency; sign in with `bunx firebase-tools login`).
+  Docker with `buildx` for the image.
 - A domain whose DNS you control, e.g. `analytics.example.com`. Optionally a second, short host for the tracking script (see [Extra domains](#extra-domains))
 - A **GitHub OAuth App** (Settings → Developer settings → OAuth Apps):
   - Homepage URL: `https://<domain>`
@@ -70,6 +72,8 @@ Outputs:
 | `dns_records` | Records to create for the custom domain and any extra domains (usually one CNAME each to `<site>.web.app`). |
 | `image_repo` | Where `make deploy` pushes images. |
 | `cloud_run_url` | Direct service URL, for debugging. |
+| `firebase_site`, `firebase_default_url` | The Hosting site and its `web.app` URL. |
+| `dashboard_url`, `logs_url` | The operations dashboard and the warnings/errors log query (see Operations). |
 
 ## 3. GitHub client secret
 
@@ -205,17 +209,6 @@ docs/API.md), since Cloud Run has no shell for `analytics events purge`.
   `litestream restore -o analytics.db gs://<project_id>-db/analytics`
 - **Standalone backups:** a Cloud Run Job (`<service>-backup`) restores the replica every hour and every day and writes a gzipped SQLite file to the separate bucket `<project_id>-backups` (`hourly/` is kept 3 days, `daily/` 90 days; see `backup_*_retention_days`). It reads the replica and never touches the running service. `make deploy` updates the job's image together with the service. After the first `terraform apply` the job uses a placeholder image, so it fails (and, with `alert_email`, sends an alert) until the first `make deploy`. Take one by hand with `gcloud run jobs execute <service>-backup --args daily --region <region> --project <project_id>`.
 - **Cost:** check the billing console. The budget alert emails at 50% and 90%, and at 100% of forecast spend.
-
-### Outputs
-
-| Output | What it is |
-|---|---|
-| `public_url` | The dashboard; `<public_url>/api/auth/github/callback` goes in the GitHub OAuth App |
-| `cloud_run_url` | The service's own `run.app` URL (Firebase Hosting proxies to it) |
-| `firebase_site`, `firebase_default_url` | The Hosting site and its `web.app` URL |
-| `dns_records` | Records to create for `domain` and `extra_domains` |
-| `image_repo` | Where `make deploy` pushes images |
-| `dashboard_url`, `logs_url` | The operations dashboard and the warnings/errors log query |
 
 ### Restoring the database (runbook)
 

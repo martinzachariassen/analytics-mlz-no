@@ -22,7 +22,8 @@ var migrationsFS embed.FS
 
 // Store is the application's data access layer.
 type Store struct {
-	db *sql.DB
+	db    *sql.DB
+	sites siteCache
 }
 
 // Open opens (or creates) the SQLite database at path and applies pending migrations.
@@ -62,6 +63,16 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
 	return s, nil
+}
+
+// Size returns the bytes in use by the database: pages holding data, excluding free pages
+// (so it drops right after deleting events, without a VACUUM) and the WAL.
+func (s *Store) Size(ctx context.Context) (int64, error) {
+	var n int64
+	err := s.db.QueryRowContext(ctx,
+		`SELECT (page_count - freelist_count) * page_size
+		 FROM pragma_page_count(), pragma_freelist_count(), pragma_page_size()`).Scan(&n)
+	return n, err
 }
 
 // Close closes the database.

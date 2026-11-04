@@ -5,7 +5,7 @@
   "description": "Tiny, cookie-free tracking script for analytics-mlz-no",
   "license": "MIT",
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --minify --format=iife --target=es2019 --legal-comments=none --outfile=../server/internal/script/script.js",
+    "build": "esbuild src/index.ts --bundle --minify --format=iife --target=es2022 --define:MLZ_TEST=false --legal-comments=none --outfile=../server/internal/script/script.js",
     "size": "npm run build && gzip -c ../server/internal/script/script.js | wc -c",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

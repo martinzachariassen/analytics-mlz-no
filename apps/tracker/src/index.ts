@@ -16,16 +16,15 @@ declare global {
 }
 
 const script = document.currentScript as HTMLScriptElement | null;
-const ds = script?.dataset ?? {};
+const ds = script?.dataset;
 
-if (script && ds.site && !window.mlz) {
-  const { track, pageview } = init({
+if (ds?.site && !window.mlz) {
+  window.mlz = init({
     site: ds.site,
-    endpoint: ds.api || new URL("/api/event", script.src).href,
+    endpoint: ds.api || new URL("/api/event", script!.src).href,
     auto: ds.auto !== "false",
     hash: ds.hash === "true",
     allowLocalhost: ds.allowLocalhost === "true",
     respectDnt: ds.respectDnt === "true",
   });
-  window.mlz = { track, pageview };
 }

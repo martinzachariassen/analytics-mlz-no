@@ -18,64 +18,65 @@ const base: Config = {
 };
 
 let sent: Array<Record<string, unknown>>;
-let pending: Array<Promise<unknown>>;
 const stops: Array<() => void> = [];
 
 /** Starts the tracker and registers it for cleanup after the test. */
 function start(cfg: Config) {
   const t = init(cfg);
-  stops.push(t.stop);
+  stops.push(t.stop!);
   return t;
 }
 
-async function decode(blob: Blob) {
-  return JSON.parse(await blob.text()) as Record<string, unknown>;
-}
-
-/** Waits for queued beacons to be decoded. */
-async function flush() {
-  await Promise.all(pending);
+/** Replaces navigator.sendBeacon; `accept` is what the browser reports (false = not queued). */
+function mockBeacon(accept: boolean) {
+  Object.defineProperty(navigator, "sendBeacon", {
+    configurable: true,
+    value: vi.fn((_url: string, body: string) => {
+      if (accept) sent.push(JSON.parse(body));
+      return accept;
+    }),
+  });
 }
 
 beforeEach(() => {
   sent = [];
-  pending = [];
   window.happyDOM.setURL("https://www.example.com/start?utm_source=newsletter#top");
   document.body.innerHTML = "";
   localStorage.clear();
   // happy-dom reports itself as an automated browser; the tracker would ignore it.
   Object.defineProperty(navigator, "webdriver", { configurable: true, value: false });
-  Object.defineProperty(navigator, "sendBeacon", {
-    configurable: true,
-    value: vi.fn((_url: string, blob: Blob) => {
-      const target = sent;
-      pending.push(decode(blob).then((p) => target.push(p)));
-      return true;
-    }),
-  });
+  mockBeacon(true);
 });
 
 afterEach(() => {
   while (stops.length) stops.pop()!();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  Object.defineProperty(navigator, "doNotTrack", { configurable: true, value: null });
 });
 
 describe("page views", () => {
-  it("sends an initial page view without the hash", async () => {
+  it("sends an initial page view without the hash", () => {
     start(base);
-    await flush();
     expect(sent).toEqual([
       { site: "site123", type: "pageview", url: "https://www.example.com/start?utm_source=newsletter" },
     ]);
-    expect(navigator.sendBeacon).toHaveBeenCalledWith(base.endpoint, expect.any(Blob));
+    expect(navigator.sendBeacon).toHaveBeenCalledWith(base.endpoint, expect.any(String));
   });
 
-  it("tracks SPA navigation via pushState and popstate, ignoring duplicates", async () => {
+  it("sends the referrer with the first page view only", () => {
+    vi.spyOn(document, "referrer", "get").mockReturnValue("https://news.example.org/");
+    start(base);
+    history.pushState({}, "", "/a");
+    expect(sent.map((p) => p.referrer)).toEqual(["https://news.example.org/", undefined]);
+  });
+
+  it("tracks SPA navigation via pushState and popstate, ignoring duplicates", () => {
     start(base);
     history.pushState({}, "", "/a");
     history.pushState({}, "", "/a"); // duplicate
     history.pushState({}, "", "/b");
     window.dispatchEvent(new PopStateEvent("popstate"));
-    await flush();
     expect(sent.map((p) => p.url)).toEqual([
       "https://www.example.com/start?utm_source=newsletter",
       "https://www.example.com/a",
@@ -83,39 +84,72 @@ describe("page views", () => {
     ]);
   });
 
-  it("does nothing automatically when auto is false", async () => {
+  it("does nothing automatically when auto is false", () => {
     const api = start({ ...base, auto: false });
-    await flush();
     expect(sent).toHaveLength(0);
     api.pageview();
-    await flush();
     expect(sent).toHaveLength(1);
   });
 
-  it("keeps the hash in hash mode", async () => {
+  it("waits for a prerendered page to be activated", () => {
+    Object.defineProperty(document, "prerendering", { configurable: true, value: true });
+    start(base);
+    expect(sent).toHaveLength(0);
+    Object.defineProperty(document, "prerendering", { configurable: true, value: false });
+    document.dispatchEvent(new Event("prerenderingchange"));
+    document.dispatchEvent(new Event("prerenderingchange")); // listener is { once: true }
+    expect(sent.map((p) => p.type)).toEqual(["pageview"]);
+    delete (document as { prerendering?: boolean }).prerendering;
+  });
+
+  it("keeps the hash in hash mode", () => {
     start({ ...base, hash: true });
-    await flush();
     expect(sent[0]!.url).toBe("https://www.example.com/start?utm_source=newsletter#top");
   });
 });
 
+describe("sending", () => {
+  it("falls back to fetch with keepalive when sendBeacon does not queue the request", async () => {
+    mockBeacon(false);
+    const fetch = vi.fn(() => Promise.resolve(new Response()));
+    vi.stubGlobal("fetch", fetch);
+    start(base);
+    expect(fetch).toHaveBeenCalledWith(base.endpoint, {
+      method: "POST",
+      body: JSON.stringify({ site: "site123", type: "pageview", url: "https://www.example.com/start?utm_source=newsletter" }),
+      keepalive: true,
+    });
+  });
+
+  it("swallows fetch errors", async () => {
+    mockBeacon(false);
+    vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new TypeError("offline"))));
+    expect(() => start(base)).not.toThrow();
+    await Promise.resolve(); // let the rejection settle; an unhandled one would fail the run
+  });
+});
+
 describe("events", () => {
-  it("tracks custom events via the API", async () => {
+  it("tracks custom events via the API", () => {
     const api = start({ ...base, auto: false });
     api.track("signup", { plan: "pro", seats: 3 });
-    await flush();
     expect(sent[0]).toMatchObject({ type: "event", name: "signup", props: { plan: "pro", seats: 3 } });
   });
 
-  it("tracks clicks on data-track elements, including nested targets", async () => {
+  it("ignores events without a name", () => {
+    const api = start({ ...base, auto: false });
+    api.track("");
+    expect(sent).toHaveLength(0);
+  });
+
+  it("tracks clicks on data-track elements, including nested targets", () => {
     document.body.innerHTML = `<button data-track="signup" data-track-plan="pro" data-track-billing-cycle="yearly"><span id="inner">Go</span></button>`;
     start({ ...base, auto: false });
     document.getElementById("inner")!.click();
-    await flush();
     expect(sent[0]).toMatchObject({ name: "signup", props: { plan: "pro", billingCycle: "yearly" } });
   });
 
-  it("tracks outbound links but not internal ones", async () => {
+  it("tracks outbound links but not internal ones", () => {
     document.body.innerHTML = `
       <a id="out" href="https://github.com/x">GitHub</a>
       <a id="in" href="/about">About</a>
@@ -124,45 +158,61 @@ describe("events", () => {
     for (const id of ["out", "in", "mail"]) {
       document.getElementById(id)!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
     }
-    await flush();
     expect(sent).toEqual([
       expect.objectContaining({ name: "outbound-link", props: { url: "https://github.com/x" } }),
     ]);
   });
 
-  it("prefers data-track over outbound tracking on the same link", async () => {
+  it("counts middle clicks but not other auxiliary clicks", () => {
+    document.body.innerHTML = `<a id="out" href="https://github.com/x">GitHub</a>`;
+    start({ ...base, auto: false });
+    const link = document.getElementById("out")!;
+    link.dispatchEvent(new MouseEvent("auxclick", { bubbles: true, button: 1 })); // middle: opens a tab
+    link.dispatchEvent(new MouseEvent("auxclick", { bubbles: true, button: 2 })); // right: context menu
+    expect(sent).toHaveLength(1);
+  });
+
+  it("ignores clicks whose target is not an element", () => {
+    start({ ...base, auto: false });
+    expect(() => document.dispatchEvent(new MouseEvent("click", { bubbles: true }))).not.toThrow();
+    expect(sent).toHaveLength(0);
+  });
+
+  it("prefers data-track over outbound tracking on the same link", () => {
     document.body.innerHTML = `<a id="l" href="https://github.com/x" data-track="github">GitHub</a>`;
     start({ ...base, auto: false });
     document.getElementById("l")!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-    await flush();
     expect(sent.map((p) => p.name)).toEqual(["github"]);
   });
 });
 
 describe("disabling", () => {
-  it("ignores localhost unless allowed", async () => {
+  it("ignores localhost unless allowed", () => {
     window.happyDOM.setURL("http://localhost:5173/");
     start(base);
-    await flush();
     expect(sent).toHaveLength(0);
 
     start({ ...base, allowLocalhost: true });
-    await flush();
     expect(sent).toHaveLength(1);
   });
 
-  it("ignores automated browsers", async () => {
+  it("ignores automated browsers", () => {
     Object.defineProperty(navigator, "webdriver", { configurable: true, value: true });
     start(base);
-    await flush();
     expect(sent).toHaveLength(0);
   });
 
-  it("respects the mlz_ignore opt-out", async () => {
+  it("respects the mlz_ignore opt-out", () => {
     localStorage.setItem("mlz_ignore", "true");
     start(base);
-    await flush();
     expect(sent).toHaveLength(0);
+  });
+
+  it("honours Do Not Track only when asked to", () => {
+    Object.defineProperty(navigator, "doNotTrack", { configurable: true, value: "1" });
+    start(base);
+    start({ ...base, respectDnt: true });
+    expect(sent).toHaveLength(1);
   });
 });
 

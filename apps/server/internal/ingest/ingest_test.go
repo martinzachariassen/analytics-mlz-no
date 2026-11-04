@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/geo"
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/store"
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/visitor"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/geo"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/store"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/visitor"
 )
 
 const chromeUA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"

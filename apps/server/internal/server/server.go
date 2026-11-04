@@ -7,15 +7,15 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/api"
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/auth"
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/config"
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/geo"
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/httpx"
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/ingest"
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/store"
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/tracker"
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/visitor"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/api"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/auth"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/config"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/geo"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/httpx"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/ingest"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/script"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/store"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/visitor"
 )
 
 // New returns the root HTTP handler.
@@ -32,7 +32,7 @@ func New(cfg config.Config, st *store.Store, authn *auth.Service, loc *geo.Locat
 	}
 	mux.Handle("POST /api/event", events)
 	mux.Handle("OPTIONS /api/event", events)
-	mux.Handle("GET /api/script.js", tracker.Handler())
+	mux.Handle("GET /api/script.js", script.Handler())
 
 	authn.Register(mux)
 

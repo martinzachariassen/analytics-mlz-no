@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/httpx"
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/store"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/httpx"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/store"
 )
 
 // API serves the dashboard endpoints. All routes must be wrapped with auth.

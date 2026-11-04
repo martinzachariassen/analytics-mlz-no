@@ -2,7 +2,7 @@
 // latency. It is a development tool for sizing a single SQLite-backed instance, not part of the
 // product.
 //
-//	go run ./dev/loadtest -url http://localhost:8080 -site <site-id> -domain example.com \
+//	go run ./apps/server/cmd/loadtest -url http://localhost:8080 -site <site-id> -domain example.com \
 //	    -concurrency 32 -duration 15s
 //
 // The server rate-limits per client IP (10 requests/s). To measure ingestion rather than the

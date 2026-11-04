@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/store"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/store"
 )
 
 func TestSeed(t *testing.T) {

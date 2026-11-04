@@ -19,8 +19,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/httpx"
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/store"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/httpx"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/store"
 )
 
 // CookieName must be "__session": Firebase Hosting strips every other cookie

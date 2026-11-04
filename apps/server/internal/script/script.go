@@ -1,5 +1,5 @@
-// Package tracker serves the embedded tracking script (built from /tracker with `npm run build`).
-package tracker
+// Package script serves the embedded tracking script (built from apps/tracker with `npm run build`).
+package script
 
 import (
 	"bytes"

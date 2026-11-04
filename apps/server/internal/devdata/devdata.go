@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/store"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/store"
 )
 
 // Options controls how much traffic Seed generates.

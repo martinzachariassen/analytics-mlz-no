@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/store"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/store"
 )
 
 // fakeGitHub emulates GitHub's token and user endpoints. The code determines the user.

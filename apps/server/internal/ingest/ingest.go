@@ -16,9 +16,9 @@ import (
 
 	"github.com/mileusna/useragent"
 
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/geo"
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/httpx"
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/store"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/geo"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/httpx"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/store"
 )
 
 // Limits on incoming payloads.

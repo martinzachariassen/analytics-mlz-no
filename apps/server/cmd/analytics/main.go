@@ -22,12 +22,12 @@ import (
 	"time"
 	_ "time/tzdata" // embed time zones so stats work on minimal hosts
 
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/auth"
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/config"
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/devdata"
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/geo"
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/server"
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/store"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/auth"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/config"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/devdata"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/geo"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/server"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/store"
 )
 
 // version is set at release time with -ldflags "-X main.version=v1.2.3".
@@ -214,7 +214,7 @@ func sites(cfg config.Config, args []string) error {
 	}
 }
 
-// demoSites are the sites `seed` creates. The first is tracked by the demo page in dev/demo.
+// demoSites are the sites `seed` creates. The first is tracked by the demo page in apps/demo.
 var demoSites = []struct {
 	name, domain string
 	visits       int

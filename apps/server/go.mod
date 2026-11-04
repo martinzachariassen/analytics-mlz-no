@@ -1,4 +1,4 @@
-module github.com/martinzachariassen/analytics-mlz-no
+module github.com/martinzachariassen/analytics-mlz-no/apps/server
 
 go 1.27.3
 

@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/auth"
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/config"
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/geo"
-	"github.com/martinzachariassen/analytics-mlz-no/server/internal/store"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/auth"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/config"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/geo"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/store"
 )
 
 func setup(t *testing.T) (http.Handler, *http.Cookie) {

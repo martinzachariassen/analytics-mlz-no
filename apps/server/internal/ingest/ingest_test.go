@@ -1,7 +1,9 @@
 package ingest
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -173,6 +175,41 @@ func TestRejected(t *testing.T) {
 	}
 	if len(rec.events) != 0 {
 		t.Fatalf("stored %d events, want 0", len(rec.events))
+	}
+}
+
+func TestRejectionIsLoggedWithoutPersonalData(t *testing.T) {
+	h, _, site := setup(t)
+	var buf bytes.Buffer
+	h.Log = slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	body := `{"site":"` + site.ID + `","url":"https://example.com/"}`
+	if w := post(h, body, chromeUA, "https://evil.com"); w.Code != 400 || strings.TrimSpace(w.Body.String()) != "invalid event" {
+		t.Fatalf("got %d %q, want 400 \"invalid event\"", w.Code, w.Body)
+	}
+	// Bots log at DEBUG, which is off here.
+	post(h, body, "Googlebot/2.1", "")
+
+	var entry map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
+		t.Fatalf("want exactly one JSON log line, got %q: %v", buf.String(), err)
+	}
+	want := map[string]any{
+		"msg":    "event rejected",
+		"reason": "origin does not match the site's domain",
+		"status": float64(400),
+		"origin": "evil.com",
+		"site":   site.ID,
+	}
+	for k, v := range want {
+		if entry[k] != v {
+			t.Errorf("%s = %v, want %v", k, entry[k], v)
+		}
+	}
+	for _, secret := range []string{"192.0.2.1", "Chrome/130", "Googlebot"} {
+		if strings.Contains(buf.String(), secret) {
+			t.Errorf("log line contains %q: %s", secret, buf.String())
+		}
 	}
 }
 

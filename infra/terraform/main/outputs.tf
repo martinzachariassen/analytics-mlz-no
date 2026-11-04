@@ -15,6 +15,16 @@ output "cloud_run_url" {
   value = google_cloud_run_v2_service.this.uri
 }
 
+output "dashboard_url" {
+  description = "Operations dashboard: traffic, errors, latency, memory, backups and server warnings."
+  value       = "https://console.cloud.google.com/monitoring/dashboards/builder/${element(split("/", google_monitoring_dashboard.ops.id), 3)}?project=${var.project_id}"
+}
+
+output "logs_url" {
+  description = "Logs Explorer filtered to the server's warnings and errors. Remove the severity clause to see everything."
+  value       = "https://console.cloud.google.com/logs/query;query=${urlencode(local.server_warnings_filter)}?project=${var.project_id}"
+}
+
 output "image_repo" {
   description = "Push server images here (make deploy)."
   value       = local.image_repo

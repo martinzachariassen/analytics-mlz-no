@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log/slog"
 	"strings"
 	"testing"
 )
@@ -38,6 +39,35 @@ func TestDevLogin(t *testing.T) {
 			}
 			if err == nil || !strings.Contains(err.Error(), c.wantErr) {
 				t.Fatalf("Load() error = %v, want %q", err, c.wantErr)
+			}
+		})
+	}
+}
+
+func TestLogLevel(t *testing.T) {
+	cases := map[string]struct {
+		want    slog.Level
+		wantErr bool
+	}{
+		"":        {slog.LevelInfo, false},
+		"debug":   {slog.LevelDebug, false},
+		"INFO":    {slog.LevelInfo, false},
+		"warning": {slog.LevelWarn, false},
+		"error":   {slog.LevelError, false},
+		"verbose": {0, true},
+	}
+	for v, c := range cases {
+		t.Run(v, func(t *testing.T) {
+			t.Setenv("LOG_LEVEL", v)
+			cfg, err := Load()
+			if c.wantErr {
+				if err == nil || !strings.Contains(err.Error(), "LOG_LEVEL") {
+					t.Fatalf("Load() error = %v, want a LOG_LEVEL error", err)
+				}
+				return
+			}
+			if err != nil || cfg.LogLevel != c.want {
+				t.Fatalf("Load() = %v, %v; want %v", cfg.LogLevel, err, c.want)
 			}
 		})
 	}

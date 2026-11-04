@@ -4,6 +4,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"os"
 	"strconv"
@@ -42,6 +43,9 @@ type Config struct {
 	// DevLogin signs every visitor in as a local "dev" user without a provider.
 	// Only allowed when PUBLIC_URL points to localhost, and not together with GitHub.
 	DevLogin bool
+
+	// LogLevel is the lowest level that is logged: debug, info (default), warn or error.
+	LogLevel slog.Level
 }
 
 // GitHubEnabled reports whether GitHub login is configured.
@@ -63,6 +67,9 @@ func Load() (Config, error) {
 		DevLogin:           os.Getenv("DEV_LOGIN") == "1",
 	}
 	var err error
+	if c.LogLevel, err = logLevel(env("LOG_LEVEL", "info")); err != nil {
+		return c, err
+	}
 	if c.ProxyHops, err = envInt("PROXY_HOPS", 0); err != nil {
 		return c, err
 	}
@@ -123,6 +130,20 @@ func env(key, def string) string {
 		return v
 	}
 	return def
+}
+
+func logLevel(v string) (slog.Level, error) {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "debug":
+		return slog.LevelDebug, nil
+	case "info":
+		return slog.LevelInfo, nil
+	case "warn", "warning":
+		return slog.LevelWarn, nil
+	case "error":
+		return slog.LevelError, nil
+	}
+	return 0, fmt.Errorf("LOG_LEVEL must be debug, info, warn or error, got %q", v)
 }
 
 func envInt(key string, def int) (int, error) {

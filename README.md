@@ -119,6 +119,7 @@ See [docs/API.md](docs/API.md).
 | `RETENTION_DAYS` | `0` | Delete events older than N days (0 = forever) |
 | `INGEST_RATE_LIMIT` | `200` | Max accepted events per second across all clients; excess gets `503` (0 = no global limit) |
 | `MAX_DATABASE_MB` | `0` | Pause ingestion (`503`) while the database is larger than this; the dashboard keeps working (0 = no limit) |
+| `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. `debug` also logs every event dropped by rate limits or bot filtering |
 | `PUBLIC_URL` | `http://localhost:8080` | Dashboard URL; used for the OAuth callback. `https://` enables Secure cookies |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | – | GitHub OAuth App credentials (enables sign-in) |
 | `ALLOWED_GITHUB_USERS` | – | Comma-separated GitHub usernames allowed to sign in |

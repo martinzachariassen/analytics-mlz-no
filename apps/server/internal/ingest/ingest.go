@@ -92,20 +92,24 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	ip := httpx.ClientIP(r, h.ProxyHops)
 	if h.Limiter != nil && !h.Limiter.Allow(ip) {
+		h.reject(r, slog.LevelDebug, "rate limit (client)", http.StatusTooManyRequests, "")
 		http.Error(w, "too many requests", http.StatusTooManyRequests)
 		return
 	}
 	if h.PeerLimiter != nil {
 		if peer := httpx.PeerIP(r, h.ProxyHops); peer != ip && !h.PeerLimiter.Allow(peer) {
+			h.reject(r, slog.LevelDebug, "rate limit (upstream address)", http.StatusTooManyRequests, "")
 			http.Error(w, "too many requests", http.StatusTooManyRequests)
 			return
 		}
 	}
 	if h.Global != nil && !h.Global.Allow() {
+		h.reject(r, slog.LevelDebug, "global rate limit", http.StatusServiceUnavailable, "")
 		unavailable(w)
 		return
 	}
 	if h.Paused != nil && h.Paused() {
+		h.reject(r, slog.LevelDebug, "ingestion paused (database size)", http.StatusServiceUnavailable, "")
 		unavailable(w)
 		return
 	}
@@ -114,6 +118,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	parsedUA := useragent.Parse(ua)
 	if isBot(ua, parsedUA) {
 		// Accept silently so bots get no signal, but don't store anything.
+		h.reject(r, slog.LevelDebug, "bot", http.StatusAccepted, "")
 		w.WriteHeader(http.StatusAccepted)
 		return
 	}
@@ -121,19 +126,22 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// sendBeacon uses text/plain to avoid a CORS preflight, so accept any content type.
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodyBytes))
 	if err != nil {
+		h.reject(r, slog.LevelInfo, "payload too large", http.StatusRequestEntityTooLarge, "")
 		http.Error(w, "payload too large", http.StatusRequestEntityTooLarge)
 		return
 	}
 	var p Payload
 	if err := json.Unmarshal(body, &p); err != nil {
+		h.reject(r, slog.LevelInfo, "invalid json", http.StatusBadRequest, "")
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
 
 	ev, err := h.buildEvent(r.Context(), r, p, ip, ua, parsedUA)
-	var bad badRequest
-	if errors.As(err, &bad) {
-		http.Error(w, bad.Error(), http.StatusBadRequest)
+	var br badRequest
+	if errors.As(err, &br) {
+		h.reject(r, slog.LevelInfo, br.reason, http.StatusBadRequest, p.Site)
+		http.Error(w, br.Error(), http.StatusBadRequest)
 		return
 	}
 	if err != nil {
@@ -142,6 +150,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.VisitorLimiter != nil && !h.VisitorLimiter.Allow(ev.SiteID+":"+strconv.FormatInt(ev.VisitorID, 10)) {
+		h.reject(r, slog.LevelDebug, "rate limit (visitor)", http.StatusAccepted, ev.SiteID)
 		w.WriteHeader(http.StatusAccepted)
 		return
 	}
@@ -153,6 +162,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			t.Stop()
 			defer func() { <-h.WriteSlots }()
 		case <-t.C:
+			h.reject(r, slog.LevelDebug, "write queue full", http.StatusServiceUnavailable, ev.SiteID)
 			unavailable(w)
 			return
 		case <-r.Context().Done():
@@ -173,41 +183,72 @@ func unavailable(w http.ResponseWriter) {
 	http.Error(w, "server busy", http.StatusServiceUnavailable)
 }
 
-// badRequest is an error caused by the client's payload.
-type badRequest string
+// reject logs why an event was not stored. It records only coarse, non-identifying facts:
+// the reason, the status sent, the Origin's hostname and the site id from the payload. Never
+// the IP address or the user agent (see docs/PRIVACY.md). Floods log at DEBUG, so they only
+// show up with LOG_LEVEL=debug.
+func (h *Handler) reject(r *http.Request, level slog.Level, reason string, status int, site string) {
+	if h.Log == nil || !h.Log.Enabled(r.Context(), level) {
+		return
+	}
+	attrs := []slog.Attr{slog.String("reason", reason), slog.Int("status", status)}
+	if o := r.Header.Get("Origin"); o != "" {
+		origin := o
+		if u, err := url.Parse(o); err == nil && u.Host != "" {
+			origin = u.Hostname()
+		}
+		attrs = append(attrs, slog.String("origin", truncate(cleanText(origin), maxLogField)))
+	}
+	if site != "" {
+		attrs = append(attrs, slog.String("site", truncate(cleanText(site), maxLogField)))
+	}
+	h.Log.LogAttrs(r.Context(), level, "event rejected", attrs...)
+}
 
-func (e badRequest) Error() string { return string(e) }
+// maxLogField caps client-supplied text in log lines.
+const maxLogField = 100
 
-const errInvalid = badRequest("invalid event")
+// badRequest is an error caused by the client's payload. The client sees public; reason is
+// the specific cause, for the log only.
+type badRequest struct{ public, reason string }
+
+func (e badRequest) Error() string { return e.public }
+
+// invalid is the deliberately vague answer for events that do not belong to a site, so a
+// prober learns nothing about which check failed.
+func invalid(reason string) badRequest { return badRequest{"invalid event", reason} }
+
+// bad is a client error whose message is safe to show as is.
+func bad(msg string) badRequest { return badRequest{msg, msg} }
 
 func (h *Handler) buildEvent(ctx context.Context, r *http.Request, p Payload, ip, ua string, parsed useragent.UserAgent) (store.Event, error) {
 	site, err := h.Store.GetSite(ctx, p.Site)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			return store.Event{}, errInvalid
+			return store.Event{}, invalid("unknown site")
 		}
 		return store.Event{}, err
 	}
 
 	pageURL, err := url.Parse(p.URL)
 	if err != nil || pageURL.Host == "" {
-		return store.Event{}, errInvalid
+		return store.Event{}, invalid("invalid page url")
 	}
 	host := normalizeHost(pageURL.Hostname())
 	if !validHostname(host) || !hostMatches(host, site.Domain) {
-		return store.Event{}, errInvalid
+		return store.Event{}, invalid("page url does not match the site's domain")
 	}
 	// Browsers always send Origin on POST, including sendBeacon. "null" comes from
 	// sandboxed or privacy-restricted contexts and is allowed. This does not stop a
 	// deliberate script, but it drops naive replays from curl and similar tools.
 	switch origin := r.Header.Get("Origin"); origin {
 	case "":
-		return store.Event{}, errInvalid
+		return store.Event{}, invalid("missing origin")
 	case "null":
 	default:
 		o, err := url.Parse(origin)
 		if err != nil || !hostMatches(normalizeHost(o.Hostname()), site.Domain) {
-			return store.Event{}, errInvalid
+			return store.Event{}, invalid("origin does not match the site's domain")
 		}
 	}
 
@@ -228,10 +269,10 @@ func (h *Handler) buildEvent(ctx context.Context, r *http.Request, p Payload, ip
 		ev.Type = "event"
 		ev.Name = truncate(strings.TrimSpace(cleanText(p.Name)), maxNameLen)
 		if ev.Name == "" {
-			return store.Event{}, badRequest("event name is required")
+			return store.Event{}, bad("event name is required")
 		}
 	default:
-		return store.Event{}, badRequest("unknown event type")
+		return store.Event{}, bad("unknown event type")
 	}
 
 	if p.Referrer != "" {
@@ -271,7 +312,7 @@ func parseProps(raw map[string]json.RawMessage) (map[string]string, error) {
 		return nil, nil
 	}
 	if len(raw) > maxProps {
-		return nil, badRequest("too many props")
+		return nil, bad("too many props")
 	}
 	out := make(map[string]string, len(raw))
 	for k, v := range raw {
@@ -281,7 +322,7 @@ func parseProps(raw map[string]json.RawMessage) (map[string]string, error) {
 		}
 		var val any
 		if err := json.Unmarshal(v, &val); err != nil {
-			return nil, badRequest("invalid prop value")
+			return nil, bad("invalid prop value")
 		}
 		switch x := val.(type) {
 		case string:
@@ -291,7 +332,7 @@ func parseProps(raw map[string]json.RawMessage) (map[string]string, error) {
 		case bool:
 			out[k] = strconv.FormatBool(x)
 		default:
-			return nil, badRequest("prop values must be strings, numbers or booleans")
+			return nil, bad("prop values must be strings, numbers or booleans")
 		}
 	}
 	return out, nil

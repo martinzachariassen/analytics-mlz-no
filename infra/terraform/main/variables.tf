@@ -74,6 +74,16 @@ variable "max_database_mb" {
   default     = 200
 }
 
+variable "log_level" {
+  description = "Lowest server log level (LOG_LEVEL): debug, info, warn or error. debug also logs every rejected event (rate limits, bots); turn it on while debugging, then back off."
+  type        = string
+  default     = "info"
+  validation {
+    condition     = contains(["debug", "info", "warn", "error"], var.log_level)
+    error_message = "log_level must be debug, info, warn or error."
+  }
+}
+
 variable "alert_email" {
   description = "Email address for abuse/overload alerts (memory pressure, load shedding). Empty disables alerting."
   type        = string

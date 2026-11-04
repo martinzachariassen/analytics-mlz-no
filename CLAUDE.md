@@ -6,7 +6,7 @@ Self-hostable, cookie-free web analytics. Plan and all architectural decisions: 
 
 - `server/cmd/analytics` — main binary (`serve`, `sites add|list`)
 - `server/internal/` — `config`, `store` (SQLite + embedded migrations, stats queries), `ingest` (POST /api/event), `visitor` (daily salt + hashing), `geo`, `httpx` (client IP, rate limit, JSON), `auth` (GitHub OAuth + sessions), `api` (sites + stats endpoints), `tracker` (embedded script.js), `server` (router)
-- API reference: `docs/API.md`
+- API reference: `docs/API.md`; privacy facts `docs/PRIVACY.md` (update when stored fields change); release process `docs/RELEASING.md` + `.github/workflows/release.yml`; `CHANGELOG.md` gets a line per user-visible change
 - `server/internal/devdata` — synthetic traffic for `analytics seed`; `dev/demo/` — demo site for `make dev`
 - `deploy/` — Dockerfile, docker-compose, Litestream config, entrypoint
 - `tracker/` — TypeScript tracking script (`src/core.ts` logic, `src/index.ts` entry). Built with esbuild into `server/internal/tracker/script.js`, which is committed and embedded in the Go binary. Run `make tracker` after changes; CI fails if it's stale.
@@ -18,13 +18,14 @@ Self-hostable, cookie-free web analytics. Plan and all architectural decisions: 
 
 ## Commands
 
-- `make test` — Go tests + tracker tests (vitest + happy-dom)
+- `make test` — Go tests + tracker tests (vitest + happy-dom) + dashboard unit tests (vitest)
 - `cd web && npm run typecheck && npm run lint` — dashboard checks
 - `make lint` — `golangci-lint run`
 - `make run` — run the server locally on :8080 (data in `./data`)
 - `make dev` — local test environment: API + dashboard + demo site (:8081), two demo sites with two years of synthetic data in `data/dev.db`, one-click sign-in via `DEV_LOGIN=1` (localhost only). `make dev-reset` wipes it.
 - `make dev-web` — dashboard on :5173; set `PUBLIC_URL=http://localhost:5173` for the server
 - `docker compose -f deploy/docker-compose.yml up --build`
+- `deploy/test-restore.sh` — verifies Litestream backup/restore with the local Docker image; `go run ./dev/loadtest` — ingest load test
 - `make deploy` — build/push the server image to Cloud Run and publish the dashboard to Firebase Hosting
 
 ## Conventions

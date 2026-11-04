@@ -26,7 +26,8 @@ Lightweight, privacy-friendly, self-hostable web analytics (inspired by Umami/Pl
 3. ✅ **Stats API + auth** — GitHub sign-in, sites CRUD, stats + breakdown endpoints.
 4. ✅ **Dashboard** — React + Vite + shadcn/ui.
 5. ✅ **Terraform** — Artifact Registry, Cloud Run, GCS, Secret Manager, Firebase Hosting.
-6. **Contributor-friendliness** — README, CONTRIBUTING, issue templates, good-first-issues.
+6. ✅ **Contributor-friendliness** — README, CONTRIBUTING, SECURITY, issue/PR templates (good-first-issues: label some once the repo is public).
+7. **Release** — CI hardening, versioned builds, GHCR image + binaries on tag (`.github/workflows/release.yml`), privacy/upgrade docs. Code is ready; the first tag waits for the production checks in [RELEASING.md](RELEASING.md).
 
 ## Open items
 

@@ -128,15 +128,16 @@ resource "google_monitoring_alert_policy" "backup_missing" {
 
   notification_channels = [google_monitoring_notification_channel.email[0].id]
   documentation {
-    content = "The hourly backup has not succeeded for two hours. Check the Cloud Scheduler job analytics-backup-hourly (resource.type=\"cloud_scheduler_job\" in Logs Explorer) and the job's executions in Cloud Run (Jobs)."
+    content = "The hourly backup has not succeeded for two hours. Check the Cloud Scheduler job ${var.service_name}-backup-hourly (resource.type=\"cloud_scheduler_job\" in Logs Explorer) and the job's executions in Cloud Run (Jobs)."
   }
 }
 
 # Is the service reachable from the outside? The check goes through Firebase Hosting to Cloud
-# Run, the same path as a visitor's browser, and fetches the tracking script. It runs every five
-# minutes from several regions and alerts when at least two of them fail for ten minutes. Needs
-# `domain`, because the check targets the public hostname. (The checks also keep the instance
-# warm, which does not cost extra.)
+# Run, the same path as a visitor's browser. It asks for /api/auth/me, which the server answers
+# with an uncached 401: the tracking script is cached at the CDN for an hour and would keep
+# passing while Cloud Run is down. It runs every five minutes from several regions and alerts
+# when at least two of them fail for ten minutes. Needs `domain`, because the check targets the
+# public hostname. (The checks also keep the instance warm, which does not cost extra.)
 resource "google_monitoring_uptime_check_config" "site" {
   count        = var.domain != "" ? local.alerts : 0
   display_name = "Analytics: ${var.domain}"
@@ -144,13 +145,13 @@ resource "google_monitoring_uptime_check_config" "site" {
   timeout      = "10s"
 
   http_check {
-    path           = "/api/script.js"
+    path           = "/api/auth/me"
     port           = 443
     use_ssl        = true
     validate_ssl   = true
     request_method = "GET"
     accepted_response_status_codes {
-      status_class = "STATUS_CLASS_2XX"
+      status_value = 401
     }
   }
 
@@ -188,7 +189,34 @@ resource "google_monitoring_alert_policy" "uptime" {
 
   notification_channels = [google_monitoring_notification_channel.email[0].id]
   documentation {
-    content = "The tracking script is not reachable on the public hostname. Check Cloud Run (service logs, revisions) and Firebase Hosting. Events sent while the service is down are lost."
+    content = "The API is not reachable on the public hostname. Check Cloud Run (service logs, revisions) and Firebase Hosting. Events sent while the service is down are lost."
+  }
+}
+
+# Litestream writes plain text without a severity, so app_errors never sees it. Replication that
+# stalls (permissions, quota) or a cold start that found no backup must still reach someone.
+resource "google_monitoring_alert_policy" "replication" {
+  count        = local.alerts
+  display_name = "Analytics: Litestream reported a problem"
+  combiner     = "OR"
+
+  conditions {
+    display_name = "Litestream error or empty restore"
+    condition_matched_log {
+      filter = "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${var.service_name}\" AND textPayload=~\"(?i)litestream.*(error|failed|no backup found|no snapshots)|level=ERROR\""
+    }
+  }
+
+  alert_strategy {
+    notification_rate_limit {
+      period = "3600s"
+    }
+    auto_close = "1800s"
+  }
+
+  notification_channels = [google_monitoring_notification_channel.email[0].id]
+  documentation {
+    content = "Litestream logged an error, or an instance started without finding a backup in the replica (gs://${google_storage_bucket.db.name}/analytics). If the service has data, an empty replica means it was lost: stop deploying, and follow the restore runbook in docs/DEPLOY.md before the standalone backups age out."
   }
 }
 

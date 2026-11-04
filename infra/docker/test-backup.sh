@@ -41,14 +41,28 @@ if [ -n "$(docker run --rm -v "$out:/out" --entrypoint sh "$IMAGE" -c 'ls -A /ou
   exit 1
 fi
 
+echo "==> with BACKUP_EXPECT_DATA=1 an empty replica must fail"
+if docker run --rm -v "$replica:/replica" -v "$out:/out" \
+    -e LITESTREAM_REPLICA_URL=file:///replica -e BACKUP_DEST_DIR=/out -e BACKUP_EXPECT_DATA=1 \
+    --entrypoint /usr/local/bin/backup.sh "$IMAGE" hourly >/dev/null 2>&1; then
+  echo "FAIL: backup.sh succeeded on an empty replica with BACKUP_EXPECT_DATA=1" >&2
+  exit 1
+fi
+
 echo "==> starting the server and sending $EVENTS events"
 docker run -d --name "$name" -p "127.0.0.1:$PORT:8080" \
   -v "$data:/data" -v "$replica:/replica" \
   -e LITESTREAM_REPLICA_URL=file:///replica "$IMAGE" >/dev/null
-for _ in $(seq 1 50); do
-  curl -fsS "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1 && break
+up=0
+for _ in $(seq 1 100); do
+  curl -fsS "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1 && up=1 && break
   sleep 0.2
 done
+if [ "$up" != 1 ]; then
+  echo "FAIL: server did not become healthy" >&2
+  docker logs "$name" >&2
+  exit 1
+fi
 site=$(docker exec "$name" analytics sites add -domain example.com | sed -n 's/^Site ID: //p')
 for i in $(seq 1 "$EVENTS"); do
   curl -fsS -A "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0" -H "Origin: https://example.com" \
@@ -58,9 +72,16 @@ done
 sleep 2
 docker stop -t 10 "$name" >/dev/null
 
-echo "==> running backup.sh"
+echo "==> running backup.sh (BACKUP_EXPECT_DATA=1 passes now that there is data)"
 run_backup hourly
-run_backup daily
+docker run --rm -v "$replica:/replica" -v "$out:/out" \
+  -e LITESTREAM_REPLICA_URL=file:///replica -e BACKUP_DEST_DIR=/out -e BACKUP_EXPECT_DATA=1 \
+  -e CLOUD_RUN_EXECUTION=analytics-backup-abc12 \
+  --entrypoint /usr/local/bin/backup.sh "$IMAGE" daily
+if ! docker run --rm -v "$out:/out" --entrypoint sh "$IMAGE" -c 'ls /out/daily/*-abc12.db.gz' >/dev/null; then
+  echo "FAIL: the execution id is not part of the file name" >&2
+  exit 1
+fi
 
 for prefix in hourly daily; do
   file=$(docker run --rm -v "$out:/out" --entrypoint sh "$IMAGE" -c "ls /out/$prefix/*.db.gz")

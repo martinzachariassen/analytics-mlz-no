@@ -1,8 +1,20 @@
-data "google_project" "this" {}
-
 locals {
-  public_url = var.domain != "" ? "https://${var.domain}" : "https://${google_firebase_hosting_site.this.default_url}"
+  # default_url already carries the scheme.
+  public_url = var.domain != "" ? "https://${var.domain}" : google_firebase_hosting_site.this.default_url
   image_repo = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.images.repository_id}"
+  labels = {
+    app = "analytics"
+  }
+}
+
+# The default compute service account is created with roles/editor on the whole project.
+# Nothing here uses it (Cloud Run and the backup job have their own accounts), so take the
+# role away rather than leave a project-wide editor identity lying around.
+resource "google_project_default_service_accounts" "deprivilege" {
+  project = var.project_id
+  action  = "DEPRIVILEGE"
+  # Leave the account as it is if this resource is ever removed.
+  restore_policy = "NONE"
 }
 
 # ---------------------------------------------------------------- images
@@ -12,6 +24,11 @@ resource "google_artifact_registry_repository" "images" {
   location      = var.region
   format        = "DOCKER"
   description   = "analytics server images"
+  labels        = local.labels
+
+  # Images older than this are deleted unless they are among the newest keep_count, which is
+  # the rollback window: `gcloud run services update-traffic` to an older revision only works
+  # while its image still exists.
 
   # Stay inside the 0.5 GB free storage tier.
   cleanup_policy_dry_run = false
@@ -39,10 +56,16 @@ resource "google_storage_bucket" "db" {
   location                    = var.region
   uniform_bucket_level_access = true
   public_access_prevention    = "enforced"
+  labels                      = local.labels
 
   # Litestream creates and deletes many small files; soft delete would keep (and bill) them for 7 days.
+  # The standalone backups in the backups bucket are the protection against a lost replica.
   soft_delete_policy {
     retention_duration_seconds = 0
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }
 

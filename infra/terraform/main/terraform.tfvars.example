@@ -7,3 +7,5 @@ retention_days       = 0
 # alert_email        = "you@example.com"   # abuse/overload alerts; empty = off
 # ingest_rate_limit  = 50                  # events/s across all clients
 # max_database_mb    = 200                 # pause ingestion above this (disk is in memory on Cloud Run)
+# backup_hourly_retention_days = 3         # hourly standalone backups (gs://<project>-backups/hourly/)
+# backup_daily_retention_days  = 90        # daily standalone backups (gs://<project>-backups/daily/)

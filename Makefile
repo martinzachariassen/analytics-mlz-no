@@ -63,6 +63,7 @@ web:
 PROJECT ?= analytics-mlz-no
 REGION  ?= europe-north1
 SERVICE ?= analytics
+BACKUP_JOB ?= $(SERVICE)-backup
 IMAGE   ?= $(REGION)-docker.pkg.dev/$(PROJECT)/analytics/server:$(shell git rev-parse --short HEAD)$(shell git diff --quiet HEAD -- apps infra go.work || echo -dirty)
 
 deploy: deploy-server deploy-web
@@ -72,6 +73,7 @@ deploy: deploy-server deploy-web
 deploy-server:
 	docker buildx build --platform linux/amd64 --build-arg VERSION=$(VERSION) -f infra/docker/Dockerfile -t $(IMAGE) --push .
 	gcloud run deploy $(SERVICE) --image $(IMAGE) --region $(REGION) --project $(PROJECT) --quiet
+	gcloud run jobs update $(BACKUP_JOB) --image $(IMAGE) --region $(REGION) --project $(PROJECT) --quiet
 
 # Build the dashboard and publish it to Firebase Hosting (rewrites /api/** to Cloud Run).
 deploy-web: web

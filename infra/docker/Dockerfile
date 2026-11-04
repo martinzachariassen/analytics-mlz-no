@@ -38,7 +38,7 @@ LABEL org.opencontainers.image.title="analytics-mlz-no" \
       org.opencontainers.image.source="https://github.com/martinzachariassen/analytics-mlz-no" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.version="${VERSION}"
-RUN apk add --no-cache ca-certificates tzdata && \
+RUN apk add --no-cache ca-certificates tzdata curl && \
     adduser -D -H -u 10001 analytics && \
     mkdir -p /data && chown analytics /data
 COPY --from=build /out/analytics /usr/local/bin/analytics
@@ -46,6 +46,7 @@ COPY --from=assets /usr/local/bin/litestream /usr/local/bin/litestream
 COPY --from=assets /geoip/dbip-country-lite.mmdb /usr/share/geoip/dbip-country-lite.mmdb
 COPY infra/docker/litestream.yml /etc/litestream.yml
 COPY infra/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY infra/docker/backup.sh /usr/local/bin/backup.sh
 
 ENV DATABASE_PATH=/data/analytics.db \
     GEOIP_DB_PATH=/usr/share/geoip/dbip-country-lite.mmdb \

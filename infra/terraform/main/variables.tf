@@ -62,3 +62,15 @@ variable "alert_email" {
   type        = string
   default     = ""
 }
+
+variable "backup_hourly_retention_days" {
+  description = "Days to keep the hourly database backups in the backup bucket."
+  type        = number
+  default     = 3
+}
+
+variable "backup_daily_retention_days" {
+  description = "Days to keep the daily database backups in the backup bucket."
+  type        = number
+  default     = 90
+}

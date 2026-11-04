@@ -2,7 +2,7 @@
 
 This sets up the production layout from `docs/PLAN.md`. The dashboard runs on Firebase Hosting, and Firebase rewrites `/api/**` to a single Cloud Run instance, so the dashboard, API and tracking script share one origin. SQLite lives on the instance and Litestream replicates it to a GCS bucket.
 
-For personal traffic this stays inside the free tiers. The only steady cost is Litestream's writes to GCS, which come to roughly $1 a month.
+For personal traffic this stays inside the free tiers. The only steady cost is Litestream's writes to GCS, which come to roughly $1 a month. The hourly and daily backups add a few cents.
 
 Self-hosting without GCP? Use `docker compose -f infra/docker/docker-compose.yml up --build` instead (see the README).
 
@@ -114,6 +114,8 @@ docs/API.md), since Cloud Run has no shell for `analytics events purge`.
 - **Logs:** `gcloud run services logs read analytics --region <region> --project <project_id>`
 - **Backups:** the bucket `<project_id>-db` holds the Litestream replica. To restore it locally:
   `litestream restore -o analytics.db gs://<project_id>-db/analytics`
+- **Standalone backups:** a Cloud Run Job (`analytics-backup`) restores the replica every hour and every day and writes a gzipped SQLite file to the separate bucket `<project_id>-backups` (`hourly/` is kept 3 days, `daily/` 90 days; see `backup_*_retention_days`). It reads the replica and never touches the running service. `make deploy` updates the job's image together with the service. After the first `terraform apply` the job uses a placeholder image, so it fails (and, with `alert_email`, sends an alert) until the first `make deploy`. To restore from a file:
+  `gcloud storage cp gs://<project_id>-backups/daily/<file>.db.gz . && gunzip <file>.db.gz`, then start the server with `DATABASE_PATH` pointing at it (with Litestream, remove the old replica first).
 - **Cost:** check the billing console. The budget alert emails at 50% and 90%, and at 100% of forecast spend.
 
 ## Known trade-offs

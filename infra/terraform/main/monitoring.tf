@@ -75,3 +75,29 @@ resource "google_monitoring_alert_policy" "shedding" {
     content = "The server is rejecting events: over INGEST_RATE_LIMIT, write queue full or database over MAX_DATABASE_MB (check the logs). Likely a flood; see SECURITY.md."
   }
 }
+
+# A backup run that failed (for example the job image is missing or the replica is unreadable).
+resource "google_monitoring_alert_policy" "backup_failed" {
+  count        = local.alerts
+  display_name = "Analytics: backup job failed"
+  combiner     = "OR"
+
+  conditions {
+    display_name = "Failed backup executions"
+    condition_threshold {
+      filter          = "resource.type = \"cloud_run_job\" AND resource.labels.job_name = \"${google_cloud_run_v2_job.backup.name}\" AND metric.type = \"run.googleapis.com/job/completed_execution_count\" AND metric.labels.result = \"failed\""
+      comparison      = "COMPARISON_GT"
+      threshold_value = 0
+      duration        = "0s"
+      aggregations {
+        alignment_period   = "3600s"
+        per_series_aligner = "ALIGN_SUM"
+      }
+    }
+  }
+
+  notification_channels = [google_monitoring_notification_channel.email[0].id]
+  documentation {
+    content = "The database backup job failed. Check the job's logs in Cloud Run (Jobs). The Litestream replica is unaffected, but the standalone backups are not being written."
+  }
+}

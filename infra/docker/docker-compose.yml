@@ -1,0 +1,32 @@
+# Self-hosting:
+#   docker compose -f infra/docker/docker-compose.yml up -d --build
+#   docker compose -f infra/docker/docker-compose.yml exec analytics analytics sites add -domain example.com
+#
+# To run a published release instead of building from source:
+#   ANALYTICS_IMAGE=ghcr.io/martinzachariassen/analytics-mlz-no:0.1.0 docker compose -f infra/docker/docker-compose.yml up -d --no-build
+services:
+  analytics:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+    image: ${ANALYTICS_IMAGE:-analytics-mlz-no:local}
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - analytics-data:/data
+    environment:
+      # Number of reverse proxies in front of the server (0 = direct). Set to 1 behind nginx/Caddy/Traefik.
+      PROXY_HOPS: "0"
+      # Dashboard sign-in via a GitHub OAuth App (callback: <PUBLIC_URL>/api/auth/github/callback).
+      PUBLIC_URL: "http://localhost:8080"
+      GITHUB_CLIENT_ID: ""
+      GITHUB_CLIENT_SECRET: ""
+      ALLOWED_GITHUB_USERS: ""
+      # Delete events older than N days (0 = keep forever).
+      RETENTION_DAYS: "0"
+      # Optional off-site backup, e.g. s3://bucket/analytics or gs://bucket/analytics.
+      # LITESTREAM_REPLICA_URL: ""
+
+volumes:
+  analytics-data:

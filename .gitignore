@@ -1,5 +1,5 @@
 # Go
-/server/bin/
+/bin/
 *.test
 *.out
 
@@ -31,3 +31,4 @@ tfplan
 .env.*
 !.env.example
 .DS_Store
+.claude/settings.local.json

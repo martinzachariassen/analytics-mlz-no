@@ -22,9 +22,20 @@ variable "service_name" {
 }
 
 variable "domain" {
-  description = "Custom domain for dashboard + tracking via Firebase Hosting, e.g. t.example.com. Empty = only <site>.web.app."
+  description = "Custom domain for dashboard + tracking via Firebase Hosting, e.g. analytics.example.com. Empty = only <site>.web.app."
   type        = string
   default     = ""
+}
+
+variable "extra_domains" {
+  description = "Additional custom domains served by the same Firebase Hosting site, e.g. a short host for the tracking script (t.example.com). They serve the same content; there is no redirect, because a redirect breaks POST /api/event. Sign-in only works on `domain`."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = !contains(var.extra_domains, var.domain)
+    error_message = "extra_domains must not contain domain."
+  }
 }
 
 variable "github_client_id" {

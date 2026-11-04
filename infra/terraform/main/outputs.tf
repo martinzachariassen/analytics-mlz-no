@@ -22,10 +22,15 @@ output "image_repo" {
 
 output "dns_records" {
   description = "DNS records to create for the custom domain."
-  value = var.domain == "" ? [] : flatten([
-    for update in google_firebase_hosting_custom_domain.this[0].required_dns_updates : [
-      for ds in update.desired : [
-        for r in ds.records : { domain = r.domain_name, type = r.type, value = r.rdata }
+  value = flatten([
+    for cd in concat(
+      google_firebase_hosting_custom_domain.this[*],
+      values(google_firebase_hosting_custom_domain.extra),
+      ) : [
+      for update in cd.required_dns_updates : [
+        for ds in update.desired : [
+          for r in ds.records : { domain = r.domain_name, type = r.type, value = r.rdata }
+        ]
       ]
     ]
   ])

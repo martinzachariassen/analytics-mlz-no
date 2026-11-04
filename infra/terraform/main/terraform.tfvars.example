@@ -1,6 +1,7 @@
 # Copy to terraform.tfvars (git-ignored) and adjust.
 project_id           = "analytics-mlz-no"
-domain               = "t.mlz.no"
+domain               = "analytics.mlz.no"
+extra_domains        = ["t.mlz.no"] # optional alias, e.g. a short host for the tracking script
 github_client_id     = "Ov23li..."
 allowed_github_users = ["martinzachariassen"]
 retention_days       = 0

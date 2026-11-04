@@ -102,6 +102,31 @@ resource "google_monitoring_alert_policy" "backup_failed" {
   }
 }
 
+# No successful backup for two hours. Catches what backup_failed cannot: a schedule that never
+# starts the job (for example a missing permission), so there is no failed execution to count.
+resource "google_monitoring_alert_policy" "backup_missing" {
+  count        = local.alerts
+  display_name = "Analytics: no successful backup for 2 hours"
+  combiner     = "OR"
+
+  conditions {
+    display_name = "No successful backup executions"
+    condition_absent {
+      filter   = "resource.type = \"cloud_run_job\" AND resource.labels.job_name = \"${google_cloud_run_v2_job.backup.name}\" AND metric.type = \"run.googleapis.com/job/completed_execution_count\" AND metric.labels.result = \"succeeded\""
+      duration = "7200s"
+      aggregations {
+        alignment_period   = "600s"
+        per_series_aligner = "ALIGN_SUM"
+      }
+    }
+  }
+
+  notification_channels = [google_monitoring_notification_channel.email[0].id]
+  documentation {
+    content = "The hourly backup has not succeeded for two hours. Check the Cloud Scheduler job analytics-backup-hourly (resource.type=\"cloud_scheduler_job\" in Logs Explorer) and the job's executions in Cloud Run (Jobs)."
+  }
+}
+
 # Is the service reachable from the outside? The check goes through Firebase Hosting to Cloud
 # Run, the same path as a visitor's browser, and fetches the tracking script. It runs every five
 # minutes from several regions and alerts when at least two of them fail for ten minutes. Needs

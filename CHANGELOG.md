@@ -6,11 +6,14 @@ All notable changes are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Repository restructured: `server/`, `web/`, `tracker/` moved to `apps/`, `deploy/` to `infra/docker/`, Terraform to `infra/terraform/`. Self-hosters now use `infra/docker/docker-compose.yml`. The Go module path is now `github.com/martinzachariassen/analytics-mlz-no/apps/server`.
+
 ### Added
 - `analytics version` and version information in the startup log.
 - Release pipeline: multi-arch image on GHCR and static binaries on GitHub Releases.
 - CI: dashboard type checking and unit tests, `govulncheck`, `npm audit`, Dependabot.
-- `deploy/test-restore.sh` (backup/restore check) and `dev/loadtest` (ingest load test).
+- `infra/docker/test-restore.sh` (backup/restore check) and `apps/server/cmd/loadtest` (ingest load test).
 - Documentation: privacy, upgrading, tracker and release guides; contributing and security policies.
 
 ### Earlier work

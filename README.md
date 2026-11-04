@@ -30,7 +30,7 @@ docker pull ghcr.io/martinzachariassen/analytics-mlz-no:latest   # or pin a vers
 **From source:** see [Development](#development).
 
 > **Dashboard hosting:** the server image serves the API and the tracking script. The dashboard
-> in `web/` is a static single-page app that must be served from the same origin as `/api`
+> in `apps/web/` is a static single-page app that must be served from the same origin as `/api`
 > (production uses Firebase Hosting with a rewrite; see [docs/DEPLOY.md](docs/DEPLOY.md)).
 
 ## Documentation
@@ -45,8 +45,8 @@ docker pull ghcr.io/martinzachariassen/analytics-mlz-no:latest   # or pin a vers
 ## Quick start (Docker)
 
 ```sh
-docker compose -f deploy/docker-compose.yml up -d --build
-docker compose -f deploy/docker-compose.yml exec analytics analytics sites add -domain example.com
+docker compose -f infra/docker/docker-compose.yml up -d --build
+docker compose -f infra/docker/docker-compose.yml exec analytics analytics sites add -domain example.com
 ```
 
 ### Dashboard sign-in (GitHub)
@@ -120,6 +120,20 @@ See [docs/API.md](docs/API.md).
 
 ## Development
 
+### Repository layout
+
+```
+apps/
+  server/     Go API and ingest (go.mod lives here)
+  web/        Dashboard (React, Vite, shadcn/ui)
+  tracker/    Tracking script (TypeScript), built into apps/server/internal/script
+  demo/       Demo site used by `make dev`
+infra/
+  docker/     Dockerfile, docker-compose, Litestream, restore test
+  terraform/  GCP: bootstrap and main
+docs/         Guides and reference
+```
+
 The quickest way to try everything locally is one command, with no sign-in or setup:
 
 ```sh
@@ -135,7 +149,7 @@ and custom events. The public home page (`/`) explains the product and has a one
 script, and they show up in the realtime counter and charts.
 
 - `make dev-reset` deletes `data/dev.db`, so the next `make dev` starts with fresh data.
-- `go run ./server/cmd/analytics seed -h` shows options (`-days`, `-scale`, `-reset`).
+- `go run ./apps/server/cmd/analytics seed -h` shows options (`-days`, `-scale`, `-reset`).
 - One-click sign-in is `DEV_LOGIN=1`. The server refuses it unless `PUBLIC_URL` is on
   `localhost` and GitHub sign-in is off.
 
@@ -156,7 +170,7 @@ make dev-web
 
 ```sh
 make test     # Go + tracker + dashboard tests
-make tracker  # rebuild server/internal/tracker/script.js after editing tracker/src
+make tracker  # rebuild apps/server/internal/script/script.js after editing apps/tracker/src
 make lint   # golangci-lint
 make run    # local server on :8080
 ```

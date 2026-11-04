@@ -6,8 +6,8 @@ Lightweight, privacy-friendly, self-hostable web analytics (inspired by Umami/Pl
 
 | Area | Decision |
 |---|---|
-| Repo | Monorepo: `server/` (Go), `web/` (React + Vite + shadcn/ui), `tracker/` (JS snippet), `deploy/` (Docker), `infra/` (Terraform). MIT license. |
-| Go module | `github.com/martinzachariassen/analytics-mlz-no` (go.mod at repo root, code under `server/`) |
+| Repo | Monorepo: `apps/server` (Go), `apps/web` (React + Vite + shadcn/ui), `apps/tracker` (JS snippet), `apps/demo` (demo site), `infra/docker` (Docker), `infra/terraform` (Terraform). MIT license. |
+| Go module | `github.com/martinzachariassen/analytics-mlz-no/apps/server` (go.mod in `apps/server`; a root `go.work` lets `go run ./apps/server/...` work from the repo root) |
 | Database | SQLite (`modernc.org/sqlite`, pure Go, no CGO). WAL mode. |
 | Durability on Cloud Run | Litestream replicates SQLite to a GCS bucket; restores on start. `max-instances=1`. |
 | Hosting | GCP Cloud Run in `europe-north1`; dashboard on Firebase Hosting with `/api/**` rewritten to Cloud Run (same origin). Self-hosters use `docker compose`. |

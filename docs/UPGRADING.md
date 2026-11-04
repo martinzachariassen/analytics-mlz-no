@@ -15,9 +15,9 @@
 ```sh
 # Pin a version rather than "latest" in production.
 export ANALYTICS_IMAGE=ghcr.io/martinzachariassen/analytics-mlz-no:0.2.0
-docker compose -f deploy/docker-compose.yml pull
-docker compose -f deploy/docker-compose.yml up -d --no-build
-docker compose -f deploy/docker-compose.yml exec analytics analytics version
+docker compose -f infra/docker/docker-compose.yml pull
+docker compose -f infra/docker/docker-compose.yml up -d --no-build
+docker compose -f infra/docker/docker-compose.yml exec analytics analytics version
 ```
 
 ## Binary
@@ -27,7 +27,7 @@ Download the archive for your platform from the GitHub release, verify it agains
 
 ## What happens on start
 
-New migrations in `server/internal/store/migrations/` are applied automatically, in order,
+New migrations in `apps/server/internal/store/migrations/` are applied automatically, in order,
 before the server starts listening. An applied migration is never edited, so a database is always
 upgradable from any earlier release.
 

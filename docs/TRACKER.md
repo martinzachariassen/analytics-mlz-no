@@ -35,6 +35,6 @@ to the fields listed in [PRIVACY.md](PRIVACY.md). The script reads and writes no
 
 ## Building from source
 
-The script is built from `tracker/` into `server/internal/tracker/script.js`, which is committed
-and embedded in the Go binary. Run `make tracker` after changing `tracker/src`. CI fails if the
+The script is built from `apps/tracker/` into `apps/server/internal/script/script.js`, which is committed
+and embedded in the Go binary. Run `make tracker` after changing `apps/tracker/src`. CI fails if the
 committed file is out of date.

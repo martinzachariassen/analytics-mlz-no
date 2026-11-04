@@ -12,7 +12,7 @@ uses one session cookie, `__session`, for signed-in users only.
 
 ## What is stored for each event
 
-(`server/internal/store/migrations/0001_init.sql`, `server/internal/ingest/ingest.go`)
+(`apps/server/internal/store/migrations/0001_init.sql`, `apps/server/internal/ingest/ingest.go`)
 
 | Field | Content |
 |---|---|
@@ -41,7 +41,7 @@ anywhere" guarantee end to end.
 ## How visitors are counted
 
 The visitor id is `SHA-256(daily salt, site id, IP address, user agent)`, truncated to 63 bits
-(`server/internal/visitor`).
+(`apps/server/internal/visitor`).
 
 - The salt is random, stored in the database and **replaced every UTC day**. The previous
   salt is deleted when the first event of the new day arrives (`Store.SaltForDay`).

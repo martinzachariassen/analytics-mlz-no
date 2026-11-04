@@ -13,16 +13,16 @@ Code and docs are ready; these steps need real infrastructure and are not automa
 - [ ] **End-to-end smoke test in production:** GitHub sign-in works, the tracking script on a real
       page produces an event in the dashboard, and the Litestream restore log line appears after a
       redeploy.
-- [ ] `deploy/test-restore.sh` passes against the image you are about to release.
+- [ ] `infra/docker/test-restore.sh` passes against the image you are about to release.
 - [ ] `CHANGELOG.md`: move "Unreleased" under the new version heading with today's date.
 - [ ] `main` is green in CI.
 
 ### Known gap: dashboard for self-hosters
 
-The Docker image contains the API only. The dashboard (`web/`) is deployed to Firebase Hosting and
+The Docker image contains the API only. The dashboard (`apps/web/`) is deployed to Firebase Hosting and
 reaches the API through a same-origin rewrite. Someone running `docker compose` therefore has a
-working collector but no dashboard unless they serve `web/dist` themselves behind the same
-origin. Decide before 1.0 whether to embed `web/dist` in the Go binary (simplest for
+working collector but no dashboard unless they serve `apps/web/dist` themselves behind the same
+origin. Decide before 1.0 whether to embed `apps/web/dist` in the Go binary (simplest for
 self-hosting) or document a reverse-proxy recipe.
 
 ## Cutting a release
@@ -63,7 +63,7 @@ Settings that cannot live in code:
 
 ## Performance reference
 
-`go run ./dev/loadtest` measures ingestion on a single instance. One run on an Apple M5 laptop
+`go run ./apps/server/cmd/loadtest` measures ingestion on a single instance. One run on an Apple M5 laptop
 (server and load generator on the same machine, loopback, `PROXY_HOPS=1 -vary-ip`, 32 clients,
 10 s): about 5,700 events/s, p99 latency about 10 ms. A Cloud Run instance with little CPU will be
 lower, but this is far above what a personal site produces. Re-measure on your own hardware before

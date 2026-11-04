@@ -4,7 +4,7 @@ This sets up the production layout from `docs/PLAN.md`. The dashboard runs on Fi
 
 For personal traffic this stays inside the free tiers. The only steady cost is Litestream's writes to GCS, which come to roughly $1 a month.
 
-Self-hosting without GCP? Use `docker compose -f deploy/docker-compose.yml up --build` instead (see the README).
+Self-hosting without GCP? Use `docker compose -f infra/docker/docker-compose.yml up --build` instead (see the README).
 
 ## Prerequisites
 
@@ -18,10 +18,10 @@ Self-hosting without GCP? Use `docker compose -f deploy/docker-compose.yml up --
 
 ## 1. Bootstrap: project, APIs, state bucket, budget
 
-`infra/bootstrap` creates the GCP project, links billing, enables the APIs, creates the bucket for Terraform state and sets a monthly budget alert. It uses local state.
+`infra/terraform/bootstrap` creates the GCP project, links billing, enables the APIs, creates the bucket for Terraform state and sets a monthly budget alert. It uses local state.
 
 ```sh
-cd infra/bootstrap
+cd infra/terraform/bootstrap
 cat > terraform.tfvars <<'EOF'
 project_id      = "my-analytics"          # globally unique
 billing_account = "012345-6789AB-CDEF01"  # gcloud billing accounts list
@@ -37,7 +37,7 @@ The project has `deletion_policy = "PREVENT"`. To delete it, change that first.
 ## 2. Main: Cloud Run, database bucket, secret, Firebase Hosting
 
 ```sh
-cd infra/main
+cd infra/terraform/main
 cp terraform.tfvars.example terraform.tfvars   # set project_id, domain, github_client_id, allowed_github_users
 terraform init -backend-config=bucket=<project_id>-tfstate
 terraform apply
@@ -80,7 +80,7 @@ make deploy                                            # or: make deploy-server 
 ```
 
 - `deploy-server` builds a `linux/amd64` image, pushes it as `server:<git sha>` (with `-dirty` for uncommitted changes) and rolls out a new Cloud Run revision.
-- `deploy-web` builds `web/dist` and publishes it to Firebase Hosting.
+- `deploy-web` builds `apps/web/dist` and publishes it to Firebase Hosting.
 
 Override `PROJECT`, `REGION` or `SERVICE` on the command line if yours differ.
 

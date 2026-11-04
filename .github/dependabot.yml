@@ -1,7 +1,7 @@
 version: 2
 updates:
   - package-ecosystem: gomod
-    directory: /
+    directory: /apps/server
     schedule:
       interval: weekly
     groups:
@@ -9,7 +9,7 @@ updates:
         patterns: ["*"]
 
   - package-ecosystem: npm
-    directory: /web
+    directory: /apps/web
     schedule:
       interval: weekly
     groups:
@@ -17,7 +17,7 @@ updates:
         patterns: ["*"]
 
   - package-ecosystem: npm
-    directory: /tracker
+    directory: /apps/tracker
     schedule:
       interval: weekly
     groups:
@@ -33,11 +33,16 @@ updates:
         patterns: ["*"]
 
   - package-ecosystem: docker
-    directory: /deploy
+    directory: /infra/docker
     schedule:
       interval: weekly
 
   - package-ecosystem: terraform
-    directory: /infra/main
+    directory: /infra/terraform/main
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: terraform
+    directory: /infra/terraform/bootstrap
     schedule:
       interval: weekly

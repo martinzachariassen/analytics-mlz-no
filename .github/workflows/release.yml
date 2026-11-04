@@ -39,7 +39,7 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: .
-          file: deploy/Dockerfile
+          file: infra/docker/Dockerfile
           platforms: linux/amd64,linux/arm64
           build-args: VERSION=${{ github.ref_name }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -55,7 +55,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version-file: go.mod
+          go-version-file: apps/server/go.mod
       # Static binaries (pure Go, no CGO). They contain no GeoIP database: set GEOIP_DB_PATH
       # to a DB-IP Lite country .mmdb file to record countries.
       - name: Build binaries
@@ -67,7 +67,7 @@ jobs:
             mkdir "dist/$name"
             CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath \
               -ldflags "-s -w -X main.version=${GITHUB_REF_NAME}" \
-              -o "dist/$name/analytics" ./server/cmd/analytics
+              -o "dist/$name/analytics" ./apps/server/cmd/analytics
             cp LICENSE README.md "dist/$name/"
             tar -C dist -czf "dist/$name.tar.gz" "$name"
             rm -r "dist/$name"

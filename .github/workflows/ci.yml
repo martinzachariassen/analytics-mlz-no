@@ -20,39 +20,40 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version-file: go.mod
-      - run: go vet ./server/...
-      - run: go test -race ./server/...
+          go-version-file: apps/server/go.mod
+      - run: go vet ./apps/server/...
+      - run: go test -race ./apps/server/...
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.14
+          working-directory: apps/server
 
   docker:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - run: docker build -f deploy/Dockerfile -t analytics-mlz-no:ci .
+      - run: docker build -f infra/docker/Dockerfile -t analytics-mlz-no:ci .
 
   tracker:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: tracker
+        working-directory: apps/tracker
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 26
           cache: npm
-          cache-dependency-path: tracker/package-lock.json
+          cache-dependency-path: apps/tracker/package-lock.json
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
       - name: Check that the embedded script.js is up to date
         run: |
           npm run build
-          git diff --exit-code -- ../server/internal/tracker/script.js || {
-            echo "::error::server/internal/tracker/script.js is stale. Run 'npm run build' in tracker/ and commit."
+          git diff --exit-code -- ../server/internal/script/script.js || {
+            echo "::error::apps/server/internal/script/script.js is stale. Run 'npm run build' in apps/tracker/ and commit."
             exit 1
           }
 
@@ -60,14 +61,14 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: web
+        working-directory: apps/web
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 26
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
@@ -80,13 +81,14 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version-file: go.mod
+          go-version-file: apps/server/go.mod
       - name: Known vulnerabilities in Go dependencies and the standard library
-        run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./server/...
+        working-directory: apps/server
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
       - uses: actions/setup-node@v7
         with:
           node-version: 26
       # Only what ships to users: production dependencies of the dashboard.
       - name: npm audit (web)
-        working-directory: web
+        working-directory: apps/web
         run: npm audit --audit-level=high --omit=dev

@@ -1,7 +1,8 @@
 .git
 data
 bin
-web/node_modules
-tracker/node_modules
-infra
+apps/web/node_modules
+apps/tracker/node_modules
+apps/web/dist
+infra/terraform
 *.db*

@@ -45,7 +45,10 @@ terraform init -migrate-state -backend-config=bucket=<project_id>-tfstate
 terraform plan   # must say: No changes
 ```
 
-Commit `backend.tf` if you work from more than one machine. Delete the local `terraform.tfstate*`
+`backend.tf` is git-ignored on purpose: on a first run the bucket does not exist yet, so a committed
+`gcs` backend would break `terraform init` for everyone else. On another machine, copy
+`backend.tf.example` to `backend.tf` and run
+`terraform init -backend-config=bucket=<project_id>-tfstate`. Delete the local `terraform.tfstate*`
 files once `gcloud storage ls gs://<project_id>-tfstate/bootstrap/` shows the state.
 
 ## 2. Main: Cloud Run, database bucket, secret, Firebase Hosting

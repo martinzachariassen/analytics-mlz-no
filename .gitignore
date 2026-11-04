@@ -21,6 +21,8 @@ dist/
 .terraform/
 *.tfstate
 *.tfstate.*
+# Local copy of infra/terraform/bootstrap/backend.tf.example (the bucket does not exist on a first run)
+infra/terraform/bootstrap/backend.tf
 *.tfvars
 !*.tfvars.example
 tfplan

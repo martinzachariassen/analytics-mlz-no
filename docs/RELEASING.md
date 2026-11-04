@@ -13,7 +13,8 @@ Code and docs are ready; these steps need real infrastructure and are not automa
 - [ ] **End-to-end smoke test in production:** GitHub sign-in works, the tracking script on a real
       page produces an event in the dashboard, and the Litestream restore log line appears after a
       redeploy.
-- [ ] `infra/docker/test-restore.sh` passes against the image you are about to release.
+- [ ] `infra/docker/test-restore.sh` and `infra/docker/test-backup.sh` pass against the image you
+      are about to release (CI runs both on every push).
 - [ ] `CHANGELOG.md`: move "Unreleased" under the new version heading with today's date.
 - [ ] `main` is green in CI.
 
@@ -37,8 +38,10 @@ The workflow then:
 
 1. runs the full CI workflow as a gate,
 2. builds and pushes `ghcr.io/martinzachariassen/analytics-mlz-no` for linux/amd64 and
-   linux/arm64, tagged `0.1.0`, `0.1` and `latest` (pre-releases get only their own tag),
-3. cross-compiles static binaries for Linux and macOS (amd64, arm64) with `checksums.txt`,
+   linux/arm64, tagged `0.1.0`, `0.1` and `latest` (pre-releases get only their own tag), with an
+   SBOM and a signed build provenance attestation; the GeoIP month is pinned to the release month,
+3. cross-compiles static binaries for Linux and macOS (amd64, arm64) with `checksums.txt` and a
+   provenance attestation (`gh attestation verify <file> --owner martinzachariassen`),
 4. creates the GitHub release with generated notes. A tag containing `-` is marked as a pre-release.
 
 Edit the generated notes afterwards if needed, copying the relevant part of the changelog.
@@ -55,10 +58,11 @@ Edit the generated notes afterwards if needed, copying the relevant part of the 
 Settings that cannot live in code:
 
 - Description and topics (`analytics`, `privacy`, `self-hosted`, `go`, `sqlite`, `react`).
-- Branch protection on `main`: require a pull request and the CI jobs `go`, `docker`, `tracker`,
-  `web` and `security` to pass.
+- Branch protection on `main`: require a pull request and the CI jobs `lint`, `go`, `tracker`,
+  `web`, `infra`, `docker`, `security` and `CodeQL / analyze` to pass; enforce for administrators.
 - Enable private vulnerability reporting (Security → Advisories), which `SECURITY.md` points to.
-- Enable Dependabot alerts. The update schedule is in `.github/dependabot.yml`.
+- Enable Dependabot alerts and security updates. The update schedule is in `.github/dependabot.yml`.
+- Code scanning uses the CodeQL workflow in the repo, not the default setup.
 - Create labels `bug` and `enhancement` (used by the issue templates), and `good first issue`.
 
 ## Performance reference

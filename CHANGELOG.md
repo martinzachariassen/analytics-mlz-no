@@ -7,6 +7,9 @@ All notable changes are documented here. The format follows
 ## [Unreleased]
 
 ### Security
+- Supply chain: base images and the Litestream binary are pinned by digest (Litestream now comes from its official image instead of a `curl | tar`), GitHub Actions are pinned to commits, `actions/checkout` no longer persists credentials, the CI image is scanned with Trivy, CodeQL runs on Go, TypeScript and the workflows, and releases carry an SBOM and signed build provenance for the image and the binaries (`gh attestation verify`). Release images pin the GeoIP month (`DBIP_MONTH`), so a rebuilt tag is the same image.
+- Docker: the container runs as `10001:10001` with a group, has a `HEALTHCHECK`, and `docker-compose.yml` binds to `127.0.0.1`, runs read-only with all capabilities dropped and `no-new-privileges`, limits memory and log size, and reads secrets from `infra/docker/.env` (`.env.example`) instead of inline values. `.dockerignore` keeps databases, env files and node_modules out of the build context.
+- Terraform: the default compute service account loses its project-wide `roles/editor` (`google_project_default_service_accounts`, `DEPRIVILEGE`); the state, replica and backup buckets have `prevent_destroy`; variables are validated (`extra_domains` needs `domain`, limits have ranges, `alert_email` is an address).
 - Rate limiters key on parsed IP addresses. A forged `X-Forwarded-For` entry that is not an address falls back to the real peer, so a flood of junk headers can no longer grow the limiter maps until the server runs out of memory. The unforgeable upstream limit now runs before the per-client limit, for ingest and sign-in alike.
 - The allowlist is checked on every authenticated request: a user removed from `ALLOWED_GITHUB_USERS` gets `401` and their sessions are deleted. `analytics sessions revoke [-user LOGIN]` deletes sessions from the command line.
 - Sessions last 7 days without use (was a fixed 30 days) and are extended while in use. Starting a new sign-in ends the previous session; a failed callback no longer clears a valid session cookie.
@@ -21,6 +24,11 @@ All notable changes are documented here. The format follows
 - Tracker: nothing the script does can throw into the host page; a failure to send is swallowed.
 
 ### Fixed
+- Terraform: `public_url` was `https://https://<site>.web.app` when `domain` was empty, which broke the OAuth callback for installs without a custom domain.
+- A lost Litestream replica was invisible: the next cold start began with an empty database and replicated that over the bucket, while the backup job kept succeeding on nothing. `require_replica = true` (`REQUIRE_REPLICA=1`, `BACKUP_EXPECT_DATA=1`) makes an empty replica a startup failure and a failed backup, and a new alert fires on Litestream errors and "no backup found" log lines. `docs/DEPLOY.md` has a restore runbook.
+- The uptime check fetched `/api/script.js`, which the CDN caches for an hour, so it could pass while Cloud Run was down. It now expects a `401` from the uncached `/api/auth/me`. Cloud Run gets a liveness probe, so a hung instance is replaced.
+- `backup.sh` retries uploads, names files with seconds and the execution id (a retry could not overwrite a partial object), and the test scripts fail when the server never becomes healthy. `test-restore.sh` also covers `REQUIRE_REPLICA` and a database newer than the replica; `test-backup.sh` covers `BACKUP_EXPECT_DATA`. CI runs both on every push, for amd64 and arm64.
+- `make deploy` runs the quality gate and refuses uncommitted, untracked, unpushed or non-`main` changes unless `FORCE=1`; it deploys the server before the dashboard and installs dashboard packages from the lockfile first.
 - Dashboard: deep links and `/` were served with Firebase Hosting's default one-hour cache, so after a deploy a visitor could get an `index.html` pointing at chunks that no longer existed. Every non-asset path is now `no-cache`; `/assets/**` and `/fonts/**` stay immutable. A stale chunk reloads the page once instead of showing a blank error.
 - Dashboard: URL parameters such as `?period=toString` or `?auth_error=__proto__` matched inherited object properties and crashed the page. Lookups use `Object.hasOwn`, and more than 10 filters in the URL are ignored instead of producing a `400`.
 - Dashboard: every view shows a failed request as a message instead of a skeleton that never ends (reports, realtime, detail sheet, overview cards, settings, site list). A `401` during a mutation re-checks the session like queries already did; a failed sign-out shows a toast instead of hanging. Error messages fall back to `HTTP <status>` when the server sends no text (HTTP/2 has no status text).
@@ -43,6 +51,7 @@ All notable changes are documented here. The format follows
 - More `golangci-lint` linters (`gocritic`, `noctx`, `sqlclosecheck`, `rowserrcheck`, `nilerr`, `usestdlibvars`, `unparam`, `perfsprint`, `exhaustive`, `contextcheck`).
 
 ### Added
+- Terraform: `require_replica` (see Fixed), labels on every resource, lock files for Linux and macOS, `terraform_version < 2.0`, and an outputs table plus restore runbook in `docs/DEPLOY.md`. The Docker image records which DB-IP month it carries in `/usr/share/geoip/VERSION`.
 - Terraform: an alert (`alert_email`) when the server logs an error, at most one email per hour. `docs/DEPLOY.md` lists useful Logs Explorer filters.
 - `LOG_LEVEL` (`debug`, `info`, `warn`, `error`; Terraform `log_level`). Rejected events log why (`event rejected` with a `reason`, never the IP or user agent): bad payloads at `INFO`, rate limits, bots and load shedding at `DEBUG`.
 - Terraform: an "Analytics" operations dashboard in Cloud Monitoring (requests by status, latency, memory, CPU, instances, backups, uptime, server warnings). `terraform output dashboard_url` and `logs_url` link to it and to the logs.

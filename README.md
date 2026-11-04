@@ -46,9 +46,14 @@ docker pull ghcr.io/martinzachariassen/analytics-mlz-no:latest   # or pin a vers
 ## Quick start (Docker)
 
 ```sh
+cp infra/docker/.env.example infra/docker/.env   # then edit it
 docker compose -f infra/docker/docker-compose.yml up -d --build
 docker compose -f infra/docker/docker-compose.yml exec analytics analytics sites add -domain example.com
 ```
+
+The container listens on `127.0.0.1:8080` only, runs read-only as an unprivileged user with no
+capabilities, and has a health check. Put a reverse proxy with TLS in front and set `PROXY_HOPS=1`.
+Image tags are signed with a build provenance attestation (`gh attestation verify oci://ghcr.io/martinzachariassen/analytics-mlz-no:0.1.0 --owner martinzachariassen`).
 
 ### Dashboard sign-in (GitHub)
 
@@ -127,7 +132,8 @@ See [docs/API.md](docs/API.md).
 | `PUBLIC_URL` | `http://localhost:8080` | Dashboard URL; used for the OAuth callback. `https://` enables Secure cookies |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | – | GitHub OAuth App credentials (enables sign-in) |
 | `ALLOWED_GITHUB_USERS` | – | Comma-separated GitHub usernames allowed to sign in |
-| `LITESTREAM_REPLICA_URL` | – | Continuous backup, e.g. `gs://bucket/analytics` or `s3://bucket/analytics` |
+| `LITESTREAM_REPLICA_URL` | – | Continuous backup, e.g. `gs://bucket/analytics` or `s3://bucket/analytics` (S3 needs `LITESTREAM_ACCESS_KEY_ID`/`LITESTREAM_SECRET_ACCESS_KEY`, GCS `GOOGLE_APPLICATION_CREDENTIALS` outside Google Cloud) |
+| `REQUIRE_REPLICA` | – | `1` refuses to start when the database is missing and the replica is empty, instead of starting fresh. Set it once the replica holds data |
 | `DEV_LOGIN` | – | `1` signs everyone in as `dev`, for local development only (requires a `localhost` `PUBLIC_URL`) |
 
 ## Development

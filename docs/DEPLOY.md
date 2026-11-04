@@ -131,10 +131,20 @@ gcloud auth configure-docker <region>-docker.pkg.dev   # once
 make deploy                                            # or: make deploy-server / make deploy-web
 ```
 
-- `deploy-server` builds a `linux/amd64` image, pushes it as `server:<git sha>` (with `-dirty` for uncommitted changes) and rolls out a new Cloud Run revision.
-- `deploy-web` builds `apps/web/dist` and publishes it to Firebase Hosting.
+- `deploy` runs the quality gate (`scripts/verify.sh`) and refuses to continue unless the tree is
+  clean, on `main` and pushed. `FORCE=1 make deploy` skips those three checks for an emergency fix.
+- `deploy-server` builds a `linux/amd64` image, pushes it as `server:<git sha>` (with `-dirty` for
+  uncommitted or untracked changes) and rolls out a new Cloud Run revision and backup job image.
+- `deploy-web` builds `apps/web/dist` and publishes it to Firebase Hosting. Server first, then
+  web, so a new dashboard never goes live before the API it needs.
 
-Override `PROJECT`, `REGION` or `SERVICE` on the command line if yours differ.
+Override `PROJECT`, `REGION` or `SERVICE` on the command line if yours differ. `SERVICE` and
+`REGION` are also written into `apps/web/firebase.json` (the `/api/**` rewrite); change both.
+
+After the first deploy has data, set `require_replica = true` in `terraform.tfvars` and apply.
+From then on an instance refuses to start from an empty replica, and the backup job treats an
+empty replica as a failure, so a lost replica becomes an alert instead of a quiet fresh start.
+Leave it `false` for the very first deploy, when the replica is empty by design.
 
 ## 6. Verify
 
@@ -193,9 +203,44 @@ docs/API.md), since Cloud Run has no shell for `analytics events purge`.
   `alert_email` set, any `ERROR` line from the server sends at most one email per hour.
 - **Backups:** the bucket `<project_id>-db` holds the Litestream replica. To restore it locally:
   `litestream restore -o analytics.db gs://<project_id>-db/analytics`
-- **Standalone backups:** a Cloud Run Job (`analytics-backup`) restores the replica every hour and every day and writes a gzipped SQLite file to the separate bucket `<project_id>-backups` (`hourly/` is kept 3 days, `daily/` 90 days; see `backup_*_retention_days`). It reads the replica and never touches the running service. `make deploy` updates the job's image together with the service. After the first `terraform apply` the job uses a placeholder image, so it fails (and, with `alert_email`, sends an alert) until the first `make deploy`. To restore from a file:
-  `gcloud storage cp gs://<project_id>-backups/daily/<file>.db.gz . && gunzip <file>.db.gz`, then start the server with `DATABASE_PATH` pointing at it (with Litestream, remove the old replica first).
+- **Standalone backups:** a Cloud Run Job (`<service>-backup`) restores the replica every hour and every day and writes a gzipped SQLite file to the separate bucket `<project_id>-backups` (`hourly/` is kept 3 days, `daily/` 90 days; see `backup_*_retention_days`). It reads the replica and never touches the running service. `make deploy` updates the job's image together with the service. After the first `terraform apply` the job uses a placeholder image, so it fails (and, with `alert_email`, sends an alert) until the first `make deploy`. Take one by hand with `gcloud run jobs execute <service>-backup --args daily --region <region> --project <project_id>`.
 - **Cost:** check the billing console. The budget alert emails at 50% and 90%, and at 100% of forecast spend.
+
+### Outputs
+
+| Output | What it is |
+|---|---|
+| `public_url` | The dashboard; `<public_url>/api/auth/github/callback` goes in the GitHub OAuth App |
+| `cloud_run_url` | The service's own `run.app` URL (Firebase Hosting proxies to it) |
+| `firebase_site`, `firebase_default_url` | The Hosting site and its `web.app` URL |
+| `dns_records` | Records to create for `domain` and `extra_domains` |
+| `image_repo` | Where `make deploy` pushes images |
+| `dashboard_url`, `logs_url` | The operations dashboard and the warnings/errors log query |
+
+### Restoring the database (runbook)
+
+When the replica is lost or damaged (the "Litestream reported a problem" alert, or a backup job
+failing with "replica is empty"). Nothing here touches the running service until the last step.
+
+1. **Stop deploying.** A deploy would start a new instance that restores from the broken replica.
+2. **Pick a backup.** `gcloud storage ls gs://<project_id>-backups/hourly/` (last 3 days, hourly)
+   or `.../daily/` (90 days). Fetch and unpack it:
+   `gcloud storage cp gs://<project_id>-backups/daily/<file>.db.gz . && gunzip <file>.db.gz`
+3. **Check it.** `sqlite3 <file>.db 'PRAGMA integrity_check; SELECT count(*), max(ts) FROM events'`
+   must print `ok` and a plausible count and timestamp. The timestamp is in milliseconds since
+   the epoch.
+4. **Seed a new replica path** instead of overwriting the old one, so the old one stays as
+   evidence: `litestream replicate <file>.db gs://<project_id>-db/analytics-<date>` and stop it
+   (Ctrl-C) once it prints that the snapshot is written.
+5. **Point the service at it.** Change `LITESTREAM_REPLICA_URL` in `infra/terraform/main/run.tf`
+   and `backup.tf` to the new path, `terraform apply`, then `make deploy-server`. The new
+   instance restores from the new path; the startup log shows the restore.
+6. **Confirm** in the dashboard and with `gcloud run jobs execute <service>-backup --args daily`.
+   Delete the old replica path only after a day of good backups.
+
+Events between the backup and the restore are lost. Litestream itself keeps a few hours of
+history for point-in-time restores (`litestream restore -timestamp …`); the standalone files
+reach back 90 days.
 
 ## Known trade-offs
 
@@ -215,4 +260,5 @@ docs/API.md), since Cloud Run has no shell for `analytics events purge`.
 | `Secret Payload cannot be empty` | stdin wasn't a terminal (e.g. a non-interactive shell). Use the hidden-prompt command above. |
 | Sign-in fails with `redirect_uri` mismatch | The OAuth App's callback URL must be exactly `https://<domain>/api/auth/github/callback`. |
 | `Location 'europe-north1' is not a valid location` creating a Cloud Scheduler job | Cloud Scheduler is not available in every region. The backup schedules use `scheduler_region` (default `europe-west1`) and still trigger the job in `region`. |
-| `/healthz` returns 404 on the `run.app` URL | Cloud Run reserves paths ending in `z` on its public URL. The in-container startup probe still works. |
+| `/healthz` returns 404 on the `run.app` URL | Cloud Run reserves paths ending in `z` on its public URL. The in-container startup and liveness probes still work; from outside, use `/api/auth/me` (401) as the health signal, which is also what the uptime check does. |
+| The service starts but the dashboard is empty, and the log says "no backup found" | The replica is empty. With `require_replica = true` the instance would have refused to start; follow the restore runbook above. |

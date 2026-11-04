@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.9"
+  required_version = ">= 1.9, < 2.0"
 
   # Bucket comes from infra/terraform/bootstrap: terraform init -backend-config=bucket=<state_bucket>
   backend "gcs" {

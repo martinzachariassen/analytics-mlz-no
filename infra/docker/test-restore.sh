@@ -27,14 +27,13 @@ cleanup_start() { docker rm -f "$name" >/dev/null 2>&1 || true; }
 docker volume create "$data" >/dev/null
 docker volume create "$replica" >/dev/null
 # The replica folder must be writable by the unprivileged user the image runs as.
-docker run --rm -v "$replica:/replica" --entrypoint chown "$IMAGE" 10001 /replica 2>/dev/null ||
-  docker run --rm --user root -v "$replica:/replica" --entrypoint chown "$IMAGE" 10001 /replica
+docker run --rm --user root -v "$replica:/replica" --entrypoint chown "$IMAGE" 10001 /replica
 
 start() {
   cleanup_start
   docker run -d --name "$name" -p "127.0.0.1:$PORT:8080" \
     -v "$data:/data" -v "$replica:/replica" \
-    -e LITESTREAM_REPLICA_URL=file:///replica "$IMAGE" >/dev/null
+    -e LITESTREAM_REPLICA_URL=file:///replica "$@" "$IMAGE" >/dev/null
   for _ in $(seq 1 50); do
     curl -fsS "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1 && return 0
     sleep 0.2
@@ -50,6 +49,14 @@ count() {
   docker cp "$name:/data/." "$work/db" >/dev/null
   sqlite3 "$work/db/analytics.db" 'SELECT count(*) FROM events'
 }
+
+echo "==> REQUIRE_REPLICA=1 with an empty replica must refuse to start"
+cleanup_start
+if docker run --rm -v "$data:/data" -v "$replica:/replica" \
+    -e LITESTREAM_REPLICA_URL=file:///replica -e REQUIRE_REPLICA=1 "$IMAGE" >/dev/null 2>&1; then
+  echo "FAIL: the server started with an empty replica and REQUIRE_REPLICA=1" >&2
+  exit 1
+fi
 
 echo "==> first start (empty database)"
 start
@@ -69,12 +76,27 @@ docker stop -t 10 "$name" >/dev/null
 before=$(count)
 echo "    events before: $before"
 
-echo "==> deleting the database and starting again (should restore from the replica)"
+echo "==> deleting the database and starting again with REQUIRE_REPLICA=1 (should restore from the replica)"
 docker run --rm --user root -v "$data:/data" --entrypoint sh "$IMAGE" -c 'rm -f /data/analytics.db*'
-start
+start -e REQUIRE_REPLICA=1
 docker stop -t 10 "$name" >/dev/null
 after=$(count)
 echo "    events after:  $after"
+
+echo "==> a database newer than the replica is kept (not overwritten by the restore)"
+start
+curl -fsS -A "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0" -H "Origin: https://example.com" \
+  --data "{\"site\":\"$site\",\"url\":\"https://example.com/extra\"}" \
+  "http://127.0.0.1:$PORT/api/event" >/dev/null
+sleep 4
+docker stop -t 10 "$name" >/dev/null
+start
+docker stop -t 10 "$name" >/dev/null
+extra=$(count)
+if [ "$extra" -ne $((EVENTS + 1)) ]; then
+  echo "FAIL: expected $((EVENTS + 1)) events after a restart with an existing database, got $extra" >&2
+  exit 1
+fi
 
 if [ "$before" -ne "$EVENTS" ] || [ "$after" -ne "$before" ]; then
   echo "FAIL: expected $EVENTS events before and after, got $before and $after" >&2

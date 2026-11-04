@@ -93,12 +93,17 @@ func (s *Store) migrate(ctx context.Context) error {
 	}
 	sort.Strings(files)
 
+	seen := make(map[int]string, len(files))
 	for _, f := range files {
 		base := filepath.Base(f)
 		version, err := strconv.Atoi(strings.SplitN(base, "_", 2)[0])
 		if err != nil {
 			return fmt.Errorf("migration %s: name must start with a number", base)
 		}
+		if other, dup := seen[version]; dup {
+			return fmt.Errorf("migrations %s and %s have the same version", other, base)
+		}
+		seen[version] = base
 
 		var exists int
 		if err := s.db.QueryRowContext(ctx,

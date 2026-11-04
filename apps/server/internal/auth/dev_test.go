@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -50,5 +51,34 @@ func TestDevSignIn(t *testing.T) {
 	// The callback still requires the state cookie.
 	if w := h.do("GET", strings.TrimPrefix(loc, "http://localhost:5173"), nil); !strings.Contains(w.Header().Get("Location"), "auth_error=state") {
 		t.Fatalf("callback without state cookie: location %q", w.Header().Get("Location"))
+	}
+}
+
+func TestDevSignInIsLoopbackOnly(t *testing.T) {
+	st, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "dev.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	svc := &Service{
+		Store: st, Provider: Dev{}, Allowed: []string{DevLogin}, PublicURL: "http://localhost:5173", LoopbackOnly: true,
+		Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+	mux := http.NewServeMux()
+	svc.Register(mux)
+
+	for remote, want := range map[string]int{
+		"127.0.0.1:5000":  http.StatusFound,
+		"[::1]:5000":      http.StatusFound,
+		"192.168.1.20:80": http.StatusForbidden,
+		"[fe80::1]:80":    http.StatusForbidden,
+	} {
+		req := httptest.NewRequest(http.MethodGet, "/api/auth/dev/login", nil)
+		req.RemoteAddr = remote
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, req)
+		if w.Code != want {
+			t.Errorf("login from %s = %d, want %d", remote, w.Code, want)
+		}
 	}
 }

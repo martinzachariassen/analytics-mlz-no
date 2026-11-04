@@ -3,6 +3,7 @@ package httpx
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"mime"
 	"net/http"
 )
@@ -23,7 +24,11 @@ func Error(w http.ResponseWriter, status int, msg string) {
 // ErrNotJSON is returned by ReadJSON when the request is not application/json.
 var ErrNotJSON = errors.New("content type must be application/json")
 
-// ReadJSON decodes a JSON request body into v (max 64 KB, unknown fields rejected).
+// MaxJSONBody is the largest request body ReadJSON accepts.
+const MaxJSONBody = 64 << 10
+
+// ReadJSON decodes a JSON request body into v: at most MaxJSONBody bytes, unknown fields
+// rejected, and exactly one JSON value.
 //
 // Requiring application/json also protects cookie-authenticated endpoints from CSRF:
 // cross-site HTML forms cannot send that content type, and cross-origin fetch
@@ -32,7 +37,13 @@ func ReadJSON(w http.ResponseWriter, r *http.Request, v any) error {
 	if mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mt != "application/json" {
 		return ErrNotJSON
 	}
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, MaxJSONBody))
 	dec.DisallowUnknownFields()
-	return dec.Decode(v)
+	if err := dec.Decode(v); err != nil {
+		return err
+	}
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		return errors.New("unexpected data after JSON body")
+	}
+	return nil
 }

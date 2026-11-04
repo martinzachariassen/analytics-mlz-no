@@ -18,7 +18,7 @@ make dev-reset  # start over with fresh data
 ```sh
 make test                                   # Go (race detector), tracker and dashboard tests
 make lint                                   # golangci-lint + eslint
-cd web && npm run typecheck                 # dashboard types
+cd apps/web && npm run typecheck                 # dashboard types
 make tracker                                # only if you changed apps/tracker/src; commit script.js
 ```
 

@@ -6,7 +6,7 @@ Self-hostable, cookie-free web analytics. Plan and all architectural decisions: 
 
 Monorepo: `apps/` holds everything that runs (`server`, `web`, `tracker`, `demo`), `infra/` holds Docker and Terraform. The Go module lives in `apps/server`; a root `go.work` lets `go run ./apps/server/cmd/analytics` work from the repo root.
 
-- `apps/server/cmd/analytics` — main binary (`serve`, `sites add|list`)
+- `apps/server/cmd/analytics` — main binary (`serve`, `sites add|list`, `events purge`, `sessions revoke`, `seed`, `version`)
 - `apps/server/internal/` — `config`, `store` (SQLite + embedded migrations, stats queries), `ingest` (POST /api/event), `visitor` (daily salt + hashing), `geo`, `httpx` (client IP, rate limit, JSON), `auth` (GitHub OAuth + sessions), `api` (sites + stats endpoints), `script` (embedded tracking script), `server` (router)
 - API reference: `docs/API.md`; privacy facts `docs/PRIVACY.md` (update when stored fields change); release process `docs/RELEASING.md` + `.github/workflows/release.yml`; `CHANGELOG.md` gets a line per user-visible change
 - `apps/server/internal/devdata` — synthetic traffic for `analytics seed`; `apps/demo/` — demo site for `make dev`
@@ -21,7 +21,7 @@ Monorepo: `apps/` holds everything that runs (`server`, `web`, `tracker`, `demo`
 ## Commands
 
 - `make test` — Go tests + tracker tests (vitest + happy-dom) + dashboard unit tests (vitest)
-- `cd web && npm run typecheck && npm run lint` — dashboard checks
+- `cd apps/web && npm run typecheck && npm run lint` — dashboard checks
 - `make lint` — `golangci-lint run` (in `apps/server`) + dashboard lint
 - `make run` — run the server locally on :8080 (data in `./data`)
 - `make dev` — local test environment: API + dashboard + demo site (:8081), two demo sites with two years of synthetic data in `data/dev.db`, one-click sign-in via `DEV_LOGIN=1` (localhost only). `make dev-reset` wipes it.
@@ -36,6 +36,7 @@ Monorepo: `apps/` holds everything that runs (`server`, `web`, `tracker`, `demo`
 - Never store IP addresses or raw user agents. Only derived, coarse fields.
 - Migrations: add a new numbered file in `apps/server/internal/store/migrations/`; never edit an applied one.
 - Session cookie must be named `__session` (Firebase Hosting only forwards that cookie).
-- Auth is OAuth-only (no passwords). Mutating dashboard endpoints must use `httpx.ReadJSON` (requires `application/json`, which is the CSRF protection).
+- Auth is OAuth-only (no passwords). Mutating dashboard endpoints must use `httpx.ReadJSON` (requires `application/json`, which is the CSRF protection); endpoints without a body (`DELETE`, logout) must check `auth.SameOrigin`.
+- Rate limiters are keyed on parsed IP addresses (`httpx.ClientIP`/`PeerIP`), never on raw header text; check the peer limiter before the client limiter.
 - Breakdown dimensions are a whitelist in `store.Dimensions`; never interpolate user input into SQL.
 - Code, comments and docs in English.

@@ -33,14 +33,18 @@ browser sends, a script can send too. No tracker without sign-in can prove an ev
 the server guarantees instead:
 
 - **No access.** Public endpoints can only add events. Reading statistics or changing sites needs a
-  GitHub sign-in from the allowlist. SQL uses a whitelist of dimensions and bound parameters.
+  GitHub sign-in from the allowlist (OAuth with PKCE, 7-day sliding sessions, allowlist checked on
+  every request). SQL uses a whitelist of dimensions and bound parameters. The dashboard is
+  single-tenant: every allowlisted user can read and change every site, and changes are logged
+  with the user who made them.
 - **Only valid, safe data is stored.** The site must exist, and the page URL and `Origin` must be on
   its domain. Lengths, property counts and types are capped, control characters and bidi overrides
   are stripped, and referrers must be plain hostnames. The dashboard renders everything as text
   under a strict Content-Security-Policy.
-- **Limited inflation from one source.** Limits apply per client IP, per upstream address (which
-  cannot be forged), and per visitor (site plus daily hash). Bots and the excess per visitor get a
-  silent `202`.
+- **Limited inflation from one source.** Limits apply per upstream address (which cannot be
+  forged), per client IP, and per visitor (site plus daily hash). Limiter keys are parsed
+  addresses, never raw header text, and the maps that hold them are bounded. Bots and the excess
+  per visitor get a silent `202`.
 - **Floods do not take the service down or run up a bill.** There is a global event rate, a bounded
   write queue that answers `503` instead of piling up, a database size cap that pauses ingestion
   but keeps the dashboard working, the script cached at the CDN, and a single Cloud Run instance.

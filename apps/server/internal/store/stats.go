@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -233,7 +234,7 @@ func (s *Store) Breakdown(ctx context.Context, siteID string, r Range, dim strin
 			return nil, fmt.Errorf("%s breakdown requires event", dim)
 		}
 		col, extra := "p.key", ""
-		args = append(visitArgs, opt.Event)
+		args = append(append([]any{}, visitArgs...), opt.Event)
 		if dim == "prop" {
 			col, extra = "p.value", " AND p.key = ?"
 			args = append(args, opt.PropKey)
@@ -361,7 +362,7 @@ type Count struct {
 func (s *Store) Histogram(ctx context.Context, siteID string, r Range, f Filters, step time.Duration) ([]Count, error) {
 	ms := step.Milliseconds()
 	if ms <= 0 {
-		return nil, fmt.Errorf("step must be positive")
+		return nil, errors.New("step must be positive")
 	}
 	where, args := scope{site: siteID, r: r, filters: f}.rows(false)
 	from := r.From.UnixMilli()

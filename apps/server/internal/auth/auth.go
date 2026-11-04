@@ -15,7 +15,9 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,12 +27,15 @@ import (
 
 // CookieName must be "__session": Firebase Hosting strips every other cookie
 // when proxying requests to Cloud Run. The same cookie therefore carries the
-// short-lived OAuth state ("oauth.<state>") during sign-in.
+// short-lived OAuth state ("oauth.<state>.<verifier>.<issued>") during sign-in.
 const CookieName = "__session"
 
 const (
-	// SessionTTL is how long a sign-in lasts.
-	SessionTTL = 30 * 24 * time.Hour
+	// SessionTTL is how long a sign-in lasts without activity.
+	SessionTTL = 7 * 24 * time.Hour
+	// SessionRenewAfter is how much of the lifetime must have passed before an
+	// authenticated request extends the session by a full SessionTTL.
+	SessionRenewAfter = 24 * time.Hour
 	// stateTTL is how long the user has to complete the provider's sign-in page.
 	stateTTL    = 10 * time.Minute
 	statePrefix = "oauth."
@@ -46,18 +51,21 @@ type Identity struct {
 type Provider interface {
 	// Name is used in URLs (/api/auth/{name}/login) and stored with the user.
 	Name() string
-	// AuthCodeURL is where the browser is sent to sign in.
-	AuthCodeURL(state, redirectURI string) string
-	// Identify exchanges the callback code for the user's identity.
-	Identify(ctx context.Context, code, redirectURI string) (Identity, error)
+	// AuthCodeURL is where the browser is sent to sign in. codeChallenge is the PKCE
+	// S256 challenge; providers that do not support PKCE may ignore it.
+	AuthCodeURL(state, redirectURI, codeChallenge string) string
+	// Identify exchanges the callback code (and the PKCE verifier) for the user's identity.
+	Identify(ctx context.Context, code, redirectURI, codeVerifier string) (Identity, error)
 }
 
 // Store is the persistence used by auth.
 type Store interface {
 	LoginUser(ctx context.Context, provider, providerID, login string, now time.Time) (store.User, error)
 	CreateSession(ctx context.Context, tokenHash []byte, userID int64, expires time.Time) error
-	UserBySession(ctx context.Context, tokenHash []byte, now time.Time) (store.User, error)
+	UserBySession(ctx context.Context, tokenHash []byte, now time.Time) (store.User, time.Time, error)
+	ExtendSession(ctx context.Context, tokenHash []byte, expires time.Time) error
 	DeleteSession(ctx context.Context, tokenHash []byte) error
+	DeleteUserSessions(ctx context.Context, userID int64) error
 	DeleteExpiredSessions(ctx context.Context, now time.Time) error
 }
 
@@ -67,8 +75,11 @@ type Service struct {
 	Provider  Provider // nil disables sign-in
 	Allowed   []string // provider usernames allowed to sign in (case-insensitive)
 	PublicURL string   // dashboard base URL, e.g. https://analytics.example.com
-	Log       *slog.Logger
-	Now       func() time.Time
+	// LoopbackOnly restricts the sign-in routes to requests from the loopback interface.
+	// Set for the Dev provider, which signs anyone in.
+	LoopbackOnly bool
+	Log          *slog.Logger
+	Now          func() time.Time
 }
 
 // Register adds the auth routes to mux.
@@ -78,8 +89,8 @@ func (s *Service) Register(mux *http.ServeMux) {
 	mux.Handle("GET /api/auth/me", s.Require(http.HandlerFunc(s.me)))
 	if s.Provider != nil {
 		name := s.Provider.Name()
-		mux.HandleFunc("GET /api/auth/"+name+"/login", s.login)
-		mux.HandleFunc("GET /api/auth/"+name+"/callback", s.callback)
+		mux.HandleFunc("GET /api/auth/"+name+"/login", s.loopback(s.login))
+		mux.HandleFunc("GET /api/auth/"+name+"/callback", s.loopback(s.callback))
 	}
 }
 
@@ -91,7 +102,9 @@ func UserFrom(ctx context.Context) (store.User, bool) {
 	return u, ok
 }
 
-// Require rejects requests without a valid session with 401.
+// Require rejects requests without a valid session with 401. The allowlist is checked on
+// every request, so removing a user from it signs them out at once; their sessions are
+// deleted. Sessions older than SessionRenewAfter are extended.
 func (s *Service) Require(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c, err := r.Cookie(CookieName)
@@ -99,7 +112,9 @@ func (s *Service) Require(next http.Handler) http.Handler {
 			httpx.Error(w, http.StatusUnauthorized, "not signed in")
 			return
 		}
-		u, err := s.Store.UserBySession(r.Context(), hashToken(c.Value), s.now())
+		now := s.now()
+		hash := hashToken(c.Value)
+		u, expires, err := s.Store.UserBySession(r.Context(), hash, now)
 		if errors.Is(err, store.ErrNotFound) {
 			httpx.Error(w, http.StatusUnauthorized, "not signed in")
 			return
@@ -108,6 +123,19 @@ func (s *Service) Require(next http.Handler) http.Handler {
 			s.Log.Error("session lookup", "err", err)
 			httpx.Error(w, http.StatusInternalServerError, "internal error")
 			return
+		}
+		if !s.allowed(u.Login) {
+			s.Log.Warn("session revoked: user no longer on allowlist", "login", u.Login)
+			_ = s.Store.DeleteUserSessions(r.Context(), u.ID)
+			http.SetCookie(w, s.cookie("", time.Unix(0, 0)))
+			httpx.Error(w, http.StatusUnauthorized, "not signed in")
+			return
+		}
+		if expires.Sub(now) < SessionTTL-SessionRenewAfter {
+			renewed := now.Add(SessionTTL)
+			if err := s.Store.ExtendSession(r.Context(), hash, renewed); err == nil {
+				http.SetCookie(w, s.cookie(c.Value, renewed))
+			}
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), contextKey{}, u)))
 	})
@@ -122,15 +150,21 @@ func (s *Service) config(w http.ResponseWriter, _ *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"providers": providers})
 }
 
+// login starts the OAuth flow. Any existing session is ended first, so a stale cookie is
+// never left pointing at a live session row.
 func (s *Service) login(w http.ResponseWriter, r *http.Request) {
-	state := newToken()
-	http.SetCookie(w, s.cookie(statePrefix+state, s.now().Add(stateTTL)))
-	http.Redirect(w, r, s.Provider.AuthCodeURL(state, s.redirectURI()), http.StatusFound)
+	if c, err := r.Cookie(CookieName); err == nil && isSessionValue(c.Value) {
+		_ = s.Store.DeleteSession(r.Context(), hashToken(c.Value))
+	}
+	state, verifier := newToken(), newToken()
+	issued := strconv.FormatInt(s.now().Unix(), 10)
+	http.SetCookie(w, s.cookie(statePrefix+state+"."+verifier+"."+issued, s.now().Add(stateTTL)))
+	http.Redirect(w, r, s.Provider.AuthCodeURL(state, s.redirectURI(), pkceChallenge(verifier)), http.StatusFound)
 }
 
 // Error codes passed to the dashboard as ?auth_error=… after a failed sign-in.
 const (
-	errState      = "state"       // missing/mismatched state: expired or forged request
+	errState      = "state"       // missing/mismatched/expired state: expired or forged request
 	errDenied     = "denied"      // user cancelled at the provider
 	errNotAllowed = "not_allowed" // username not on the allowlist
 	errConflict   = "conflict"    // username bound to a different account
@@ -140,8 +174,12 @@ const (
 func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	c, err := r.Cookie(CookieName)
-	want := statePrefix + q.Get("state")
-	if err != nil || q.Get("state") == "" || subtle.ConstantTimeCompare([]byte(c.Value), []byte(want)) != 1 {
+	if err != nil {
+		s.fail(w, r, errState)
+		return
+	}
+	verifier, ok := s.checkState(c.Value, q.Get("state"))
+	if !ok {
 		s.fail(w, r, errState)
 		return
 	}
@@ -151,7 +189,7 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	id, err := s.Provider.Identify(ctx, q.Get("code"), s.redirectURI())
+	id, err := s.Provider.Identify(ctx, q.Get("code"), s.redirectURI(), verifier)
 	if err != nil {
 		s.Log.Error("oauth identify", "provider", s.Provider.Name(), "err", err)
 		s.fail(w, r, errFailed)
@@ -188,17 +226,70 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, s.PublicURL+"/", http.StatusFound)
 }
 
+// checkState validates the state cookie against the state query parameter and returns the
+// PKCE verifier. The cookie's own expiry is not trusted: the issue time inside it is checked.
+func (s *Service) checkState(cookie, state string) (string, bool) {
+	if state == "" || !strings.HasPrefix(cookie, statePrefix) {
+		return "", false
+	}
+	parts := strings.Split(strings.TrimPrefix(cookie, statePrefix), ".")
+	if len(parts) != 3 {
+		return "", false
+	}
+	issued, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil || s.now().Sub(time.Unix(issued, 0)) > stateTTL {
+		return "", false
+	}
+	if subtle.ConstantTimeCompare([]byte(parts[0]), []byte(state)) != 1 {
+		return "", false
+	}
+	return parts[1], true
+}
+
+// fail sends the browser back to the dashboard with an error code. Only a state cookie is
+// cleared: a cross-site link to the callback must not sign out an existing session.
 func (s *Service) fail(w http.ResponseWriter, r *http.Request, code string) {
-	http.SetCookie(w, s.cookie("", time.Unix(0, 0)))
+	if c, err := r.Cookie(CookieName); err != nil || !isSessionValue(c.Value) {
+		http.SetCookie(w, s.cookie("", time.Unix(0, 0)))
+	}
 	http.Redirect(w, r, s.PublicURL+"/?auth_error="+url.QueryEscape(code), http.StatusFound)
 }
 
+// logout ends the session. It is a POST from the dashboard, so it requires the dashboard's
+// own Origin (or none, for non-browser clients such as curl).
 func (s *Service) logout(w http.ResponseWriter, r *http.Request) {
-	if c, err := r.Cookie(CookieName); err == nil && c.Value != "" {
+	if !SameOrigin(r, s.PublicURL) {
+		httpx.Error(w, http.StatusForbidden, "cross-origin request")
+		return
+	}
+	if c, err := r.Cookie(CookieName); err == nil && isSessionValue(c.Value) {
 		_ = s.Store.DeleteSession(r.Context(), hashToken(c.Value))
 	}
 	http.SetCookie(w, s.cookie("", time.Unix(0, 0)))
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// SameOrigin reports whether the request's Origin header (or, failing that, its Referer)
+// is publicURL. Requests without either header pass: browsers always send Origin on
+// cross-origin POST and DELETE, so a missing header means a non-browser client, which
+// cannot carry the victim's cookie anyway.
+func SameOrigin(r *http.Request, publicURL string) bool {
+	src := r.Header.Get("Origin")
+	if src == "" {
+		src = r.Header.Get("Referer")
+	}
+	if src == "" {
+		return true
+	}
+	u, err := url.Parse(src)
+	if err != nil {
+		return false
+	}
+	want, err := url.Parse(publicURL)
+	if err != nil {
+		return false
+	}
+	return strings.EqualFold(u.Scheme, want.Scheme) && strings.EqualFold(u.Host, want.Host)
 }
 
 type userResponse struct {
@@ -218,6 +309,21 @@ func (s *Service) allowed(login string) bool {
 		}
 	}
 	return false
+}
+
+// loopback wraps a handler so that, with LoopbackOnly, only requests from 127.0.0.1 or ::1
+// reach it. It looks at the TCP peer, never at forwarded headers.
+func (s *Service) loopback(next http.HandlerFunc) http.HandlerFunc {
+	if !s.LoopbackOnly {
+		return next
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		if ap, err := netip.ParseAddrPort(r.RemoteAddr); err != nil || !ap.Addr().Unmap().IsLoopback() {
+			httpx.Error(w, http.StatusForbidden, "development sign-in is only available from this machine")
+			return
+		}
+		next(w, r)
+	}
 }
 
 func (s *Service) redirectURI() string {
@@ -244,6 +350,10 @@ func (s *Service) now() time.Time {
 	return time.Now()
 }
 
+func isSessionValue(v string) bool {
+	return v != "" && !strings.HasPrefix(v, statePrefix)
+}
+
 func newToken() string {
 	b := make([]byte, 32)
 	_, _ = rand.Read(b)
@@ -253,4 +363,10 @@ func newToken() string {
 func hashToken(token string) []byte {
 	sum := sha256.Sum256([]byte(token))
 	return sum[:]
+}
+
+// pkceChallenge is the S256 code challenge for a verifier (RFC 7636).
+func pkceChallenge(verifier string) string {
+	sum := sha256.Sum256([]byte(verifier))
+	return base64.RawURLEncoding.EncodeToString(sum[:])
 }

@@ -5,6 +5,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -55,9 +56,9 @@ func New(cfg config.Config, st *store.Store, authn *auth.Service, loc *geo.Locat
 	// the OAuth provider or the session table.
 	authMux := http.NewServeMux()
 	authn.Register(authMux)
-	mux.Handle("/api/auth/", limit(httpx.NewRateLimiter(5, 30), cfg.ProxyHops, authMux))
+	mux.Handle("/api/auth/", limit(httpx.NewRateLimiter(5, 30), httpx.NewRateLimiter(20, 100), cfg.ProxyHops, authMux))
 
-	(&api.API{Store: st, Log: log}).Register(mux, authn.Require)
+	(&api.API{Store: st, Log: log, PublicURL: cfg.PublicURL}).Register(mux, authn.Require)
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
@@ -69,22 +70,70 @@ func New(cfg config.Config, st *store.Store, authn *auth.Service, loc *geo.Locat
 		_, _ = w.Write([]byte("ok"))
 	})
 
-	return noIndex(mux)
+	return secure(cfg, jsonErrors(mux))
 }
 
-// noIndex tells search engines not to index anything this server serves: the API, the tracking
-// script and error pages. It does not stop browsers from loading the script.
-func noIndex(next http.Handler) http.Handler {
+// secure adds the response headers every response gets, whether or not a CDN in front
+// adds its own. The API serves JSON and a script, never HTML, so the policy is "nothing":
+// no embedding, no scripts, no referrer. HSTS is sent when the dashboard is served over https.
+func secure(cfg config.Config, next http.Handler) http.Handler {
+	hsts := strings.HasPrefix(cfg.PublicURL, "https://")
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Robots-Tag", "noindex, nofollow")
+		h := w.Header()
+		h.Set("X-Robots-Tag", "noindex, nofollow")
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("Referrer-Policy", "no-referrer")
+		h.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+		h.Set("X-Frame-Options", "DENY")
+		if hsts {
+			h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
 		next.ServeHTTP(w, r)
 	})
 }
 
-func limit(rl *httpx.RateLimiter, proxyHops int, next http.Handler) http.Handler {
+// jsonErrors turns the mux's own text 404 and 405 responses into the API's JSON shape,
+// keeping the Allow header the mux sets on a 405.
+func jsonErrors(mux *http.ServeMux) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !rl.Allow(httpx.ClientIP(r, proxyHops)) {
-			http.Error(w, "too many requests", http.StatusTooManyRequests)
+		if _, pattern := mux.Handler(r); pattern != "" {
+			mux.ServeHTTP(w, r)
+			return
+		}
+		probe := &headerOnly{header: http.Header{}}
+		mux.ServeHTTP(probe, r)
+		if allow := probe.header.Get("Allow"); allow != "" {
+			w.Header().Set("Allow", allow)
+		}
+		if probe.status == http.StatusMethodNotAllowed {
+			httpx.Error(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		httpx.Error(w, http.StatusNotFound, "not found")
+	})
+}
+
+// headerOnly records a response's status and headers and discards its body.
+type headerOnly struct {
+	header http.Header
+	status int
+}
+
+func (h *headerOnly) Header() http.Header         { return h.header }
+func (h *headerOnly) Write(b []byte) (int, error) { return len(b), nil }
+func (h *headerOnly) WriteHeader(status int)      { h.status = status }
+
+// limit rate limits by client IP and, separately, by the unforgeable upstream address, so a
+// client that forges X-Forwarded-For on a direct connection still hits a ceiling.
+func limit(client, peer *httpx.RateLimiter, proxyHops int, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ip := httpx.ClientIP(r, proxyHops)
+		if p := httpx.PeerIP(r, proxyHops); p != ip && !peer.Allow(p) {
+			httpx.Error(w, http.StatusTooManyRequests, "too many requests")
+			return
+		}
+		if !client.Allow(ip) {
+			httpx.Error(w, http.StatusTooManyRequests, "too many requests")
 			return
 		}
 		next.ServeHTTP(w, r)

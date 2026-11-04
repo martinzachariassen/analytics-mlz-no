@@ -1,9 +1,10 @@
-// Package httpx contains small HTTP helpers: client IP extraction and per-IP rate limiting.
+// Package httpx contains small HTTP helpers: client IP extraction, JSON and per-IP rate limiting.
 package httpx
 
 import (
 	"net"
 	"net/http"
+	"net/netip"
 	"strings"
 	"sync"
 	"time"
@@ -11,7 +12,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// ClientIP returns the client's IP address.
+// ClientIP returns the client's IP address in canonical form.
 //
 // With proxyHops == 0 the TCP remote address is used. With proxyHops == n the
 // n-th entry from the right of X-Forwarded-For is used, i.e. the address the
@@ -21,7 +22,8 @@ import (
 // If a request bypasses one of the proxies (for example a direct request to the
 // run.app URL when Firebase Hosting is expected in front), the entry ClientIP
 // picks can be client-controlled. Callers that rate limit should also limit by
-// PeerIP, which cannot be spoofed.
+// PeerIP, which cannot be spoofed. An entry that is not an IP address is never
+// returned: the result is always a parsed address, so it is safe as a map key.
 func ClientIP(r *http.Request, proxyHops int) string {
 	if proxyHops > 0 {
 		if hops := forwardedFor(r); len(hops) > 0 {
@@ -31,7 +33,9 @@ func ClientIP(r *http.Request, proxyHops int) string {
 				// entry, use what the nearest proxy saw.
 				i = len(hops) - 1
 			}
-			return hops[i]
+			if ip, ok := parseIP(hops[i]); ok {
+				return ip
+			}
 		}
 	}
 	return remoteHost(r)
@@ -44,7 +48,9 @@ func ClientIP(r *http.Request, proxyHops int) string {
 func PeerIP(r *http.Request, proxyHops int) string {
 	if proxyHops > 0 {
 		if hops := forwardedFor(r); len(hops) > 0 {
-			return hops[len(hops)-1]
+			if ip, ok := parseIP(hops[len(hops)-1]); ok {
+				return ip
+			}
 		}
 	}
 	return remoteHost(r)
@@ -62,12 +68,25 @@ func forwardedFor(r *http.Request) []string {
 	return hops
 }
 
-func remoteHost(r *http.Request) string {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
+// parseIP canonicalises an address from a header: IPv4-mapped IPv6 becomes IPv4, zones and
+// ports are dropped, and anything that is not an address is rejected.
+func parseIP(s string) (string, bool) {
+	if h, _, err := net.SplitHostPort(s); err == nil {
+		s = h
 	}
-	return host
+	s = strings.TrimSuffix(strings.TrimPrefix(s, "["), "]")
+	addr, err := netip.ParseAddr(s)
+	if err != nil {
+		return "", false
+	}
+	return addr.Unmap().WithZone("").String(), true
+}
+
+func remoteHost(r *http.Request) string {
+	if ip, ok := parseIP(r.RemoteAddr); ok {
+		return ip
+	}
+	return r.RemoteAddr
 }
 
 // RateLimiter limits requests per key (typically client IP).
@@ -83,11 +102,13 @@ type RateLimiter struct {
 // Memory bounds for RateLimiter. Idle keys are swept at most once per sweepEvery once the
 // map passes sweepAbove; if a flood of distinct keys pushes it past maxKeys anyway, it is
 // reset, which briefly forgives everyone rather than letting memory grow without bound.
+// Keys are capped in length so a caller cannot pass arbitrarily large strings.
 const (
 	sweepAbove = 10_000
 	sweepEvery = time.Minute
 	idleAfter  = 10 * time.Minute
 	maxKeys    = 200_000
+	maxKeyLen  = 128
 )
 
 type entry struct {
@@ -102,6 +123,9 @@ func NewRateLimiter(perSecond float64, burst int) *RateLimiter {
 
 // Allow reports whether a request for key may proceed.
 func (rl *RateLimiter) Allow(key string) bool {
+	if len(key) > maxKeyLen {
+		key = key[:maxKeyLen]
+	}
 	now := time.Now()
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
@@ -125,4 +149,11 @@ func (rl *RateLimiter) Allow(key string) bool {
 	}
 	e.seen = now
 	return e.lim.Allow()
+}
+
+// Len returns the number of tracked keys.
+func (rl *RateLimiter) Len() int {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	return len(rl.limiters)
 }

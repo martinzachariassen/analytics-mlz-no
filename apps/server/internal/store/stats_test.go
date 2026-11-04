@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 )
@@ -149,30 +148,6 @@ func TestBreakdown(t *testing.T) {
 
 	if _, err := st.Breakdown(context.Background(), site, r, "password; DROP TABLE", BreakdownOptions{}); err == nil {
 		t.Fatal("unknown dimension must fail")
-	}
-}
-
-func TestLoginUser(t *testing.T) {
-	ctx := context.Background()
-	st := openTemp(t)
-	now := time.Now()
-
-	u, err := st.LoginUser(ctx, "github", "1", "martin", now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Rename at GitHub: same id, new login.
-	renamed, err := st.LoginUser(ctx, "github", "1", "martin-z", now)
-	if err != nil || renamed.ID != u.ID || renamed.Login != "martin-z" {
-		t.Fatalf("rename: %+v, %v", renamed, err)
-	}
-	// Someone else registers "MARTIN-Z" (case-insensitive) with another id.
-	if _, err := st.LoginUser(ctx, "github", "2", "MARTIN-Z", now); !errors.Is(err, ErrIdentityConflict) {
-		t.Fatalf("err = %v, want ErrIdentityConflict", err)
-	}
-	// The released old name can be taken by a new account.
-	if _, err := st.LoginUser(ctx, "github", "3", "martin", now); err != nil {
-		t.Fatalf("new account with released name: %v", err)
 	}
 }
 

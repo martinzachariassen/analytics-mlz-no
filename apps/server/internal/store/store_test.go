@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -20,14 +21,70 @@ func openTemp(t *testing.T) *Store {
 
 func TestNormalizeDomain(t *testing.T) {
 	for in, want := range map[string]string{
-		"https://www.Example.com/": "example.com",
-		"mlz.no":                   "mlz.no",
-		"blog.mlz.no:8080/path":    "blog.mlz.no",
-		"  WWW.MLZ.NO  ":           "mlz.no",
+		"https://www.Example.com/":        "example.com",
+		"mlz.no":                          "mlz.no",
+		"blog.mlz.no:8080/path":           "blog.mlz.no",
+		"  WWW.MLZ.NO  ":                  "mlz.no",
+		"example.com.":                    "example.com",
+		"ærø.no":                          "xn--r-3fa9c.no",
+		"ÆRØ.NO":                          "xn--r-3fa9c.no",
+		"localhost":                       "localhost",
+		"docs.localhost":                  "docs.localhost",
+		"no":                              "",
+		"com":                             "",
+		"exa mple.com":                    "",
+		"a_b.example.com":                 "",
+		"<b>.example.com":                 "",
+		"":                                "",
+		"https://":                        "",
+		strings.Repeat("a", 250) + ".com": "",
 	} {
 		if got := NormalizeDomain(in); got != want {
 			t.Errorf("NormalizeDomain(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestSiteNamesAndIDs(t *testing.T) {
+	ctx := context.Background()
+	st := openTemp(t)
+	long := strings.Repeat("n", 500)
+	site, err := st.CreateSite(ctx, " My\x00 site\n "+long, "a.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.ContainsAny(site.Name, "\x00\n") || len(site.Name) > maxNameLen || !strings.HasPrefix(site.Name, "My site") {
+		t.Fatalf("name = %q", site.Name)
+	}
+	if !ValidSiteID(site.ID) {
+		t.Fatalf("generated id %q is not valid", site.ID)
+	}
+	for _, bad := range []string{"", "short", "abcdefghijk0", "ABCDEFGHIJKM", "abcdefghijkmn", "abcdefghijk;"} {
+		if ValidSiteID(bad) {
+			t.Errorf("ValidSiteID(%q) = true", bad)
+		}
+	}
+	if _, err := st.CreateSite(ctx, "x", "com"); !errors.Is(err, ErrDomainInvalid) {
+		t.Fatalf("bare TLD: err = %v", err)
+	}
+	if _, err := st.CreateSite(ctx, "x", "   "); !errors.Is(err, ErrDomainRequired) {
+		t.Fatalf("blank: err = %v", err)
+	}
+	// Updating with an empty domain keeps it; an empty name falls back to the domain.
+	updated, err := st.UpdateSite(ctx, site.ID, "", "")
+	if err != nil || updated.Domain != "a.example" || updated.Name != "a.example" {
+		t.Fatalf("UpdateSite(empty) = %+v, %v", updated, err)
+	}
+	if _, err := st.UpdateSite(ctx, "missing", "x", ""); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("update missing: %v", err)
+	}
+	seen := map[string]bool{}
+	for range 1000 {
+		id := newID(siteIDLen)
+		if seen[id] {
+			t.Fatal("duplicate id")
+		}
+		seen[id] = true
 	}
 }
 

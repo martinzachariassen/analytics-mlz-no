@@ -8,7 +8,10 @@ Options and custom events are described in the [README](../README.md#tracking-yo
 
 ## Size and caching
 
-- About 2.4 KB minified, 1.2 KB gzipped, no dependencies.
+- About 1.7 KB minified, 0.9 KB gzipped, no dependencies.
+- Served gzip-compressed when the browser accepts it (compressed once at startup).
+- Targets ES2022 (Chrome/Edge 94+, Firefox 93+, Safari 15.4+). Older browsers fail to parse it and
+  are simply not counted; the page itself is unaffected.
 - Served with `Cache-Control: public, max-age=3600, stale-while-revalidate=86400` and an `ETag`, so
   an update reaches visitors within about an hour.
 - Served with `Access-Control-Allow-Origin: *` and `Cross-Origin-Resource-Policy: cross-origin`,

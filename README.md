@@ -74,7 +74,7 @@ Add the script to every page (replace the host and site id):
 ```
 
 That's it — page views (including SPA navigation via `history.pushState`) and clicks on
-outbound links are tracked automatically. The script is ~1.2 KB gzipped and sets no cookies.
+outbound links are tracked automatically. The script is ~0.9 KB gzipped and sets no cookies.
 
 **Custom events**
 

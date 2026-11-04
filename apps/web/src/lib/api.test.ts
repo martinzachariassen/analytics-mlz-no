@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { api, ApiError } from "@/lib/api"
+import { ApiError, api } from "@/lib/api"
 
 function respond(
   status: number,
@@ -36,10 +36,10 @@ describe("api requests", () => {
   it("sends JSON bodies with the content type the server requires", async () => {
     const fetch = respond(201, "{}")
     await api.createSite({ name: "A", domain: "a.example" })
-    const [, init] = fetch.mock.calls[0]!
-    expect(init?.method).toBe("POST")
-    expect(init?.credentials).toBe("same-origin")
-    expect((init?.headers as Record<string, string>)["Content-Type"]).toBe(
+    const init = fetch.mock.calls[0]![1]!
+    expect(init.method).toBe("POST")
+    expect(init.credentials).toBe("same-origin")
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBe(
       "application/json"
     )
   })

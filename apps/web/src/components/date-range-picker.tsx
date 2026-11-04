@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react"
 import { format, parseISO } from "date-fns"
-import type { DateRange } from "react-day-picker"
 import { CalendarDays, Check, ChevronDown } from "lucide-react"
+import { useEffect, useState } from "react"
+import type { DateRange } from "react-day-picker"
 
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import type { Compare, Interval } from "@/lib/api"
+import { isTyping } from "@/lib/keys"
 import {
   formatDay,
   formatRange,
@@ -26,7 +27,6 @@ import {
   PERIODS,
   type Period,
 } from "@/lib/period"
-import { isTyping } from "@/lib/keys"
 import type { ScopeState } from "@/lib/use-scope"
 import { cn } from "@/lib/utils"
 

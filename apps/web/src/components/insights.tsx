@@ -1,6 +1,6 @@
-import type { ReactNode } from "react"
 import { format } from "date-fns"
 import { Sparkles } from "lucide-react"
+import type { ReactNode } from "react"
 
 import type { Stats } from "@/lib/api"
 import { change, formatNumber, formatPercent } from "@/lib/format"

@@ -180,11 +180,14 @@ PUBLIC_URL=http://localhost:5173 GITHUB_CLIENT_ID=… GITHUB_CLIENT_SECRET=… \
 make dev-web
 ```
 
+Tools are pinned in `mise.toml` (`mise install`), JavaScript packages come from `bun install`.
+
 ```sh
+make verify   # the full quality gate (scripts/verify.sh); CI runs the same file
 make test     # Go + tracker + dashboard tests
+make lint     # Biome + gofmt + golangci-lint
 make tracker  # rebuild apps/server/internal/script/script.js after editing apps/tracker/src
-make lint   # golangci-lint
-make run    # local server on :8080
+make run      # local server on :8080
 ```
 
 IP geolocation by [DB-IP](https://db-ip.com) (CC BY 4.0).

@@ -33,6 +33,7 @@ All notable changes are documented here. The format follows
 - Shutdown: a second signal ends the process, a shutdown timeout closes open connections instead of exiting non-zero, and `net/http`'s own errors are logged as JSON.
 
 ### Changed
+- Tooling: every tool is pinned in `mise.toml` (`mise install`), JavaScript packages are one Bun workspace (`bun install`), Biome replaces eslint and prettier, a pre-commit hook runs `bun run lint`, and `scripts/verify.sh` (`make verify`) is the one quality gate that CI runs too, including Terraform `fmt`/`validate`, shellcheck, hadolint and actionlint.
 - `404`, `405` and `429` responses are JSON like the API's other errors.
 - Statistics queries are cancelled after 10 seconds.
 - Site creation, changes, deletion and purges are logged with the signed-in user.

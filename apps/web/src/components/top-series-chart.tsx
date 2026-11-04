@@ -108,7 +108,8 @@ export function TopSeriesChart({
             cursor={{ stroke: "var(--fg-muted)", strokeWidth: 1 }}
             content={({ active, payload }) => {
               const pt = payload?.[0]?.payload as
-                Record<string, number | null> | undefined
+                | Record<string, number | null>
+                | undefined
               if (!active || !pt) return null
               return (
                 <TipBox>

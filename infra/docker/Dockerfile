@@ -13,6 +13,7 @@ COPY apps/server ./
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/analytics ./cmd/analytics
 
 FROM --platform=$BUILDPLATFORM alpine:3.24 AS assets
+SHELL ["/bin/ash", "-o", "pipefail", "-c"]
 ARG TARGETARCH
 ARG LITESTREAM_VERSION=0.5.17
 RUN apk add --no-cache curl

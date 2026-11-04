@@ -1,0 +1,4 @@
+# Alpine removes old package versions from its repositories, so pinning apk packages breaks
+# the build within weeks; the base image digest pins what is installed instead.
+ignored:
+  - DL3018

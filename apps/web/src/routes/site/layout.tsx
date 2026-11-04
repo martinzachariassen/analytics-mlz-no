@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
-import { Link, Outlet, useLocation } from "react-router"
 import { ChevronRight } from "lucide-react"
+import { Link, Outlet, useLocation } from "react-router"
 
 import { VIEWS } from "@/components/app-sidebar"
 import {
@@ -11,7 +11,7 @@ import {
 import { DetailSheet } from "@/components/detail-sheet"
 import { FilterBar } from "@/components/filter-bar"
 import { PageHeader } from "@/components/page-header"
-import { api, ApiError } from "@/lib/api"
+import { ApiError, api } from "@/lib/api"
 import { useScope } from "@/lib/use-scope"
 
 /**

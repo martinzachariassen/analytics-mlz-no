@@ -13,83 +13,84 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Every job runs scripts/verify.sh with one group, so CI and `make verify` check the same things
+# with the same tool versions (mise.toml).
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@v5
+      - run: bun install --frozen-lockfile
+      - run: ./scripts/verify.sh lint
+
   go:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
         with:
-          go-version-file: apps/server/go.mod
-      - run: go vet ./apps/server/...
-      - run: go test -race ./apps/server/...
-      - uses: golangci/golangci-lint-action@v9
-        with:
-          version: v2.14
-          working-directory: apps/server
-
-  docker:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - run: docker build -f infra/docker/Dockerfile -t analytics-mlz-no:ci .
+          persist-credentials: false
+      - uses: jdx/mise-action@v5
+      - run: ./scripts/verify.sh go
 
   tracker:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/tracker
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
         with:
-          node-version: 26
-          cache: npm
-          cache-dependency-path: apps/tracker/package-lock.json
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
-      - name: Check that the embedded script.js is up to date
-        run: |
-          npm run build
-          git diff --exit-code -- ../server/internal/script/script.js || {
-            echo "::error::apps/server/internal/script/script.js is stale. Run 'npm run build' in apps/tracker/ and commit."
-            exit 1
-          }
-      - run: npm run check-size
+          persist-credentials: false
+      - uses: jdx/mise-action@v5
+      - run: bun install --frozen-lockfile
+      - run: ./scripts/verify.sh tracker
 
   web:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/web
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
         with:
-          node-version: 26
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm test
-      - run: npm run build
+          persist-credentials: false
+      - uses: jdx/mise-action@v5
+      - run: bun install --frozen-lockfile
+      - run: ./scripts/verify.sh web
+
+  infra:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@v5
+      - run: ./scripts/verify.sh infra
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: docker build -f infra/docker/Dockerfile -t analytics-mlz-no:ci .
 
   security:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
         with:
-          go-version-file: apps/server/go.mod
+          persist-credentials: false
+      - uses: jdx/mise-action@v5
       - name: Known vulnerabilities in Go dependencies and the standard library
         working-directory: apps/server
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 26
+      - run: bun install --frozen-lockfile
       # Only what ships to users: production dependencies of the dashboard.
-      - name: npm audit (web)
+      - name: bun audit (web)
         working-directory: apps/web
-        run: npm audit --audit-level=high --omit=dev
+        run: bun audit --audit-level=high --prod

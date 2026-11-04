@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { init, dataProps, type Config } from "./core";
+import { type Config, dataProps, init } from "./core";
 
 // Provided by the happy-dom test environment.
 declare global {
@@ -121,7 +121,10 @@ describe("page views", () => {
     start(base);
     history.replaceState({}, "", "/login");
     history.replaceState({}, "", "/login"); // duplicate
-    expect(sent.map((p) => p.url)).toEqual(["https://www.example.com/start?utm_source=newsletter", "https://www.example.com/login"]);
+    expect(sent.map((p) => p.url)).toEqual([
+      "https://www.example.com/start?utm_source=newsletter",
+      "https://www.example.com/login",
+    ]);
   });
 
   it("counts a page restored from the back-forward cache again", () => {
@@ -144,14 +147,21 @@ describe("sending", () => {
     start(base);
     expect(fetch).toHaveBeenCalledWith(base.endpoint, {
       method: "POST",
-      body: JSON.stringify({ site: "site123", type: "pageview", url: "https://www.example.com/start?utm_source=newsletter" }),
+      body: JSON.stringify({
+        site: "site123",
+        type: "pageview",
+        url: "https://www.example.com/start?utm_source=newsletter",
+      }),
       keepalive: true,
     });
   });
 
   it("swallows fetch errors", async () => {
     mockBeacon(false);
-    vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new TypeError("offline"))));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new TypeError("offline")))
+    );
     expect(() => start(base)).not.toThrow();
     await Promise.resolve(); // let the rejection settle; an unhandled one would fail the run
   });
@@ -213,9 +223,7 @@ describe("events", () => {
     for (const id of ["out", "in", "mail"]) {
       document.getElementById(id)!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
     }
-    expect(sent).toEqual([
-      expect.objectContaining({ name: "outbound-link", props: { url: "https://github.com/x" } }),
-    ]);
+    expect(sent).toEqual([expect.objectContaining({ name: "outbound-link", props: { url: "https://github.com/x" } })]);
   });
 
   it("sends only the origin and path of an outbound link", () => {
@@ -260,7 +268,13 @@ describe("disabling", () => {
   });
 
   it("treats *.localhost, loopback addresses and file: as local", () => {
-    for (const url of ["http://app.localhost/", "http://127.0.0.2:8080/", "http://0.0.0.0/", "http://[::1]/", "file:///tmp/index.html"]) {
+    for (const url of [
+      "http://app.localhost/",
+      "http://127.0.0.2:8080/",
+      "http://0.0.0.0/",
+      "http://[::1]/",
+      "file:///tmp/index.html",
+    ]) {
       window.happyDOM.setURL(url);
       start(base);
     }

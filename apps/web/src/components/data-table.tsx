@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react"
 import { ArrowDown, ArrowUp, Search } from "lucide-react"
+import { useMemo, useState } from "react"
 
 import { Delta } from "@/components/delta"
 import { Button } from "@/components/ui/button"
@@ -142,6 +142,8 @@ export function DataTable({
       : []),
   ]
 
+  // columns is derived from rows and dim, which are already dependencies.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: see above
   const sorted = useMemo(() => {
     const needle = search.trim().toLowerCase()
     const list = (rows ?? []).filter(
@@ -164,8 +166,6 @@ export function DataTable({
       const cmp = x < y ? -1 : 1
       return sort.desc ? -cmp : cmp
     })
-    // columns is derived from rows and dim, which are already dependencies.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, search, sort, dim])
 
   const toggle = (key: SortKey) =>

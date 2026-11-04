@@ -7,7 +7,7 @@
 //   data-hash="true"                include #hash in paths (hash routers)
 //   data-allow-localhost="true"     track on localhost
 //   data-respect-dnt="true"         honour Do Not Track
-import { init, type Api } from "./core";
+import { type Api, init } from "./core";
 
 declare global {
   interface Window {

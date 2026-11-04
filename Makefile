@@ -1,18 +1,23 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
-.PHONY: run test lint build docker tracker web dev-web dev dev-api dev-demo dev-reset deploy deploy-server deploy-web
+.PHONY: run verify test lint format build docker tracker web dev-web dev dev-api dev-demo dev-reset deploy deploy-server deploy-web
 
 run:
 	go run ./apps/server/cmd/analytics serve
 
+# scripts/verify.sh is the quality gate; CI runs the same file. Tools: `mise install`, packages: `bun install`.
+verify:
+	./scripts/verify.sh
+
 test:
-	go test -race ./apps/server/...
-	cd apps/tracker && npm test
-	cd apps/web && npm test
+	./scripts/verify.sh go tracker web
 
 lint:
+	./scripts/verify.sh lint
 	cd apps/server && golangci-lint run
-	cd apps/web && npm run lint
+
+format:
+	bun run format
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags "-X main.version=$(VERSION)" -o bin/analytics ./apps/server/cmd/analytics
@@ -22,11 +27,11 @@ docker:
 
 # Rebuild the embedded tracking script after changing apps/tracker/src.
 tracker:
-	cd apps/tracker && npm run build
+	cd apps/tracker && bun run build
 
 # Dashboard dev server on :5173 (proxies /api to `make run` on :8080).
 dev-web:
-	cd apps/web && npm run dev
+	cd apps/web && bun run dev
 
 # ---------------------------------------------------------------- local test environment
 
@@ -58,7 +63,7 @@ dev-reset:
 # "Tracking code" page puts in the snippet (default: the dashboard's own origin).
 TRACKER_ORIGIN ?=
 web:
-	cd apps/web && VITE_TRACKER_ORIGIN=$(TRACKER_ORIGIN) npm run build
+	cd apps/web && VITE_TRACKER_ORIGIN=$(TRACKER_ORIGIN) bun run build
 
 # ---------------------------------------------------------------- production (see infra/terraform)
 
@@ -79,4 +84,4 @@ deploy-server:
 
 # Build the dashboard and publish it to Firebase Hosting (rewrites /api/** to Cloud Run).
 deploy-web: web
-	cd apps/web && firebase deploy --only hosting --project $(PROJECT) --non-interactive
+	cd apps/web && bunx firebase-tools deploy --only hosting --project $(PROJECT) --non-interactive

@@ -8,9 +8,9 @@ import {
   intervalsFor,
   isDay,
   isPeriod,
+  type Period,
   periodRange,
   timeZone,
-  type Period,
 } from "@/lib/period"
 
 const OPS: FilterOp[] = ["is", "is_not", "contains"]

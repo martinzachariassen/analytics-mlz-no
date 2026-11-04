@@ -8,25 +8,13 @@ updates:
       go-dependencies:
         patterns: ["*"]
 
-  - package-ecosystem: npm
-    directory: /apps/web
+  # One Bun workspace: the root lockfile covers apps/web and apps/tracker.
+  - package-ecosystem: bun
+    directory: /
     schedule:
       interval: weekly
     groups:
-      web-dependencies:
-        patterns: ["*"]
-    # typescript-eslint does not support TypeScript 7 yet; `npm ci` fails with ERESOLVE.
-    # Remove this once its peer range includes 7.
-    ignore:
-      - dependency-name: typescript
-        update-types: ["version-update:semver-major"]
-
-  - package-ecosystem: npm
-    directory: /apps/tracker
-    schedule:
-      interval: weekly
-    groups:
-      tracker-dependencies:
+      js-dependencies:
         patterns: ["*"]
 
   - package-ecosystem: github-actions

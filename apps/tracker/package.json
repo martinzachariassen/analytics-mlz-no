@@ -6,7 +6,7 @@
   "license": "MIT",
   "scripts": {
     "build": "esbuild src/index.ts --bundle --minify --format=iife --target=es2022 --define:MLZ_TEST=false --legal-comments=none --outfile=../server/internal/script/script.js",
-    "size": "npm run build && node check-size.mjs",
+    "size": "bun run build && node check-size.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check-size": "node check-size.mjs"

@@ -1,13 +1,12 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { Link, useLocation, useNavigate, useParams } from "react-router"
-import { toast } from "sonner"
 import {
   Activity,
   ChevronsUpDown,
   FileText,
-  LayoutGrid,
   LayoutDashboard,
+  LayoutGrid,
   LogOut,
+  type LucideIcon,
   MapPin,
   Monitor,
   Moon,
@@ -17,8 +16,9 @@ import {
   Share2,
   Sun,
   Zap,
-  type LucideIcon,
 } from "lucide-react"
+import { Link, useLocation, useNavigate, useParams } from "react-router"
+import { toast } from "sonner"
 
 import { BrandMark } from "@/components/brand-mark"
 import { useTheme } from "@/components/theme-provider"

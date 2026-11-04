@@ -36,7 +36,10 @@ describe("script attributes", () => {
     await load({ "data-site": "site123" });
     expect(window.mlz).toBeDefined();
     expect(sent).toEqual([
-      { url: "https://stats.example.com/api/event", body: { site: "site123", type: "pageview", url: "https://www.example.com/page" } },
+      {
+        url: "https://stats.example.com/api/event",
+        body: { site: "site123", type: "pageview", url: "https://www.example.com/page" },
+      },
     ]);
   });
 

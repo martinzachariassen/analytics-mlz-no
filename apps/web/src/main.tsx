@@ -1,17 +1,17 @@
-import { lazy, StrictMode } from "react"
-import { createRoot } from "react-dom/client"
 import {
   MutationCache,
   QueryCache,
   QueryClient,
   QueryClientProvider,
 } from "@tanstack/react-query"
+import { lazy, StrictMode } from "react"
+import { createRoot } from "react-dom/client"
 import { createBrowserRouter, Navigate, RouterProvider } from "react-router"
 
 import "./index.css"
 import { ThemeProvider } from "@/components/theme-provider"
-import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "@/components/ui/sonner"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { ApiError } from "@/lib/api"
 import { AppLayout } from "@/routes/app-layout"
 import { ErrorPage } from "@/routes/error-page"

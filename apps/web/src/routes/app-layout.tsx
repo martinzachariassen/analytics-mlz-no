@@ -1,12 +1,12 @@
-import { Suspense, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { Suspense, useState } from "react"
 import { Navigate, Outlet, useLocation } from "react-router"
 
 import { AppSidebar } from "@/components/app-sidebar"
 import { CommandMenu } from "@/components/command-menu"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
-import { api, ApiError } from "@/lib/api"
+import { ApiError, api } from "@/lib/api"
 
 /**
  * Authenticated shell: a collapsible sidebar (sites and views) next to the

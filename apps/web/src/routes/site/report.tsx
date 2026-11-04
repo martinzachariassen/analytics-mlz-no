@@ -3,12 +3,12 @@ import { useSearchParams } from "react-router"
 
 import { BarList } from "@/components/bar-list"
 import { DataTable } from "@/components/data-table"
+import { IntervalSelect } from "@/components/date-range-picker"
 import { ErrorNote } from "@/components/error-note"
 import { KpiStrip } from "@/components/kpi-strip"
 import { Panel, TextTabs } from "@/components/panel"
 import { ProportionStrip } from "@/components/proportion-strip"
 import { TopSeriesChart } from "@/components/top-series-chart"
-import { IntervalSelect } from "@/components/date-range-picker"
 import {
   Select,
   SelectContent,

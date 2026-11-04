@@ -1,5 +1,5 @@
-import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { useState } from "react"
 
 import { Panel, TextTabs } from "@/components/panel"
 import { Skeleton } from "@/components/ui/skeleton"

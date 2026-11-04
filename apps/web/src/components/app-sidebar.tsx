@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link, useLocation, useNavigate, useParams } from "react-router"
+import { toast } from "sonner"
 import {
   Activity,
   ChevronsUpDown,
@@ -21,7 +22,7 @@ import {
 
 import { BrandMark } from "@/components/brand-mark"
 import { useTheme } from "@/components/theme-provider"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -252,7 +253,12 @@ function UserMenu({ user }: { user: User }) {
   const github = user.provider === "github"
 
   async function logout() {
-    await api.logout()
+    try {
+      await api.logout()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not sign out")
+      return
+    }
     queryClient.clear()
     window.location.assign("/")
   }
@@ -264,13 +270,7 @@ function UserMenu({ user }: { user: User }) {
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton size="lg">
               <Avatar className="size-7 rounded-md after:rounded-md">
-                {/* GitHub avatars are public; only loaded for the signed-in admin. */}
-                {github && (
-                  <AvatarImage
-                    src={`https://github.com/${user.login}.png?size=56`}
-                    alt=""
-                  />
-                )}
+                {/* Initials only: the CSP allows no third-party images, and GitHub need not see the dashboard. */}
                 <AvatarFallback className="rounded-md text-[10px]">
                   {user.login.slice(0, 2).toUpperCase()}
                 </AvatarFallback>

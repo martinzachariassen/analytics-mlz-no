@@ -90,7 +90,20 @@ export function WorldMap({
               strokeWidth={0.5}
               className={
                 v && onSelect
-                  ? "cursor-pointer transition-opacity hover:opacity-80"
+                  ? "cursor-pointer transition-opacity hover:opacity-80 focus:opacity-80 focus:outline-none"
+                  : undefined
+              }
+              tabIndex={v && onSelect ? 0 : undefined}
+              role={v && onSelect ? "button" : undefined}
+              aria-label={v && onSelect ? `${s.name}: ${v}` : undefined}
+              onKeyDown={
+                v && onSelect
+                  ? (e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault()
+                        onSelect(s.alpha2)
+                      }
+                    }
                   : undefined
               }
               onMouseMove={(e) => {

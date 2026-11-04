@@ -22,8 +22,8 @@ const AUTH_ERRORS: Record<string, string> = {
 
 const FEATURES = [
   {
-    title: "No cookies, no banner",
-    text: "Visitors are counted anonymously with a daily rotating hash, so there is nothing to consent to.",
+    title: "No cookies",
+    text: "Visitors are counted anonymously with a daily rotating hash. Nothing is stored in the browser.",
   },
   {
     title: "No personal data",
@@ -88,7 +88,9 @@ export function HomePage() {
           <CircleAlert />
           <AlertTitle>Could not sign in</AlertTitle>
           <AlertDescription>
-            {AUTH_ERRORS[error] ?? AUTH_ERRORS.failed}
+            {Object.hasOwn(AUTH_ERRORS, error)
+              ? AUTH_ERRORS[error]
+              : AUTH_ERRORS.failed}
           </AlertDescription>
         </Alert>
       )}

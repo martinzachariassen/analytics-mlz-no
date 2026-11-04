@@ -17,6 +17,28 @@ type ThemeProviderState = {
 
 const COLOR_SCHEME_QUERY = "(prefers-color-scheme: dark)"
 const THEME_VALUES: Theme[] = ["dark", "light", "system"]
+// Must match the <meta name="theme-color"> values in index.html.
+const THEME_COLOR: Record<ResolvedTheme, string> = {
+  dark: "#0c0c0f",
+  light: "#fbfbfc",
+}
+
+// localStorage throws in some private windows and sandboxed frames; the theme still works then.
+function readStored(key: string): string | null {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+function writeStored(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    // ignore
+  }
+}
 
 const ThemeProviderContext = React.createContext<
   ThemeProviderState | undefined
@@ -84,7 +106,7 @@ export function ThemeProvider({
   ...props
 }: ThemeProviderProps) {
   const [theme, setThemeState] = React.useState<Theme>(() => {
-    const storedTheme = localStorage.getItem(storageKey)
+    const storedTheme = readStored(storageKey)
     if (isTheme(storedTheme)) {
       return storedTheme
     }
@@ -94,7 +116,7 @@ export function ThemeProvider({
 
   const setTheme = React.useCallback(
     (nextTheme: Theme) => {
-      localStorage.setItem(storageKey, nextTheme)
+      writeStored(storageKey, nextTheme)
       setThemeState(nextTheme)
     },
     [storageKey]
@@ -114,10 +136,7 @@ export function ThemeProvider({
       for (const meta of document.querySelectorAll(
         'meta[name="theme-color"]'
       )) {
-        meta.setAttribute(
-          "content",
-          resolvedTheme === "dark" ? "#151619" : "#ebeff2"
-        )
+        meta.setAttribute("content", THEME_COLOR[resolvedTheme])
       }
 
       if (restoreTransitions) {
@@ -174,7 +193,7 @@ export function ThemeProvider({
                 ? "light"
                 : "dark"
 
-        localStorage.setItem(storageKey, nextTheme)
+        writeStored(storageKey, nextTheme)
         return nextTheme
       })
     }

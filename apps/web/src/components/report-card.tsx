@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react"
 
 import { BarList, ViewAll } from "@/components/bar-list"
+import { ErrorNote } from "@/components/error-note"
 import { Panel, TextTabs } from "@/components/panel"
 import type { Dimension } from "@/lib/api"
 import { DIMS, DIM_VIEW, isFilterDim } from "@/lib/dims"
@@ -57,10 +58,11 @@ export function ReportCard({
       }
     >
       {children?.(dim)}
+      {q.isError && <ErrorNote error={q.error} className="py-2" />}
       <BarList
         dim={dim}
         rows={q.data}
-        loading={q.isPending}
+        loading={q.isPending && !q.isError}
         total={total}
         rowsShown={rows}
         onOpen={

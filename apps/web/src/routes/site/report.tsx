@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router"
 
 import { BarList } from "@/components/bar-list"
 import { DataTable } from "@/components/data-table"
+import { ErrorNote } from "@/components/error-note"
 import { KpiStrip } from "@/components/kpi-strip"
 import { Panel, TextTabs } from "@/components/panel"
 import { ProportionStrip } from "@/components/proportion-strip"
@@ -107,6 +108,8 @@ export function ReportPage({ report }: { report: keyof typeof REPORTS }) {
   return (
     <div className="flex flex-col gap-3 lg:gap-4">
       <KpiStrip stats={stats.data} now={stats.dataUpdatedAt} />
+      {stats.isError && <ErrorNote error={stats.error} />}
+      {rows.isError && !stats.isError && <ErrorNote error={rows.error} />}
       {cfg.extra === "map" && (
         <Panel
           title="Visitor map"
@@ -168,6 +171,8 @@ export function EventsPage() {
   return (
     <div className="flex flex-col gap-3 lg:gap-4">
       <KpiStrip stats={stats.data} now={stats.dataUpdatedAt} />
+      {stats.isError && <ErrorNote error={stats.error} />}
+      {events.isError && !stats.isError && <ErrorNote error={events.error} />}
       <Panel
         title="Top events over time"
         description="Visitors who triggered each event"
@@ -245,7 +250,9 @@ function Properties({
         ) : undefined
       }
     >
-      {keys.data && keys.data.length === 0 ? (
+      {keys.isError || values.isError ? (
+        <ErrorNote error={keys.error ?? values.error} />
+      ) : keys.data && keys.data.length === 0 ? (
         <p className="py-10 text-center text-xs text-fg-muted">
           This event has no properties.
         </p>

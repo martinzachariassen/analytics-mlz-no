@@ -125,7 +125,7 @@ export function BarList({
                   aria-label={`Filter by ${label}`}
                   title="Filter by this"
                   onClick={() => onFilter(r)}
-                  className="absolute top-1/2 right-1 hidden size-6 -translate-y-1/2 items-center justify-center rounded-md border border-border-strong bg-surface text-fg-muted shadow-sm group-hover:flex hover:text-fg max-md:hidden"
+                  className="absolute top-1/2 right-1 hidden size-6 -translate-y-1/2 items-center justify-center rounded-md border border-border-strong bg-surface text-fg-muted shadow-sm group-focus-within:flex group-hover:flex hover:text-fg max-md:hidden"
                 >
                   <FilterIcon className="size-3" />
                 </button>

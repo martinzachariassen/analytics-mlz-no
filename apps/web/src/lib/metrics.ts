@@ -78,5 +78,5 @@ export const METRIC: Record<MetricKey, Metric> = Object.fromEntries(
 ) as Record<MetricKey, Metric>
 
 export function isMetric(v: string | null): v is MetricKey {
-  return v !== null && v in METRIC
+  return v !== null && Object.hasOwn(METRIC, v)
 }

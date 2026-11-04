@@ -13,13 +13,21 @@ describe("Content-Security-Policy", () => {
         hosting: { headers: { headers: { key: string; value: string }[] }[] }
       }
     ).hosting.headers.flatMap((h) => h.headers)
-    const csp = headers.find((h) => h.key === "Content-Security-Policy")?.value ?? ""
-    const scripts = [...indexHtml.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1])
+    const csp =
+      headers.find((h) => h.key === "Content-Security-Policy")?.value ?? ""
+    const scripts = [
+      ...indexHtml.matchAll(/<script>([\s\S]*?)<\/script>/g),
+    ].map((m) => m[1])
     expect(scripts.length).toBeGreaterThan(0)
     for (const script of scripts) {
-      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(script))
+      const digest = await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(script)
+      )
       const hash = btoa(String.fromCharCode(...new Uint8Array(digest)))
-      expect(csp, "update the sha256 in firebase.json").toContain(`'sha256-${hash}'`)
+      expect(csp, "update the sha256 in firebase.json").toContain(
+        `'sha256-${hash}'`
+      )
     }
   })
 })

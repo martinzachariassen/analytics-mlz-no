@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { Link } from "react-router"
 
 import { AddSiteDialog } from "@/components/add-site-dialog"
+import { ErrorNote } from "@/components/error-note"
 import { PageHeader } from "@/components/page-header"
 import { Sparkline } from "@/components/sparkline"
 import { Delta } from "@/components/delta"
@@ -36,9 +37,7 @@ export function SitesPage() {
             ))}
           </div>
         )}
-        {sites.isError && (
-          <p className="text-sm text-destructive">{sites.error.message}</p>
-        )}
+        {sites.isError && <ErrorNote error={sites.error} />}
         {count === 0 && (
           <div className="flex flex-col items-start gap-4 rounded-lg border border-dashed px-6 py-14 sm:px-10">
             <p className="display text-2xl">No sites yet</p>
@@ -91,6 +90,13 @@ function SiteRow({ site, index }: { site: Site; index: number }) {
         <span className="max-sm:order-last max-sm:col-span-2">
           {stats.data ? (
             <Sparkline values={stats.data.timeseries.map((b) => b.visitors)} />
+          ) : stats.isError ? (
+            <span
+              className="text-xs text-destructive"
+              title={stats.error.message}
+            >
+              Could not load
+            </span>
           ) : (
             <Skeleton className="h-9 w-full" />
           )}
@@ -98,6 +104,8 @@ function SiteRow({ site, index }: { site: Site; index: number }) {
         <span className="figure text-right text-[22px]">
           {stats.data ? (
             formatNumber(stats.data.summary.visitors)
+          ) : stats.isError ? (
+            <span className="text-fg-muted">–</span>
           ) : (
             <Skeleton className="ml-auto h-7 w-14" />
           )}

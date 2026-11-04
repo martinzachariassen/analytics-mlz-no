@@ -6,6 +6,8 @@ All notable changes are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-04
+
 ### Security
 - Dashboard and API tell search engines not to index anything: `robots.txt`, `X-Robots-Tag: noindex, nofollow` and `/.well-known/security.txt`. More monitoring, benchmark and link-preview clients are treated as bots.
 - Ingestion is hardened against abuse: a global limit (`INGEST_RATE_LIMIT`), a per-visitor limit, a limit per upstream address (closes forged `X-Forwarded-For` on a directly reachable Cloud Run URL), a bounded write queue and an optional database size cap (`MAX_DATABASE_MB`). Overload returns `503` instead of timing out.
@@ -36,3 +38,6 @@ All notable changes are documented here. The format follows
 ### Earlier work
 - Event ingestion, cookie-free visitor counting, tracking script, GitHub sign-in, sites and
   statistics API, dashboard, Terraform for GCP.
+
+[Unreleased]: https://github.com/martinzachariassen/analytics-mlz-no/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/martinzachariassen/analytics-mlz-no/releases/tag/v0.1.0

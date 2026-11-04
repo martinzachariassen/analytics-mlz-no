@@ -1,0 +1,10 @@
+# Optional: keep the bootstrap state in the bucket this stack creates, so losing the laptop does
+# not lose it. Copy to backend.tf after the first apply, then migrate (see docs/DEPLOY.md):
+#
+#   cp backend.tf.example backend.tf
+#   terraform init -migrate-state -backend-config=bucket=<project_id>-tfstate
+terraform {
+  backend "gcs" {
+    prefix = "bootstrap"
+  }
+}

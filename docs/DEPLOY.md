@@ -34,6 +34,20 @@ terraform apply
 
 The project has `deletion_policy = "PREVENT"`. To delete it, change that first.
 
+**Move the bootstrap state off your machine.** The state starts out local, and it is the only
+record of the project, billing link and budget. After the first `apply`, copy it into the state
+bucket (the `main` stack keeps its state there under `main/`; this one goes under `bootstrap/`):
+
+```sh
+cp terraform.tfstate ~/terraform.tfstate.bootstrap-backup   # safety copy first
+cp backend.tf.example backend.tf
+terraform init -migrate-state -backend-config=bucket=<project_id>-tfstate
+terraform plan   # must say: No changes
+```
+
+Commit `backend.tf` if you work from more than one machine. Delete the local `terraform.tfstate*`
+files once `gcloud storage ls gs://<project_id>-tfstate/bootstrap/` shows the state.
+
 ## 2. Main: Cloud Run, database bucket, secret, Firebase Hosting
 
 ```sh

@@ -128,8 +128,9 @@ through it (disabling the default URL breaks them). A request sent there directl
 
 **Abuse limits.** `ingest_rate_limit` (default 50 events/s) and `max_database_mb` (default 200)
 bound how fast and how far a flood can grow the database, which on Cloud Run lives in the
-instance's 512 MiB of memory. Set `alert_email` to be told about memory pressure and load
-shedding. To remove spam afterwards, call `POST /api/sites/{id}/purge` while signed in (see
+instance's 512 MiB of memory. Set `alert_email` to be told about memory pressure, load
+shedding, failed backups and (with `domain` set) downtime: an uptime check fetches
+`/api/script.js` through the public hostname every five minutes. To remove spam afterwards, call `POST /api/sites/{id}/purge` while signed in (see
 docs/API.md), since Cloud Run has no shell for `analytics events purge`.
 
 ## Operations

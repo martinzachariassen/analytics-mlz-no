@@ -160,6 +160,10 @@ docs/API.md), since Cloud Run has no shell for `analytics events purge`.
 
 ## Operations
 
+- **Dashboard:** `terraform output dashboard_url` opens the "Analytics" dashboard in Cloud
+  Monitoring: requests by status, latency, memory and CPU, instances, backup runs, uptime and
+  the server's warnings and errors. `terraform output logs_url` opens Logs Explorer on the
+  server's warnings and errors.
 - **Logs:** in the console under Cloud Run → `analytics` → *Logs*, or in
   [Logs Explorer](https://console.cloud.google.com/logs/query) for search and filters. From a terminal:
   `gcloud run services logs read analytics --region <region> --project <project_id>`
@@ -173,6 +177,13 @@ docs/API.md), since Cloud Run has no shell for `analytics events purge`.
   | Sign-ins | `resource.type="cloud_run_revision" jsonPayload.message="signed in"` |
   | Backup job | `resource.type="cloud_run_job" resource.labels.job_name="analytics-backup"` |
   | Backup schedules | `resource.type="cloud_scheduler_job"` |
+  | Why events were rejected | `resource.type="cloud_run_revision" jsonPayload.message="event rejected"` |
+
+  A rejected event logs its `reason` (for example `missing origin`, `unknown site`), the status,
+  the Origin's hostname and the site id, never the IP address or user agent. Bad payloads log at
+  `INFO`. Rate limits, bots and load shedding log only at `DEBUG`, because a flood would
+  otherwise flood the logs too. To see them, run `terraform apply -var log_level=debug`, which
+  rolls out a new revision. Set it back to `info` when you are done.
 
   Litestream's own lines (restore, replication) are plain text without a severity. With
   `alert_email` set, any `ERROR` line from the server sends at most one email per hour.

@@ -52,9 +52,10 @@ func buildVersion() string {
 
 // newLogger writes JSON lines that Cloud Logging understands: the level goes in "severity"
 // (DEBUG, INFO, WARNING, ERROR) and the text in "message", so `severity>=ERROR` finds app errors.
-// Other log collectors read the same fields.
-func newLogger(w io.Writer) *slog.Logger {
+// Other log collectors read the same fields. Lines below level are dropped.
+func newLogger(w io.Writer, level slog.Leveler) *slog.Logger {
 	return slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{
+		Level: level,
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 			if len(groups) > 0 {
 				return a
@@ -87,14 +88,16 @@ func severity(l slog.Level) string {
 }
 
 func main() {
-	log := newLogger(os.Stdout)
-	if err := run(os.Args[1:], log); err != nil {
+	// Info until LOG_LEVEL has been read.
+	level := new(slog.LevelVar)
+	log := newLogger(os.Stdout, level)
+	if err := run(os.Args[1:], log, level); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
 }
 
-func run(args []string, log *slog.Logger) error {
+func run(args []string, log *slog.Logger, level *slog.LevelVar) error {
 	// Handled before config.Load so it works without any environment.
 	if len(args) > 0 && (args[0] == "version" || args[0] == "-version" || args[0] == "--version") {
 		fmt.Println("analytics", buildVersion())
@@ -105,6 +108,7 @@ func run(args []string, log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	level.Set(cfg.LogLevel)
 
 	cmd := "serve"
 	if len(args) > 0 {
@@ -178,7 +182,7 @@ func serve(cfg config.Config, log *slog.Logger) error {
 
 	errCh := make(chan error, 1)
 	go func() {
-		log.Info("listening", "version", buildVersion(), "addr", cfg.Addr, "db", cfg.DatabasePath)
+		log.Info("listening", "version", buildVersion(), "addr", cfg.Addr, "db", cfg.DatabasePath, "log_level", severity(cfg.LogLevel))
 		errCh <- srv.ListenAndServe()
 	}()
 

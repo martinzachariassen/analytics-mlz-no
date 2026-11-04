@@ -58,6 +58,10 @@ resource "google_cloud_run_v2_service" "this" {
         value = tostring(var.max_database_mb)
       }
       env {
+        name  = "LOG_LEVEL"
+        value = var.log_level
+      }
+      env {
         name  = "LITESTREAM_REPLICA_URL"
         value = "gs://${google_storage_bucket.db.name}/analytics"
       }

@@ -8,10 +8,15 @@ locals {
   alerts = var.alert_email != "" ? 1 : 0
 }
 
+# Always on: the operations dashboard (dashboard.tf) needs it even without alerts.
 resource "google_project_service" "monitoring" {
-  count              = local.alerts
   service            = "monitoring.googleapis.com"
   disable_on_destroy = false
+}
+
+moved {
+  from = google_project_service.monitoring[0]
+  to   = google_project_service.monitoring
 }
 
 resource "google_monitoring_notification_channel" "email" {

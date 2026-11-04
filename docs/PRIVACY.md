@@ -29,7 +29,9 @@ uses one session cookie, `__session`, for signed-in users only.
 ## What is never stored
 
 - IP addresses, in the database or in the application's own logs.
-- Raw user agent strings. Only the derived browser, OS and device are kept.
+- Raw user agent strings, in the database or in the application's own logs. Only the derived
+  browser, OS and device are kept. A log line about a rejected event has only the reason, the
+  status, the Origin's hostname and the site id.
 - Full URLs with query strings, or referrer paths.
 - Anything that identifies a person across days or across sites.
 

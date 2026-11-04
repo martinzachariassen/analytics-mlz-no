@@ -31,5 +31,6 @@ Lightweight, privacy-friendly, self-hostable web analytics (inspired by Umami/Pl
 
 ## Open items
 
-- Production domain (needed for milestone 5).
-- Verify `PROXY_HOPS` value on Cloud Run behind Firebase by logging `X-Forwarded-For`.
+- ✅ Production domain: `analytics.mlz.no` (dashboard and API), `t.mlz.no` (tracking script).
+- ✅ `PROXY_HOPS=2` on Cloud Run behind Firebase Hosting: production events carry the right country and one visitor per person.
+- Decide how self-hosters get the dashboard (embed `apps/web/dist` or a reverse-proxy recipe; see RELEASING.md) before 1.0.

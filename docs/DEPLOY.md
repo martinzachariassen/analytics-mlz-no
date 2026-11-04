@@ -160,7 +160,22 @@ docs/API.md), since Cloud Run has no shell for `analytics events purge`.
 
 ## Operations
 
-- **Logs:** `gcloud run services logs read analytics --region <region> --project <project_id>`
+- **Logs:** in the console under Cloud Run → `analytics` → *Logs*, or in
+  [Logs Explorer](https://console.cloud.google.com/logs/query) for search and filters. From a terminal:
+  `gcloud run services logs read analytics --region <region> --project <project_id>`
+  (or `gcloud beta run services logs tail …` to follow). The server writes JSON lines with
+  `severity` and `message`, so the usual filters work. Useful queries in Logs Explorer:
+
+  | What | Filter |
+  |---|---|
+  | Server errors and warnings | `resource.type="cloud_run_revision" resource.labels.service_name="analytics" log_id("run.googleapis.com/stdout") severity>=WARNING` |
+  | Requests that failed (4xx/5xx) | `resource.type="cloud_run_revision" resource.labels.service_name="analytics" log_id("run.googleapis.com/requests") httpRequest.status>=400` |
+  | Sign-ins | `resource.type="cloud_run_revision" jsonPayload.message="signed in"` |
+  | Backup job | `resource.type="cloud_run_job" resource.labels.job_name="analytics-backup"` |
+  | Backup schedules | `resource.type="cloud_scheduler_job"` |
+
+  Litestream's own lines (restore, replication) are plain text without a severity. With
+  `alert_email` set, any `ERROR` line from the server sends at most one email per hour.
 - **Backups:** the bucket `<project_id>-db` holds the Litestream replica. To restore it locally:
   `litestream restore -o analytics.db gs://<project_id>-db/analytics`
 - **Standalone backups:** a Cloud Run Job (`analytics-backup`) restores the replica every hour and every day and writes a gzipped SQLite file to the separate bucket `<project_id>-backups` (`hourly/` is kept 3 days, `daily/` 90 days; see `backup_*_retention_days`). It reads the replica and never touches the running service. `make deploy` updates the job's image together with the service. After the first `terraform apply` the job uses a placeholder image, so it fails (and, with `alert_email`, sends an alert) until the first `make deploy`. To restore from a file:
@@ -172,6 +187,7 @@ docs/API.md), since Cloud Run has no shell for `analytics events purge`.
 - **Scale to zero:** the first request after an idle period waits for a cold start (1–3 s, including the database restore). Events aren't lost, because the request waits.
 - **Replication between requests:** with request-based billing the instance has almost no CPU between requests, so Litestream can fall behind. If an instance dies without SIGTERM, the last seconds of events can be lost.
 - **Deploys:** Cloud Run briefly runs the old and new revision side by side. The new one restores from the replica while the old one still serves, so events from those few seconds can be lost. Deploy when traffic is quiet.
+- **What the backups cover:** the Litestream replica trails the live database by about a second; the hourly and daily files are full copies and survive damage to the replica. Together they lose at most the events from the two cases above. Older events are never lost, because every daily file contains all of them (with `retention_days = 0`).
 - **One instance:** `max_instance_count = 1`, because SQLite has a single writer. This handles far more than personal traffic needs.
 
 ## Troubleshooting

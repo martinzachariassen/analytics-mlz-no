@@ -13,6 +13,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -49,8 +50,44 @@ func buildVersion() string {
 	return version
 }
 
+// newLogger writes JSON lines that Cloud Logging understands: the level goes in "severity"
+// (DEBUG, INFO, WARNING, ERROR) and the text in "message", so `severity>=ERROR` finds app errors.
+// Other log collectors read the same fields.
+func newLogger(w io.Writer) *slog.Logger {
+	return slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if len(groups) > 0 {
+				return a
+			}
+			switch a.Key {
+			case slog.LevelKey:
+				a.Key = "severity"
+				if lvl, ok := a.Value.Any().(slog.Level); ok {
+					a.Value = slog.StringValue(severity(lvl))
+				}
+			case slog.MessageKey:
+				a.Key = "message"
+			}
+			return a
+		},
+	}))
+}
+
+func severity(l slog.Level) string {
+	switch {
+	case l >= slog.LevelError:
+		return "ERROR"
+	case l >= slog.LevelWarn:
+		return "WARNING"
+	case l >= slog.LevelInfo:
+		return "INFO"
+	default:
+		return "DEBUG"
+	}
+}
+
 func main() {
-	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	log := newLogger(os.Stdout)
 	if err := run(os.Args[1:], log); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)

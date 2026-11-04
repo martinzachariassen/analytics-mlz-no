@@ -23,6 +23,13 @@ type Config struct {
 	ProxyHops int
 	// RetentionDays deletes events older than this many days. 0 keeps events forever.
 	RetentionDays int
+	// IngestRate caps accepted POST /api/event requests per second across all clients, to
+	// protect the single SQLite writer. 0 disables the global limit.
+	IngestRate int
+	// MaxDatabaseMB pauses ingestion (503) while the database file is larger than this, so a
+	// flood of events cannot fill the disk, or memory on Cloud Run where the disk is in memory.
+	// The dashboard keeps working; delete events or raise the limit to resume. 0 disables it.
+	MaxDatabaseMB int
 
 	// PublicURL is the URL where users open the dashboard, e.g. https://analytics.example.com.
 	// It is used for the OAuth callback and post-login redirect, and https enables Secure cookies.
@@ -60,6 +67,12 @@ func Load() (Config, error) {
 		return c, err
 	}
 	if c.RetentionDays, err = envInt("RETENTION_DAYS", 0); err != nil {
+		return c, err
+	}
+	if c.IngestRate, err = envInt("INGEST_RATE_LIMIT", 200); err != nil {
+		return c, err
+	}
+	if c.MaxDatabaseMB, err = envInt("MAX_DATABASE_MB", 0); err != nil {
 		return c, err
 	}
 	if u, err := url.Parse(c.PublicURL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {

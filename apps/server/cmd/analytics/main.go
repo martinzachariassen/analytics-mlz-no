@@ -133,6 +133,7 @@ func serve(cfg config.Config, log *slog.Logger) error {
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    16 << 10,
 	}
 
 	errCh := make(chan error, 1)

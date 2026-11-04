@@ -129,3 +129,14 @@ func TestMutationsRequireJSON(t *testing.T) {
 		}
 	}
 }
+
+func TestAuthRateLimited(t *testing.T) {
+	h, _ := setup(t)
+	var last int
+	for i := 0; i < 50; i++ {
+		last = call(h, http.MethodGet, "/api/auth/config", "", nil, "").Code
+	}
+	if last != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want 429 after a burst", last)
+	}
+}

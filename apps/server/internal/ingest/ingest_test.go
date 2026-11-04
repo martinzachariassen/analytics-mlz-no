@@ -6,11 +6,15 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/geo"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/httpx"
 	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/store"
 	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/visitor"
 )
@@ -51,11 +55,18 @@ func setup(t *testing.T) (*Handler, *recordingStore, store.Site) {
 	return h, rec, site
 }
 
+// noOrigin makes post send no Origin header; "" sends the site's own origin, as browsers do.
+const noOrigin = "-"
+
 func post(h http.Handler, body, ua, origin string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, "/api/event", strings.NewReader(body))
 	req.Header.Set("Content-Type", "text/plain")
 	req.Header.Set("User-Agent", ua)
-	if origin != "" {
+	switch origin {
+	case noOrigin:
+	case "":
+		req.Header.Set("Origin", "https://example.com")
+	default:
 		req.Header.Set("Origin", origin)
 	}
 	w := httptest.NewRecorder()
@@ -134,6 +145,9 @@ func TestRejected(t *testing.T) {
 		"foreign host":    {`{"site":"` + site.ID + `","url":"https://evil.com/"}`, chromeUA, "", 400},
 		"lookalike host":  {`{"site":"` + site.ID + `","url":"https://notexample.com/"}`, chromeUA, "", 400},
 		"foreign origin":  {`{"site":"` + site.ID + `","url":"https://example.com/"}`, chromeUA, "https://evil.com", 400},
+		"missing origin":  {`{"site":"` + site.ID + `","url":"https://example.com/"}`, chromeUA, noOrigin, 400},
+		"markup in host":  {`{"site":"` + site.ID + `","url":"https://a_<b>.example.com/"}`, chromeUA, "", 400},
+		"script client":   {`{"site":"` + site.ID + `","url":"https://example.com/"}`, "python-requests/2.32", "", 202},
 		"event w/o name":  {`{"site":"` + site.ID + `","type":"event","url":"https://example.com/"}`, chromeUA, "", 400},
 		"bad prop type":   {`{"site":"` + site.ID + `","type":"event","name":"x","url":"https://example.com/","props":{"a":{"b":1}}}`, chromeUA, "", 400},
 		"invalid json":    {`{`, chromeUA, "", 400},
@@ -159,5 +173,103 @@ func TestPreflight(t *testing.T) {
 	h.ServeHTTP(w, req)
 	if w.Code != http.StatusNoContent || w.Header().Get("Access-Control-Allow-Origin") != "*" {
 		t.Fatalf("status = %d, headers = %v", w.Code, w.Header())
+	}
+}
+
+func TestNullOriginAllowed(t *testing.T) {
+	h, rec, site := setup(t)
+	if w := post(h, `{"site":"`+site.ID+`","url":"https://example.com/"}`, chromeUA, "null"); w.Code != http.StatusAccepted {
+		t.Fatalf("status = %d", w.Code)
+	}
+	if len(rec.events) != 1 {
+		t.Fatal("event not stored")
+	}
+}
+
+func TestTextIsCleaned(t *testing.T) {
+	h, rec, site := setup(t)
+	body := `{"site":"` + site.ID + `","type":"event","name":"sign\nup\u202e","url":"https://example.com/a%0Ab%00c?utm_source=x%1By",` +
+		`"referrer":"https://evil<script>.com/","props":{"k\u0000ey":"v\ralue"}}`
+	if w := post(h, body, chromeUA, ""); w.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body)
+	}
+	e := rec.events[0]
+	checks := map[string][2]string{
+		"name":     {e.Name, "signup"},
+		"path":     {e.Path, "/abc"},
+		"utm":      {e.UTMSource, "xy"},
+		"referrer": {e.ReferrerHost, ""},
+		"prop":     {e.Props["key"], "value"},
+	}
+	for name, c := range checks {
+		if c[0] != c[1] {
+			t.Errorf("%s = %q, want %q", name, c[0], c[1])
+		}
+	}
+}
+
+func TestVisitorLimitDropsSilently(t *testing.T) {
+	h, rec, site := setup(t)
+	h.VisitorLimiter = httpx.NewRateLimiter(0.001, 2)
+	body := `{"site":"` + site.ID + `","url":"https://example.com/"}`
+	for i := 0; i < 5; i++ {
+		if w := post(h, body, chromeUA, ""); w.Code != http.StatusAccepted {
+			t.Fatalf("request %d: status = %d", i, w.Code)
+		}
+	}
+	if len(rec.events) != 2 {
+		t.Fatalf("stored %d events, want 2", len(rec.events))
+	}
+}
+
+func TestGlobalLimit(t *testing.T) {
+	h, rec, site := setup(t)
+	h.Global = rate.NewLimiter(0.001, 1)
+	body := `{"site":"` + site.ID + `","url":"https://example.com/"}`
+	post(h, body, chromeUA, "")
+	w := post(h, body, chromeUA, "")
+	if w.Code != http.StatusServiceUnavailable || w.Header().Get("Retry-After") == "" {
+		t.Fatalf("status = %d, headers = %v", w.Code, w.Header())
+	}
+	if len(rec.events) != 1 {
+		t.Fatalf("stored %d events, want 1", len(rec.events))
+	}
+}
+
+func TestPeerLimitCatchesForgedForwardedFor(t *testing.T) {
+	h, _, site := setup(t)
+	h.ProxyHops = 2
+	h.Limiter = httpx.NewRateLimiter(0.001, 1)
+	h.PeerLimiter = httpx.NewRateLimiter(0.001, 2)
+	body := `{"site":"` + site.ID + `","url":"https://example.com/"}`
+	codes := make([]int, 0, 3)
+	for i := 0; i < 3; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/api/event", strings.NewReader(body))
+		req.Header.Set("User-Agent", chromeUA)
+		req.Header.Set("Origin", "https://example.com")
+		// A new forged client address each time, but the same real peer appended by Cloud Run.
+		req.Header.Set("X-Forwarded-For", "10.0.0."+strconv.Itoa(i+1)+", 198.51.100.7")
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+		codes = append(codes, w.Code)
+	}
+	if codes[0] != 202 || codes[1] != 202 || codes[2] != 429 {
+		t.Fatalf("codes = %v, want [202 202 429]", codes)
+	}
+}
+
+func TestWriteSlotsFull(t *testing.T) {
+	h, rec, site := setup(t)
+	h.WriteSlots = make(chan struct{}, 1)
+	h.WriteSlots <- struct{}{} // occupied by a stuck writer
+	req := httptest.NewRequest(http.MethodPost, "/api/event", strings.NewReader(`{"site":"`+site.ID+`","url":"https://example.com/"}`))
+	req.Header.Set("User-Agent", chromeUA)
+	req.Header.Set("Origin", "https://example.com")
+	ctx, cancel := context.WithTimeout(req.Context(), 50*time.Millisecond)
+	defer cancel()
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req.WithContext(ctx))
+	if len(rec.events) != 0 {
+		t.Fatal("stored an event without a write slot")
 	}
 }

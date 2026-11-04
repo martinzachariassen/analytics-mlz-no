@@ -12,7 +12,8 @@ locals {
       title = "Requests per second by status"
       xyChart = {
         dataSets = [{
-          plotType = "STACKED_BAR"
+          targetAxis = "Y1"
+          plotType   = "STACKED_BAR"
           timeSeriesQuery = {
             timeSeriesFilter = {
               filter = "${local.run_filter} AND metric.type=\"run.googleapis.com/request_count\""
@@ -31,6 +32,7 @@ locals {
       title = "Latency (p50, p95)"
       xyChart = {
         dataSets = [for p in ["50", "95"] : {
+          targetAxis     = "Y1"
           plotType       = "LINE"
           legendTemplate = "p${p}"
           timeSeriesQuery = {
@@ -50,6 +52,7 @@ locals {
       title = "Memory and CPU (p99)"
       xyChart = {
         dataSets = [for m in ["memory", "cpu"] : {
+          targetAxis     = "Y1"
           plotType       = "LINE"
           legendTemplate = m
           timeSeriesQuery = {
@@ -69,7 +72,8 @@ locals {
       title = "Instances"
       xyChart = {
         dataSets = [{
-          plotType = "STACKED_AREA"
+          targetAxis = "Y1"
+          plotType   = "STACKED_AREA"
           timeSeriesQuery = {
             timeSeriesFilter = {
               filter = "${local.run_filter} AND metric.type=\"run.googleapis.com/container/instance_count\""
@@ -88,7 +92,8 @@ locals {
       title = "Backup runs by result"
       xyChart = {
         dataSets = [{
-          plotType = "STACKED_BAR"
+          targetAxis = "Y1"
+          plotType   = "STACKED_BAR"
           timeSeriesQuery = {
             timeSeriesFilter = {
               filter = "resource.type=\"cloud_run_job\" AND resource.labels.job_name=\"${google_cloud_run_v2_job.backup.name}\" AND metric.type=\"run.googleapis.com/job/completed_execution_count\""
@@ -108,7 +113,8 @@ locals {
       title = "Uptime: ${var.domain} (share of checks passing)"
       xyChart = {
         dataSets = [{
-          plotType = "LINE"
+          targetAxis = "Y1"
+          plotType   = "LINE"
           timeSeriesQuery = {
             timeSeriesFilter = {
               filter = "resource.type=\"uptime_url\" AND metric.type=\"monitoring.googleapis.com/uptime_check/check_passed\" AND metric.labels.check_id=\"${google_monitoring_uptime_check_config.site[0].uptime_check_id}\""
@@ -132,16 +138,15 @@ resource "google_monitoring_dashboard" "ops" {
     displayName = "Analytics"
     mosaicLayout = {
       columns = 48
+      # The API drops xPos/yPos when they are 0 and adds targetAxis = "Y1"; matching that here
+      # keeps `terraform plan` clean.
       tiles = concat(
-        [for i, w in local.chart_widgets : {
-          xPos   = (i % 2) * 24
-          yPos   = floor(i / 2) * 16
-          width  = 24
-          height = 16
-          widget = w
-        }],
+        [for i, w in local.chart_widgets : merge(
+          i % 2 == 0 ? {} : { xPos = 24 },
+          i < 2 ? {} : { yPos = floor(i / 2) * 16 },
+          { width = 24, height = 16, widget = w },
+        )],
         [{
-          xPos   = 0
           yPos   = local.chart_rows * 16
           width  = 48
           height = 24

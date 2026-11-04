@@ -1,0 +1,4 @@
+# This is a private analytics dashboard and API: nothing here should be indexed.
+# Crawler rules do not affect tracking; browsers load /api/script.js regardless.
+User-agent: *
+Disallow: /

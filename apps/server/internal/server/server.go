@@ -69,7 +69,16 @@ func New(cfg config.Config, st *store.Store, authn *auth.Service, loc *geo.Locat
 		_, _ = w.Write([]byte("ok"))
 	})
 
-	return mux
+	return noIndex(mux)
+}
+
+// noIndex tells search engines not to index anything this server serves: the API, the tracking
+// script and error pages. It does not stop browsers from loading the script.
+func noIndex(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Robots-Tag", "noindex, nofollow")
+		next.ServeHTTP(w, r)
+	})
 }
 
 func limit(rl *httpx.RateLimiter, proxyHops int, next http.Handler) http.Handler {

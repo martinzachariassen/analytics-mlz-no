@@ -151,3 +151,12 @@ func TestAuthRateLimited(t *testing.T) {
 		t.Fatalf("status = %d, want 429 after a burst", last)
 	}
 }
+
+func TestNoIndexHeader(t *testing.T) {
+	h, _ := setup(t)
+	for _, path := range []string{"/api/script.js", "/api/auth/me", "/healthz", "/does-not-exist"} {
+		if got := call(h, "GET", path, "", nil, "").Header().Get("X-Robots-Tag"); got != "noindex, nofollow" {
+			t.Errorf("GET %s: X-Robots-Tag = %q", path, got)
+		}
+	}
+}

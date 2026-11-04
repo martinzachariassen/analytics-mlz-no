@@ -56,7 +56,8 @@ contain the salt table as it was at that time, so keep backups as access-control
 
 ## Bots
 
-Requests from known crawlers and automation are dropped before anything is stored.
+Requests from known crawlers and automation are dropped before anything is stored. See
+[BOTS.md](BOTS.md) for what is filtered, how floods are limited and what cannot be stopped.
 
 ## Custom events: your responsibility
 

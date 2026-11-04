@@ -7,6 +7,7 @@ All notable changes are documented here. The format follows
 ## [Unreleased]
 
 ### Security
+- Dashboard and API tell search engines not to index anything: `robots.txt`, `X-Robots-Tag: noindex, nofollow` and `/.well-known/security.txt`. More monitoring, benchmark and link-preview clients are treated as bots.
 - Ingestion is hardened against abuse: a global limit (`INGEST_RATE_LIMIT`), a per-visitor limit, a limit per upstream address (closes forged `X-Forwarded-For` on a directly reachable Cloud Run URL), a bounded write queue and an optional database size cap (`MAX_DATABASE_MB`). Overload returns `503` instead of timing out.
 - `POST /api/event` now requires an `Origin` header, strips control characters and bidi overrides from stored text, drops invalid referrer hosts and filters more script user agents.
 - Sign-in endpoints are rate limited; the dashboard sends a Content-Security-Policy, HSTS and Permissions-Policy.
@@ -23,7 +24,7 @@ All notable changes are documented here. The format follows
 - Release pipeline: multi-arch image on GHCR and static binaries on GitHub Releases.
 - CI: dashboard type checking and unit tests, `govulncheck`, `npm audit`, Dependabot.
 - `infra/docker/test-restore.sh` (backup/restore check) and `apps/server/cmd/loadtest` (ingest load test).
-- Documentation: privacy, upgrading, tracker and release guides; contributing and security policies.
+- Documentation: bots, scanners and robots ([docs/BOTS.md](docs/BOTS.md)), privacy, upgrading, tracker and release guides; contributing and security policies.
 
 ### Earlier work
 - Event ingestion, cookie-free visitor counting, tracking script, GitHub sign-in, sites and

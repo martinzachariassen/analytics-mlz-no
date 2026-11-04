@@ -377,6 +377,8 @@ var botMarkers = []string{
 	"bot", "crawl", "spider", "slurp", "headless", "lighthouse", "pingdom", "uptime", "phantomjs",
 	"curl/", "wget/", "python-requests", "python-urllib", "aiohttp", "httpx", "go-http-client",
 	"node-fetch", "axios/", "undici", "okhttp", "java/", "libwww", "scrapy", "postman",
+	// Monitoring, benchmark and link-preview clients that don't say "bot".
+	"gtmetrix", "check_http", "nagios", "site24x7", "statuscake", "apachebench", "whatsapp/",
 }
 
 func isBot(raw string, ua useragent.UserAgent) bool {

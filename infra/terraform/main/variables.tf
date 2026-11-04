@@ -44,3 +44,21 @@ variable "proxy_hops" {
   type        = number
   default     = 2
 }
+
+variable "ingest_rate_limit" {
+  description = "Max accepted events per second across all clients (INGEST_RATE_LIMIT). The excess gets 503 and the tracker drops it."
+  type        = number
+  default     = 50
+}
+
+variable "max_database_mb" {
+  description = "Pause ingestion while the database is larger than this (MAX_DATABASE_MB). On Cloud Run the disk lives in the instance's memory, so keep it well under the 512Mi limit."
+  type        = number
+  default     = 200
+}
+
+variable "alert_email" {
+  description = "Email address for abuse/overload alerts (memory pressure, load shedding). Empty disables alerting."
+  type        = string
+  default     = ""
+}

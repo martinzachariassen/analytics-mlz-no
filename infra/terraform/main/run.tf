@@ -50,6 +50,14 @@ resource "google_cloud_run_v2_service" "this" {
         value = tostring(var.retention_days)
       }
       env {
+        name  = "INGEST_RATE_LIMIT"
+        value = tostring(var.ingest_rate_limit)
+      }
+      env {
+        name  = "MAX_DATABASE_MB"
+        value = tostring(var.max_database_mb)
+      }
+      env {
         name  = "LITESTREAM_REPLICA_URL"
         value = "gs://${google_storage_bucket.db.name}/analytics"
       }

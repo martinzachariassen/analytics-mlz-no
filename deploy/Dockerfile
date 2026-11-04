@@ -5,11 +5,12 @@
 # toolchain under amd64 emulation on Apple Silicon crashes, and native builds are much faster.
 FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS build
 ARG TARGETOS TARGETARCH
+ARG VERSION=dev
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY server ./server
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build -trimpath -ldflags="-s -w" -o /out/analytics ./server/cmd/analytics
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/analytics ./server/cmd/analytics
 
 FROM --platform=$BUILDPLATFORM alpine:3.24 AS assets
 ARG TARGETARCH
@@ -31,6 +32,12 @@ RUN mkdir -p /geoip && \
     test -s /geoip/dbip-country-lite.mmdb
 
 FROM alpine:3.24
+ARG VERSION=dev
+LABEL org.opencontainers.image.title="analytics-mlz-no" \
+      org.opencontainers.image.description="Lightweight, privacy-friendly, self-hostable web analytics" \
+      org.opencontainers.image.source="https://github.com/martinzachariassen/analytics-mlz-no" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.version="${VERSION}"
 RUN apk add --no-cache ca-certificates tzdata && \
     adduser -D -H -u 10001 analytics && \
     mkdir -p /data && chown analytics /data

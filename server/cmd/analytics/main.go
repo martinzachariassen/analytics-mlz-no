@@ -4,6 +4,7 @@
 //	analytics sites add -domain mlz.no [-name "My site"]
 //	analytics sites list
 //	analytics seed [-days 730] [-scale 1] [-reset]   demo sites with synthetic data for local development
+//	analytics version                         print the version
 package main
 
 import (
@@ -15,6 +16,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
 	"text/tabwriter"
 	"time"
@@ -28,6 +30,24 @@ import (
 	"github.com/martinzachariassen/analytics-mlz-no/server/internal/store"
 )
 
+// version is set at release time with -ldflags "-X main.version=v1.2.3".
+var version = "dev"
+
+// buildVersion returns the release version, or the VCS revision for local builds.
+func buildVersion() string {
+	if version != "dev" {
+		return version
+	}
+	if info, ok := debug.ReadBuildInfo(); ok {
+		for _, s := range info.Settings {
+			if s.Key == "vcs.revision" && len(s.Value) >= 7 {
+				return "dev-" + s.Value[:7]
+			}
+		}
+	}
+	return version
+}
+
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	if err := run(os.Args[1:], log); err != nil {
@@ -37,6 +57,12 @@ func main() {
 }
 
 func run(args []string, log *slog.Logger) error {
+	// Handled before config.Load so it works without any environment.
+	if len(args) > 0 && (args[0] == "version" || args[0] == "-version" || args[0] == "--version") {
+		fmt.Println("analytics", buildVersion())
+		return nil
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		return err
@@ -54,7 +80,7 @@ func run(args []string, log *slog.Logger) error {
 	case "seed":
 		return seed(cfg, args)
 	default:
-		return fmt.Errorf("unknown command %q (want: serve, sites, seed)", cmd)
+		return fmt.Errorf("unknown command %q (want: serve, sites, seed, version)", cmd)
 	}
 }
 
@@ -111,7 +137,7 @@ func serve(cfg config.Config, log *slog.Logger) error {
 
 	errCh := make(chan error, 1)
 	go func() {
-		log.Info("listening", "addr", cfg.Addr, "db", cfg.DatabasePath)
+		log.Info("listening", "version", buildVersion(), "addr", cfg.Addr, "db", cfg.DatabasePath)
 		errCh <- srv.ListenAndServe()
 	}()
 

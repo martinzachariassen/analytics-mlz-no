@@ -1,3 +1,5 @@
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+
 .PHONY: run test lint build docker tracker web dev-web dev dev-api dev-demo dev-reset deploy deploy-server deploy-web
 
 run:
@@ -6,16 +8,17 @@ run:
 test:
 	go test -race ./server/...
 	cd tracker && npm test
+	cd web && npm test
 
 lint:
 	golangci-lint run
 	cd web && npm run lint
 
 build:
-	CGO_ENABLED=0 go build -trimpath -o bin/analytics ./server/cmd/analytics
+	CGO_ENABLED=0 go build -trimpath -ldflags "-X main.version=$(VERSION)" -o bin/analytics ./server/cmd/analytics
 
 docker:
-	docker build -f deploy/Dockerfile -t analytics-mlz-no:local .
+	docker build -f deploy/Dockerfile --build-arg VERSION=$(VERSION) -t analytics-mlz-no:local .
 
 # Rebuild the embedded tracking script after changing tracker/src.
 tracker:
@@ -67,7 +70,7 @@ deploy: deploy-server deploy-web
 # Build for Cloud Run (amd64), push to Artifact Registry and roll out a new revision.
 # One-time setup: gcloud auth configure-docker $(REGION)-docker.pkg.dev
 deploy-server:
-	docker buildx build --platform linux/amd64 -f deploy/Dockerfile -t $(IMAGE) --push .
+	docker buildx build --platform linux/amd64 --build-arg VERSION=$(VERSION) -f deploy/Dockerfile -t $(IMAGE) --push .
 	gcloud run deploy $(SERVICE) --image $(IMAGE) --region $(REGION) --project $(PROJECT) --quiet
 
 # Build the dashboard and publish it to Firebase Hosting (rewrites /api/** to Cloud Run).

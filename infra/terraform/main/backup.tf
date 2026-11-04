@@ -111,10 +111,12 @@ resource "google_service_account" "scheduler" {
   display_name = "analytics backup scheduler"
 }
 
+# The schedules pass `args` as an override (hourly/daily), which needs run.jobs.runWithOverrides.
+# roles/run.invoker only has run.jobs.run, so every scheduled run would fail with 403.
 resource "google_cloud_run_v2_job_iam_member" "scheduler_runs_backup" {
   name     = google_cloud_run_v2_job.backup.name
   location = google_cloud_run_v2_job.backup.location
-  role     = "roles/run.invoker"
+  role     = "roles/run.jobsExecutorWithOverrides"
   member   = "serviceAccount:${google_service_account.scheduler.email}"
 }
 

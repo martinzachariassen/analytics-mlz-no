@@ -6,6 +6,9 @@ All notable changes are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Terraform: scheduled backups never ran. The scheduler's service account had `roles/run.invoker`, but the schedules pass `args` as an override, which needs `roles/run.jobsExecutorWithOverrides`. A new alert (`alert_email`) fires when no backup has succeeded for two hours.
+
 ## [0.1.0] - 2026-11-04
 
 ### Security

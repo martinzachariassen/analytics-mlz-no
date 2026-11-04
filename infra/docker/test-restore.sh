@@ -2,8 +2,8 @@
 # Verifies that backups work: writes events, replicates them with Litestream to a local volume,
 # throws the database away and checks that the next start restores every event.
 #
-#   make docker && deploy/test-restore.sh            # uses analytics-mlz-no:local
-#   IMAGE=ghcr.io/martinzachariassen/analytics-mlz-no:0.1.0 deploy/test-restore.sh
+#   make docker && infra/docker/test-restore.sh            # uses analytics-mlz-no:local
+#   IMAGE=ghcr.io/martinzachariassen/analytics-mlz-no:0.1.0 infra/docker/test-restore.sh
 #
 # Needs docker, curl and sqlite3. Uses temporary docker volumes (not bind mounts: SQLite's WAL
 # does not work on every host file sharing layer) and removes everything when it exits.

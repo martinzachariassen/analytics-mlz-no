@@ -1,16 +1,16 @@
 # Build context: repository root.
-#   docker build -f deploy/Dockerfile -t analytics-mlz-no .
+#   docker build -f infra/docker/Dockerfile -t analytics-mlz-no .
 
 # Build stages run on the host platform and cross-compile (pure Go, no CGO). Running the Go
 # toolchain under amd64 emulation on Apple Silicon crashes, and native builds are much faster.
 FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS build
 ARG TARGETOS TARGETARCH
 ARG VERSION=dev
-WORKDIR /src
-COPY go.mod go.sum ./
+WORKDIR /src/apps/server
+COPY apps/server/go.mod apps/server/go.sum ./
 RUN go mod download
-COPY server ./server
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/analytics ./server/cmd/analytics
+COPY apps/server ./
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/analytics ./cmd/analytics
 
 FROM --platform=$BUILDPLATFORM alpine:3.24 AS assets
 ARG TARGETARCH
@@ -44,8 +44,8 @@ RUN apk add --no-cache ca-certificates tzdata && \
 COPY --from=build /out/analytics /usr/local/bin/analytics
 COPY --from=assets /usr/local/bin/litestream /usr/local/bin/litestream
 COPY --from=assets /geoip/dbip-country-lite.mmdb /usr/share/geoip/dbip-country-lite.mmdb
-COPY deploy/litestream.yml /etc/litestream.yml
-COPY deploy/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY infra/docker/litestream.yml /etc/litestream.yml
+COPY infra/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 ENV DATABASE_PATH=/data/analytics.db \
     GEOIP_DB_PATH=/usr/share/geoip/dbip-country-lite.mmdb \

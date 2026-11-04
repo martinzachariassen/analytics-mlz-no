@@ -1,7 +1,7 @@
 # Bootstrap: creates the GCP project, links billing, enables APIs and creates the
-# bucket that stores Terraform state for infra/main. Uses local state (small, no secrets).
+# bucket that stores Terraform state for infra/terraform/main. Uses local state (small, no secrets).
 #
-#   cd infra/bootstrap && terraform init && terraform apply
+#   cd infra/terraform/bootstrap && terraform init && terraform apply
 
 terraform {
   required_version = ">= 1.9"
@@ -59,7 +59,7 @@ resource "google_project_service" "this" {
   disable_on_destroy = false
 }
 
-# Terraform state for infra/main.
+# Terraform state for infra/terraform/main.
 resource "google_storage_bucket" "tfstate" {
   project                     = google_project.this.project_id
   name                        = "${var.project_id}-tfstate"

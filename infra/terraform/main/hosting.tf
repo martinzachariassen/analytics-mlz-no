@@ -1,5 +1,5 @@
-# Firebase Hosting serves the dashboard (web/dist) and rewrites /api/** to Cloud Run,
-# so dashboard, API and tracking script share one origin (see web/firebase.json).
+# Firebase Hosting serves the dashboard (apps/web/dist) and rewrites /api/** to Cloud Run,
+# so dashboard, API and tracking script share one origin (see apps/web/firebase.json).
 
 resource "google_firebase_project" "this" {
   provider = google-beta

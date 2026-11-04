@@ -1,14 +1,14 @@
 # Self-hosting:
-#   docker compose -f deploy/docker-compose.yml up -d --build
-#   docker compose -f deploy/docker-compose.yml exec analytics analytics sites add -domain example.com
+#   docker compose -f infra/docker/docker-compose.yml up -d --build
+#   docker compose -f infra/docker/docker-compose.yml exec analytics analytics sites add -domain example.com
 #
 # To run a published release instead of building from source:
-#   ANALYTICS_IMAGE=ghcr.io/martinzachariassen/analytics-mlz-no:0.1.0 docker compose -f deploy/docker-compose.yml up -d --no-build
+#   ANALYTICS_IMAGE=ghcr.io/martinzachariassen/analytics-mlz-no:0.1.0 docker compose -f infra/docker/docker-compose.yml up -d --no-build
 services:
   analytics:
     build:
-      context: ..
-      dockerfile: deploy/Dockerfile
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
     image: ${ANALYTICS_IMAGE:-analytics-mlz-no:local}
     restart: unless-stopped
     ports:

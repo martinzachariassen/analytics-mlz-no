@@ -1,5 +1,5 @@
 variable "project_id" {
-  description = "GCP project created by infra/bootstrap."
+  description = "GCP project created by infra/terraform/bootstrap."
   type        = string
 }
 
@@ -10,7 +10,7 @@ variable "region" {
 }
 
 variable "service_name" {
-  description = "Cloud Run service name (also referenced by web/firebase.json)."
+  description = "Cloud Run service name (also referenced by apps/web/firebase.json)."
   type        = string
   default     = "analytics"
 }

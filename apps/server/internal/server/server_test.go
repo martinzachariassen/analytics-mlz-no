@@ -112,6 +112,17 @@ func TestSitesCRUD(t *testing.T) {
 		t.Fatalf("bad dim = %d, want 400", w.Code)
 	}
 
+	purge := `{"from":"2026-11-01T00:00:00Z","to":"2026-11-02T00:00:00Z","path":"/spam"}`
+	if w := call(h, "POST", "/api/sites/"+site.ID+"/purge", purge, c, js); w.Code != http.StatusOK || w.Body.String() != `{"deleted":0}`+"\n" {
+		t.Fatalf("purge = %d %q", w.Code, w.Body)
+	}
+	if w := call(h, "POST", "/api/sites/"+site.ID+"/purge", `{"from":"2026-11-02T00:00:00Z","to":"2026-11-01T00:00:00Z"}`, c, js); w.Code != http.StatusBadRequest {
+		t.Fatalf("reversed purge = %d, want 400", w.Code)
+	}
+	if w := call(h, "POST", "/api/sites/"+site.ID+"/purge", purge, nil, js); w.Code != http.StatusUnauthorized {
+		t.Fatalf("anonymous purge = %d, want 401", w.Code)
+	}
+
 	if w := call(h, "DELETE", "/api/sites/"+site.ID, "", c, ""); w.Code != http.StatusNoContent {
 		t.Fatalf("delete = %d", w.Code)
 	}

@@ -3,6 +3,7 @@
 //	analytics [serve]                         start the HTTP server (default)
 //	analytics sites add -domain mlz.no [-name "My site"]
 //	analytics sites list
+//	analytics events purge -site ID -from 2026-11-01 -to 2026-11-02 [-path /x]   delete spam
 //	analytics seed [-days 730] [-scale 1] [-reset]   demo sites with synthetic data for local development
 //	analytics version                         print the version
 package main
@@ -77,10 +78,12 @@ func run(args []string, log *slog.Logger) error {
 		return serve(cfg, log)
 	case "sites":
 		return sites(cfg, args)
+	case "events":
+		return events(cfg, args)
 	case "seed":
 		return seed(cfg, args)
 	default:
-		return fmt.Errorf("unknown command %q (want: serve, sites, seed, version)", cmd)
+		return fmt.Errorf("unknown command %q (want: serve, sites, events, seed, version)", cmd)
 	}
 }
 
@@ -213,6 +216,54 @@ func sites(cfg config.Config, args []string) error {
 	default:
 		return fmt.Errorf("unknown sites command %q", args[0])
 	}
+}
+
+// events manages stored events. The only subcommand, purge, removes spam after the fact.
+func events(cfg config.Config, args []string) error {
+	if len(args) == 0 || args[0] != "purge" {
+		return errors.New("usage: analytics events purge -site ID -from TIME -to TIME [-path PATH]")
+	}
+	fs := flag.NewFlagSet("events purge", flag.ExitOnError)
+	site := fs.String("site", "", "site id (required)")
+	from := fs.String("from", "", "start, inclusive: YYYY-MM-DD (UTC) or RFC 3339 (required)")
+	to := fs.String("to", "", "end, exclusive: YYYY-MM-DD (UTC) or RFC 3339 (required)")
+	path := fs.String("path", "", "only delete events for this exact path")
+	_ = fs.Parse(args[1:])
+
+	f := store.PurgeFilter{SiteID: *site, Path: *path}
+	var err error
+	if f.From, err = parseTime(*from); err != nil {
+		return fmt.Errorf("-from: %w", err)
+	}
+	if f.To, err = parseTime(*to); err != nil {
+		return fmt.Errorf("-to: %w", err)
+	}
+	if f.SiteID == "" || !f.From.Before(f.To) {
+		return errors.New("-site is required and -from must be before -to")
+	}
+
+	ctx := context.Background()
+	st, err := store.Open(ctx, cfg.DatabasePath)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = st.Close() }()
+	if _, err := st.GetSite(ctx, f.SiteID); err != nil {
+		return fmt.Errorf("site %q: %w", f.SiteID, err)
+	}
+	n, err := st.PurgeEvents(ctx, f)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Deleted %d events.\n", n)
+	return nil
+}
+
+func parseTime(s string) (time.Time, error) {
+	if t, err := time.Parse(time.DateOnly, s); err == nil {
+		return t, nil
+	}
+	return time.Parse(time.RFC3339, s)
 }
 
 // demoSites are the sites `seed` creates. The first is tracked by the demo page in apps/demo.

@@ -120,7 +120,7 @@ resource "google_cloud_run_v2_job_iam_member" "scheduler_runs_backup" {
 
 resource "google_cloud_scheduler_job" "backup_hourly" {
   name      = "${var.service_name}-backup-hourly"
-  region    = var.region
+  region    = var.scheduler_region
   schedule  = "17 * * * *"
   time_zone = "Etc/UTC"
 
@@ -144,7 +144,7 @@ resource "google_cloud_scheduler_job" "backup_hourly" {
 
 resource "google_cloud_scheduler_job" "backup_daily" {
   name      = "${var.service_name}-backup-daily"
-  region    = var.region
+  region    = var.scheduler_region
   schedule  = "43 3 * * *"
   time_zone = "Etc/UTC"
 

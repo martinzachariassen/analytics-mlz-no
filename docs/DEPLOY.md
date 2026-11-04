@@ -134,4 +134,5 @@ docs/API.md), since Cloud Run has no shell for `analytics events purge`.
 | `go mod download` segfaults during `make deploy` on Apple Silicon | The Go toolchain crashes under amd64 emulation. The Dockerfile cross-compiles on the build platform (`--platform=$BUILDPLATFORM`). Make sure you're on the current Dockerfile. |
 | `Secret Payload cannot be empty` | stdin wasn't a terminal (e.g. a non-interactive shell). Use the hidden-prompt command above. |
 | Sign-in fails with `redirect_uri` mismatch | The OAuth App's callback URL must be exactly `https://<domain>/api/auth/github/callback`. |
+| `Location 'europe-north1' is not a valid location` creating a Cloud Scheduler job | Cloud Scheduler is not available in every region. The backup schedules use `scheduler_region` (default `europe-west1`) and still trigger the job in `region`. |
 | `/healthz` returns 404 on the `run.app` URL | Cloud Run reserves paths ending in `z` on its public URL. The in-container startup probe still works. |

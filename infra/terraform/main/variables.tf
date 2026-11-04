@@ -9,6 +9,12 @@ variable "region" {
   default     = "europe-north1"
 }
 
+variable "scheduler_region" {
+  description = "Region for the Cloud Scheduler jobs that trigger the backup. Cloud Scheduler is not available in every region (not europe-north1); the job itself still runs in var.region."
+  type        = string
+  default     = "europe-west1"
+}
+
 variable "service_name" {
   description = "Cloud Run service name (also referenced by apps/web/firebase.json)."
   type        = string

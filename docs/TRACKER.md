@@ -27,6 +27,11 @@ script-src  https://analytics.example.com;
 connect-src https://analytics.example.com;
 ```
 
+## Bots and automation
+
+The script does nothing when `navigator.webdriver` is set and does not count prerendered pages.
+The server drops known bots and non-browser clients; see [BOTS.md](BOTS.md).
+
 ## Do Not Track and opt-out
 
 - `data-respect-dnt="true"` skips visitors who have Do Not Track enabled.

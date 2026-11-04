@@ -1,0 +1,4 @@
+Contact: https://github.com/martinzachariassen/analytics-mlz-no/security/advisories/new
+Expires: 2027-10-31T23:59:59.000Z
+Preferred-Languages: en, no
+Policy: https://github.com/martinzachariassen/analytics-mlz-no/blob/main/SECURITY.md

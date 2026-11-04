@@ -37,6 +37,7 @@ docker pull ghcr.io/martinzachariassen/analytics-mlz-no:latest   # or pin a vers
 
 - [Privacy: what is stored and what is not](docs/PRIVACY.md)
 - [Tracking script, CSP and caching](docs/TRACKER.md)
+- [Bots, scanners and robots: what is filtered, what is not, what to check](docs/BOTS.md)
 - [API reference](docs/API.md)
 - [Deploying to Google Cloud](docs/DEPLOY.md)
 - [Upgrading and rolling back](docs/UPGRADING.md)

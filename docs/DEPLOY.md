@@ -82,6 +82,14 @@ On other systems, run `gcloud secrets versions add github-client-secret --data-f
 
 Avoid a trailing newline, because it becomes part of the secret. Cloud Run reads `latest`, so the new version is used from the next deploy or cold start.
 
+**Rotating the secret.** If the secret leaks or you want a new one: in GitHub, open the OAuth App
+(Settings, Developer settings), choose *Generate a new client secret*, add it with the command above
+(it becomes the new `latest` version), then run `make deploy`. The new revision reads `latest` at startup.
+
+Check that sign-in works, then delete the old secret in GitHub and disable the old version with
+`gcloud secrets versions disable <n> --secret github-client-secret --project <project_id>`.
+Sessions are not affected.
+
 ## 4. DNS
 
 Create the records from `terraform output dns_records` at your DNS provider. Firebase verifies the domain and issues a TLS certificate on its own, which usually takes from a few minutes up to about an hour. Until then, the dashboard is reachable at `https://<site>.web.app`, but sign-in only works on the domain configured in the OAuth App.
@@ -142,8 +150,9 @@ through it (disabling the default URL breaks them). A request sent there directl
 
 **Abuse limits.** `ingest_rate_limit` (default 50 events/s) and `max_database_mb` (default 200)
 bound how fast and how far a flood can grow the database, which on Cloud Run lives in the
-instance's 512 MiB of memory. Set `alert_email` to be told about memory pressure and load
-shedding. To remove spam afterwards, call `POST /api/sites/{id}/purge` while signed in (see
+instance's 512 MiB of memory. Set `alert_email` to be told about memory pressure, load
+shedding, failed backups and (with `domain` set) downtime: an uptime check fetches
+`/api/script.js` through the public hostname every five minutes. To remove spam afterwards, call `POST /api/sites/{id}/purge` while signed in (see
 docs/API.md), since Cloud Run has no shell for `analytics events purge`.
 
 ## Operations

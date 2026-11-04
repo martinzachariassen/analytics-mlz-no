@@ -118,3 +118,91 @@ func TestSaltRotation(t *testing.T) {
 		t.Fatalf("salts = %d, want 1 (old salts deleted)", n)
 	}
 }
+
+func TestSiteCacheInvalidation(t *testing.T) {
+	st := openTemp(t)
+	ctx := context.Background()
+
+	if _, err := st.GetSite(ctx, "missing"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("err = %v", err)
+	}
+	site, err := st.CreateSite(ctx, "A", "a.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := st.GetSite(ctx, site.ID); err != nil || got.Domain != "a.example" {
+		t.Fatalf("got %+v, %v", got, err)
+	}
+	if _, err := st.UpdateSite(ctx, site.ID, "A", "b.example"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := st.GetSite(ctx, site.ID); got.Domain != "b.example" {
+		t.Fatalf("stale cache after update: %q", got.Domain)
+	}
+	if err := st.DeleteSite(ctx, site.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.GetSite(ctx, site.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("stale cache after delete: %v", err)
+	}
+}
+
+func TestPurgeEvents(t *testing.T) {
+	st := openTemp(t)
+	ctx := context.Background()
+	site, err := st.CreateSite(ctx, "", "a.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	for i, path := range []string{"/", "/spam", "/spam", "/"} {
+		e := Event{SiteID: site.ID, Time: base.Add(time.Duration(i) * time.Hour), Type: "pageview", Path: path, VisitorID: int64(i + 1),
+			Props: map[string]string{"k": "v"}}
+		if err := st.InsertEvent(ctx, e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Window covers events 1..3; only /spam is removed.
+	n, err := st.PurgeEvents(ctx, PurgeFilter{SiteID: site.ID, From: base.Add(time.Hour), To: base.Add(4 * time.Hour), Path: "/spam"})
+	if err != nil || n != 2 {
+		t.Fatalf("deleted %d, %v; want 2", n, err)
+	}
+	n, err = st.PurgeEvents(ctx, PurgeFilter{SiteID: site.ID, From: base, To: base.Add(time.Hour)})
+	if err != nil || n != 1 {
+		t.Fatalf("deleted %d, %v; want 1", n, err)
+	}
+	var left, props int
+	_ = st.db.QueryRowContext(ctx, `SELECT count(*) FROM events`).Scan(&left)
+	_ = st.db.QueryRowContext(ctx, `SELECT count(*) FROM event_props`).Scan(&props)
+	if left != 1 || props != 1 {
+		t.Fatalf("left %d events, %d props; want 1, 1", left, props)
+	}
+}
+
+func TestSize(t *testing.T) {
+	st := openTemp(t)
+	ctx := context.Background()
+	site, err := st.CreateSite(ctx, "", "a.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	empty, err := st.Size(ctx)
+	if err != nil || empty <= 0 {
+		t.Fatalf("size = %d, %v", empty, err)
+	}
+	base := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	for i := 0; i < 2000; i++ {
+		e := Event{SiteID: site.ID, Time: base.Add(time.Duration(i) * time.Second), Type: "pageview", Path: "/some/longer/path", VisitorID: int64(i)}
+		if err := st.InsertEvent(ctx, e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	full, _ := st.Size(ctx)
+	if _, err := st.PurgeEvents(ctx, PurgeFilter{SiteID: site.ID, From: base, To: base.Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	after, _ := st.Size(ctx)
+	if full <= empty || after >= full {
+		t.Fatalf("sizes: empty %d, full %d, after purge %d", empty, full, after)
+	}
+}

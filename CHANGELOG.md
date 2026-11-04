@@ -6,11 +6,19 @@ All notable changes are documented here. The format follows
 
 ## [Unreleased]
 
+### Security
+- Ingestion is hardened against abuse: a global limit (`INGEST_RATE_LIMIT`), a per-visitor limit, a limit per upstream address (closes forged `X-Forwarded-For` on a directly reachable Cloud Run URL), a bounded write queue and an optional database size cap (`MAX_DATABASE_MB`). Overload returns `503` instead of timing out.
+- `POST /api/event` now requires an `Origin` header, strips control characters and bidi overrides from stored text, drops invalid referrer hosts and filters more script user agents.
+- Sign-in endpoints are rate limited; the dashboard sends a Content-Security-Policy, HSTS and Permissions-Policy.
+- `POST /api/sites/{id}/purge` and `analytics events purge` delete spam events for a site and time window.
+- Terraform: `ingest_rate_limit`, `max_database_mb` and optional email alerts (`alert_email`) for memory pressure and load shedding.
+
 ### Changed
 - Tracking script is smaller (1.7 KB minified, 0.9 KB gzipped, down from 2.4/1.2 KB) and is served gzip-compressed. It now targets ES2022 (Safari 15.4+, Chrome 94+, Firefox 93+).
 - Repository restructured: `server/`, `web/`, `tracker/` moved to `apps/`, `deploy/` to `infra/docker/`, Terraform to `infra/terraform/`. Self-hosters now use `infra/docker/docker-compose.yml`. The Go module path is now `github.com/martinzachariassen/analytics-mlz-no/apps/server`.
 
 ### Added
+- Standalone database backups: a Cloud Run Job restores the Litestream replica every hour and every day, gzips it and writes it to a separate bucket (`<project>-backups`), with retention and a failure alert. `infra/docker/backup.sh`, `infra/docker/test-backup.sh`.
 - `analytics version` and version information in the startup log.
 - Release pipeline: multi-arch image on GHCR and static binaries on GitHub Releases.
 - CI: dashboard type checking and unit tests, `govulncheck`, `npm audit`, Dependabot.

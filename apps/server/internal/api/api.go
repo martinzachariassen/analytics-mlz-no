@@ -30,6 +30,7 @@ func (a *API) Register(mux *http.ServeMux, protect func(http.Handler) http.Handl
 		"GET /api/sites/{id}/breakdown": a.breakdown,
 		"GET /api/sites/{id}/heatmap":   a.heatmap,
 		"GET /api/sites/{id}/realtime":  a.realtime,
+		"POST /api/sites/{id}/purge":    a.purge,
 	}
 	for pattern, h := range routes {
 		mux.Handle(pattern, protect(h))
@@ -104,6 +105,33 @@ func (a *API) deleteSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+type purgeRequest struct {
+	From time.Time `json:"from"`
+	To   time.Time `json:"to"`
+	Path string    `json:"path"`
+}
+
+// purge deletes a site's events in [from, to), optionally for one path. It is how spam is
+// removed on hosts without a shell (Cloud Run); `analytics events purge` does the same locally.
+func (a *API) purge(w http.ResponseWriter, r *http.Request) {
+	site, ok := a.site(w, r)
+	if !ok {
+		return
+	}
+	var req purgeRequest
+	if err := httpx.ReadJSON(w, r, &req); err != nil || req.From.IsZero() || !req.From.Before(req.To) {
+		httpx.Error(w, http.StatusBadRequest, "from and to (RFC 3339) are required, and from must be before to")
+		return
+	}
+	n, err := a.Store.PurgeEvents(r.Context(), store.PurgeFilter{SiteID: site.ID, From: req.From, To: req.To, Path: req.Path})
+	if err != nil {
+		a.internal(w, "purge events", err)
+		return
+	}
+	a.Log.Info("purged events", "site", site.ID, "from", req.From, "to", req.To, "path", req.Path, "deleted", n)
+	httpx.WriteJSON(w, http.StatusOK, map[string]int64{"deleted": n})
 }
 
 // site loads the {id} path site, writing 404 if missing.

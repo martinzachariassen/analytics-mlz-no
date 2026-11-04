@@ -39,7 +39,9 @@ func Handler() http.Handler {
 		h := w.Header()
 		h.Set("Content-Type", "text/javascript; charset=utf-8")
 		// Short cache so tracker updates roll out quickly; ETag makes revalidation cheap.
-		h.Set("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400")
+		// s-maxage lets a CDN in front (Firebase Hosting) serve it, so floods of script
+		// requests stay at the edge instead of reaching the server.
+		h.Set("Cache-Control", "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400")
 		h.Set("Access-Control-Allow-Origin", "*")
 		h.Set("Cross-Origin-Resource-Policy", "cross-origin")
 		h.Add("Vary", "Accept-Encoding")

@@ -58,7 +58,7 @@ echo "    site id: $site"
 
 echo "==> sending $EVENTS events"
 for i in $(seq 1 "$EVENTS"); do
-  curl -fsS -A "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0" \
+  curl -fsS -A "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0" -H "Origin: https://example.com" \
     --data "{\"site\":\"$site\",\"url\":\"https://example.com/page-$i\"}" \
     "http://127.0.0.1:$PORT/api/event" >/dev/null
 done

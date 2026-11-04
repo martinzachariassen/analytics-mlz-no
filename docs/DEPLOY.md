@@ -2,7 +2,7 @@
 
 This sets up the production layout from `docs/PLAN.md`. The dashboard runs on Firebase Hosting, and Firebase rewrites `/api/**` to a single Cloud Run instance, so the dashboard, API and tracking script share one origin. SQLite lives on the instance and Litestream replicates it to a GCS bucket.
 
-For personal traffic this stays inside the free tiers. The only steady cost is Litestream's writes to GCS, which come to roughly $1 a month.
+For personal traffic this stays inside the free tiers. The only steady cost is Litestream's writes to GCS, which come to roughly $1 a month. The hourly and daily backups add a few cents.
 
 Self-hosting without GCP? Use `docker compose -f infra/docker/docker-compose.yml up --build` instead (see the README).
 
@@ -98,11 +98,24 @@ Then sign in at `https://<domain>`, add a site and embed the tracking snippet sh
 
 **`PROXY_HOPS`.** The server takes the client IP from `X-Forwarded-For`, skipping `PROXY_HOPS` trusted proxies from the right. Firebase Hosting → Cloud Run is expected to be 2. If countries show up wrong, or every visitor looks the same, check the header Cloud Run receives and adjust `proxy_hops` in `terraform.tfvars`.
 
+The service must also be reachable on its `run.app` URL, because Firebase Hosting rewrites go
+through it (disabling the default URL breaks them). A request sent there directly can forge
+`X-Forwarded-For`. The server therefore also rate-limits by the address Cloud Run itself saw
+(the rightmost entry), which cannot be forged.
+
+**Abuse limits.** `ingest_rate_limit` (default 50 events/s) and `max_database_mb` (default 200)
+bound how fast and how far a flood can grow the database, which on Cloud Run lives in the
+instance's 512 MiB of memory. Set `alert_email` to be told about memory pressure and load
+shedding. To remove spam afterwards, call `POST /api/sites/{id}/purge` while signed in (see
+docs/API.md), since Cloud Run has no shell for `analytics events purge`.
+
 ## Operations
 
 - **Logs:** `gcloud run services logs read analytics --region <region> --project <project_id>`
 - **Backups:** the bucket `<project_id>-db` holds the Litestream replica. To restore it locally:
   `litestream restore -o analytics.db gs://<project_id>-db/analytics`
+- **Standalone backups:** a Cloud Run Job (`analytics-backup`) restores the replica every hour and every day and writes a gzipped SQLite file to the separate bucket `<project_id>-backups` (`hourly/` is kept 3 days, `daily/` 90 days; see `backup_*_retention_days`). It reads the replica and never touches the running service. `make deploy` updates the job's image together with the service. After the first `terraform apply` the job uses a placeholder image, so it fails (and, with `alert_email`, sends an alert) until the first `make deploy`. To restore from a file:
+  `gcloud storage cp gs://<project_id>-backups/daily/<file>.db.gz . && gunzip <file>.db.gz`, then start the server with `DATABASE_PATH` pointing at it (with Litestream, remove the old replica first).
 - **Cost:** check the billing console. The budget alert emails at 50% and 90%, and at 100% of forecast spend.
 
 ## Known trade-offs

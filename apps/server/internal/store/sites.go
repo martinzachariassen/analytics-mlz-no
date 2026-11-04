@@ -58,11 +58,30 @@ func (s *Store) CreateSite(ctx context.Context, name, domain string) (Site, erro
 		}
 		return Site{}, err
 	}
+	s.sites.clear()
 	return site, nil
 }
 
-// GetSite returns a site by id.
+// GetSite returns a site by id. Results, including "not found", are cached briefly.
 func (s *Store) GetSite(ctx context.Context, id string) (Site, error) {
+	now := time.Now()
+	if site, found, ok := s.sites.get(id, now); ok {
+		if !found {
+			return Site{}, ErrNotFound
+		}
+		return site, nil
+	}
+	site, err := s.getSite(ctx, id)
+	switch {
+	case err == nil:
+		s.sites.put(id, site, true, now)
+	case errors.Is(err, ErrNotFound):
+		s.sites.put(id, Site{}, false, now)
+	}
+	return site, err
+}
+
+func (s *Store) getSite(ctx context.Context, id string) (Site, error) {
 	var site Site
 	var created int64
 	err := s.db.QueryRowContext(ctx,
@@ -130,7 +149,8 @@ func (s *Store) UpdateSite(ctx context.Context, id, name, domain string) (Site, 
 	if n, _ := res.RowsAffected(); n == 0 {
 		return Site{}, ErrNotFound
 	}
-	return s.GetSite(ctx, id)
+	s.sites.clear()
+	return s.getSite(ctx, id)
 }
 
 // DeleteSite removes a site and all its events.
@@ -139,6 +159,7 @@ func (s *Store) DeleteSite(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
+	s.sites.clear()
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
 	}

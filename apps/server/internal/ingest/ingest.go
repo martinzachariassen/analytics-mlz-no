@@ -12,9 +12,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/mileusna/useragent"
+	"golang.org/x/time/rate"
 
 	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/geo"
 	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/httpx"
@@ -53,15 +55,33 @@ type VisitorHasher interface {
 }
 
 // Handler serves POST /api/event.
+//
+// Abuse protection, in request order (every limiter is optional):
+//   - Limiter: per client IP. Rejected with 429.
+//   - PeerLimiter: per PeerIP (the address the nearest proxy saw, which cannot be forged).
+//     Catches clients that bypass a proxy and forge X-Forwarded-For. Rejected with 429.
+//   - Global: across all clients, protects the single SQLite writer. Rejected with 503.
+//   - VisitorLimiter: per site and visitor id. Excess is accepted with 202 but not stored,
+//     so a script replaying one visitor cannot inflate counts and gets no signal.
+//   - WriteSlots: bounds concurrent inserts; a request that waits too long gets 503.
+//   - Paused: when it reports true (e.g. the database is over its size limit), 503.
 type Handler struct {
-	Store     Store
-	Visitors  VisitorHasher
-	Geo       *geo.Locator
-	Limiter   *httpx.RateLimiter
-	ProxyHops int
-	Log       *slog.Logger
-	Now       func() time.Time
+	Store          Store
+	Visitors       VisitorHasher
+	Geo            *geo.Locator
+	Limiter        *httpx.RateLimiter
+	PeerLimiter    *httpx.RateLimiter
+	Global         *rate.Limiter
+	VisitorLimiter *httpx.RateLimiter
+	WriteSlots     chan struct{}
+	Paused         func() bool
+	ProxyHops      int
+	Log            *slog.Logger
+	Now            func() time.Time
 }
+
+// writeWait is how long a request waits for a free write slot before giving up.
+const writeWait = 2 * time.Second
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	setCORS(w)
@@ -73,6 +93,20 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ip := httpx.ClientIP(r, h.ProxyHops)
 	if h.Limiter != nil && !h.Limiter.Allow(ip) {
 		http.Error(w, "too many requests", http.StatusTooManyRequests)
+		return
+	}
+	if h.PeerLimiter != nil {
+		if peer := httpx.PeerIP(r, h.ProxyHops); peer != ip && !h.PeerLimiter.Allow(peer) {
+			http.Error(w, "too many requests", http.StatusTooManyRequests)
+			return
+		}
+	}
+	if h.Global != nil && !h.Global.Allow() {
+		unavailable(w)
+		return
+	}
+	if h.Paused != nil && h.Paused() {
+		unavailable(w)
 		return
 	}
 
@@ -107,12 +141,36 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	if h.VisitorLimiter != nil && !h.VisitorLimiter.Allow(ev.SiteID+":"+strconv.FormatInt(ev.VisitorID, 10)) {
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+
+	if h.WriteSlots != nil {
+		t := time.NewTimer(writeWait)
+		select {
+		case h.WriteSlots <- struct{}{}:
+			t.Stop()
+			defer func() { <-h.WriteSlots }()
+		case <-t.C:
+			unavailable(w)
+			return
+		case <-r.Context().Done():
+			t.Stop()
+			return
+		}
+	}
 	if err := h.Store.InsertEvent(r.Context(), ev); err != nil {
 		h.Log.Error("insert event", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func unavailable(w http.ResponseWriter) {
+	w.Header().Set("Retry-After", "5")
+	http.Error(w, "server busy", http.StatusServiceUnavailable)
 }
 
 // badRequest is an error caused by the client's payload.
@@ -136,10 +194,17 @@ func (h *Handler) buildEvent(ctx context.Context, r *http.Request, p Payload, ip
 		return store.Event{}, errInvalid
 	}
 	host := normalizeHost(pageURL.Hostname())
-	if !hostMatches(host, site.Domain) {
+	if !validHostname(host) || !hostMatches(host, site.Domain) {
 		return store.Event{}, errInvalid
 	}
-	if origin := r.Header.Get("Origin"); origin != "" && origin != "null" {
+	// Browsers always send Origin on POST, including sendBeacon. "null" comes from
+	// sandboxed or privacy-restricted contexts and is allowed. This does not stop a
+	// deliberate script, but it drops naive replays from curl and similar tools.
+	switch origin := r.Header.Get("Origin"); origin {
+	case "":
+		return store.Event{}, errInvalid
+	case "null":
+	default:
 		o, err := url.Parse(origin)
 		if err != nil || !hostMatches(normalizeHost(o.Hostname()), site.Domain) {
 			return store.Event{}, errInvalid
@@ -151,7 +216,7 @@ func (h *Handler) buildEvent(ctx context.Context, r *http.Request, p Payload, ip
 		Time:     h.now(),
 		Type:     "pageview",
 		Hostname: host,
-		Path:     truncate(cleanPath(pageURL.Path), maxPathLen),
+		Path:     truncate(cleanPath(cleanText(pageURL.Path)), maxPathLen),
 		Browser:  parsed.Name,
 		OS:       parsed.OS,
 		Device:   deviceType(parsed),
@@ -161,7 +226,7 @@ func (h *Handler) buildEvent(ctx context.Context, r *http.Request, p Payload, ip
 	case "", "pageview":
 	case "event":
 		ev.Type = "event"
-		ev.Name = truncate(strings.TrimSpace(p.Name), maxNameLen)
+		ev.Name = truncate(strings.TrimSpace(cleanText(p.Name)), maxNameLen)
 		if ev.Name == "" {
 			return store.Event{}, badRequest("event name is required")
 		}
@@ -172,16 +237,16 @@ func (h *Handler) buildEvent(ctx context.Context, r *http.Request, p Payload, ip
 	if p.Referrer != "" {
 		if ref, err := url.Parse(p.Referrer); err == nil {
 			refHost := normalizeHost(ref.Hostname())
-			if refHost != "" && !hostMatches(refHost, site.Domain) {
+			if validHostname(refHost) && strings.Contains(refHost, ".") && !hostMatches(refHost, site.Domain) {
 				ev.ReferrerHost = refHost
 			}
 		}
 	}
 
 	q := pageURL.Query()
-	ev.UTMSource = truncate(strings.ToLower(q.Get("utm_source")), maxPropValLen)
-	ev.UTMMedium = truncate(strings.ToLower(q.Get("utm_medium")), maxPropValLen)
-	ev.UTMCampaign = truncate(q.Get("utm_campaign"), maxPropValLen)
+	ev.UTMSource = truncate(strings.ToLower(cleanText(q.Get("utm_source"))), maxPropValLen)
+	ev.UTMMedium = truncate(strings.ToLower(cleanText(q.Get("utm_medium"))), maxPropValLen)
+	ev.UTMCampaign = truncate(cleanText(q.Get("utm_campaign")), maxPropValLen)
 
 	if ev.Props, err = parseProps(p.Props); err != nil {
 		return store.Event{}, err
@@ -210,7 +275,7 @@ func parseProps(raw map[string]json.RawMessage) (map[string]string, error) {
 	}
 	out := make(map[string]string, len(raw))
 	for k, v := range raw {
-		k = truncate(strings.TrimSpace(k), maxPropKeyLen)
+		k = truncate(strings.TrimSpace(cleanText(k)), maxPropKeyLen)
 		if k == "" {
 			continue
 		}
@@ -220,7 +285,7 @@ func parseProps(raw map[string]json.RawMessage) (map[string]string, error) {
 		}
 		switch x := val.(type) {
 		case string:
-			out[k] = truncate(x, maxPropValLen)
+			out[k] = truncate(cleanText(x), maxPropValLen)
 		case float64:
 			out[k] = strconv.FormatFloat(x, 'f', -1, 64)
 		case bool:
@@ -246,6 +311,35 @@ func normalizeHost(h string) string {
 // hostMatches reports whether host is domain or one of its subdomains.
 func hostMatches(host, domain string) bool {
 	return host == domain || strings.HasSuffix(host, "."+domain)
+}
+
+// validHostname reports whether h is a plausible DNS name: lowercase letters, digits,
+// dots and hyphens, at most 253 characters. It rejects IP literals with ports, userinfo
+// leftovers and anything that could carry markup into the dashboard.
+func validHostname(h string) bool {
+	if h == "" || len(h) > 253 {
+		return false
+	}
+	for i := 0; i < len(h); i++ {
+		c := h[i]
+		if (c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '.' && c != '-' {
+			return false
+		}
+	}
+	return true
+}
+
+// cleanText drops invalid UTF-8, control characters (newlines, NUL, escapes) and bidi
+// overrides, so stored strings are safe to log and cannot reorder text in the dashboard.
+// Zero-width joiners stay, since emoji sequences use them.
+func cleanText(s string) string {
+	s = strings.ToValidUTF8(s, "")
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || (r >= 0x202A && r <= 0x202E) || (r >= 0x2066 && r <= 0x2069) {
+			return -1
+		}
+		return r
+	}, s)
 }
 
 func cleanPath(p string) string {
@@ -279,7 +373,11 @@ func deviceType(ua useragent.UserAgent) string {
 	}
 }
 
-var botMarkers = []string{"bot", "crawl", "spider", "slurp", "headless", "lighthouse", "pingdom", "uptime", "curl/", "wget/", "python-requests", "go-http-client"}
+var botMarkers = []string{
+	"bot", "crawl", "spider", "slurp", "headless", "lighthouse", "pingdom", "uptime", "phantomjs",
+	"curl/", "wget/", "python-requests", "python-urllib", "aiohttp", "httpx", "go-http-client",
+	"node-fetch", "axios/", "undici", "okhttp", "java/", "libwww", "scrapy", "postman",
+}
 
 func isBot(raw string, ua useragent.UserAgent) bool {
 	if raw == "" || ua.Bot {

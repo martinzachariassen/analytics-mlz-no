@@ -98,6 +98,38 @@ func (s *Store) DeleteEventsBefore(ctx context.Context, t time.Time) (int64, err
 	}
 }
 
+// PurgeFilter selects events to delete with PurgeEvents. Path is optional (exact match).
+type PurgeFilter struct {
+	SiteID   string
+	From, To time.Time // half-open: From <= ts < To
+	Path     string
+}
+
+// PurgeEvents deletes the events matching f in batches and returns the number deleted.
+// It is meant for cleaning up spam after the fact. Sessions are derived from events, so
+// nothing else needs updating; event props cascade.
+func (s *Store) PurgeEvents(ctx context.Context, f PurgeFilter) (int64, error) {
+	where := `site_id = ? AND ts >= ? AND ts < ?`
+	args := []any{f.SiteID, f.From.UnixMilli(), f.To.UnixMilli()}
+	if f.Path != "" {
+		where += ` AND path = ?`
+		args = append(args, f.Path)
+	}
+	var total int64
+	for {
+		res, err := s.db.ExecContext(ctx,
+			`DELETE FROM events WHERE id IN (SELECT id FROM events WHERE `+where+` LIMIT 5000)`, args...)
+		if err != nil {
+			return total, err
+		}
+		n, _ := res.RowsAffected()
+		total += n
+		if n == 0 {
+			return total, nil
+		}
+	}
+}
+
 // SaltForDay returns the salt for day (YYYY-MM-DD), creating it if needed,
 // and deletes salts for all other days.
 func (s *Store) SaltForDay(ctx context.Context, day string) ([]byte, error) {

@@ -19,6 +19,21 @@ Requests with a body must use `Content-Type: application/json` (this is also the
 { "site": "SITE_ID", "type": "event", "name": "signup", "url": "https://example.com/", "props": { "plan": "pro" } }
 ```
 
+Requests must carry an `Origin` header (browsers always send it on `POST`, including
+`sendBeacon`) whose host is the site's domain or a subdomain; `null` is accepted. The `url` host
+must match too. Responses:
+
+| Status | Meaning |
+|---|---|
+| `202` | Accepted. Also returned, without storing anything, for bots and for a visitor over its own rate limit, so scripts get no signal. |
+| `400` | Unknown site, foreign host or origin, missing `Origin`, invalid payload. |
+| `413` | Body over 8 KB. |
+| `429` | Too many requests from one client IP (10/s, burst 30), or from one upstream address. |
+| `503` | Server is shedding load: over `INGEST_RATE_LIMIT`, write queue full, or the database is over `MAX_DATABASE_MB`. Sent with `Retry-After`. The tracker does not retry. |
+
+Control characters and bidi overrides are stripped from stored text, and referrers that are not
+plain DNS hostnames are dropped. `/api/auth/*` is rate limited per IP (5/s, burst 30).
+
 ## Authentication
 
 | Method | Path | Description |
@@ -41,6 +56,12 @@ A failed sign-in redirects to `PUBLIC_URL/?auth_error=<code>` where code is one 
 | `GET` | `/api/sites/{id}` | | Get one |
 | `PATCH` | `/api/sites/{id}` | `{"name", "domain"}` | Update |
 | `DELETE` | `/api/sites/{id}` | | Delete the site **and all its events** (204) |
+
+## Cleaning up spam
+
+`POST /api/sites/{id}/purge` with `{"from": "2026-11-01T00:00:00Z", "to": "2026-11-02T00:00:00Z", "path": "/optional"}`
+deletes the site's events with `from <= time < to` (and the given exact path, if any). Returns
+`{"deleted": n}`. This cannot be undone.
 
 ## Statistics
 

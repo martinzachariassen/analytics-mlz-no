@@ -12,8 +12,9 @@ Options and custom events are described in the [README](../README.md#tracking-yo
 - Served gzip-compressed when the browser accepts it (compressed once at startup).
 - Targets ES2022 (Chrome/Edge 94+, Firefox 93+, Safari 15.4+). Older browsers fail to parse it and
   are simply not counted; the page itself is unaffected.
-- Served with `Cache-Control: public, max-age=3600, stale-while-revalidate=86400` and an `ETag`, so
-  an update reaches visitors within about an hour.
+- Served with `Cache-Control: public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400`
+  and an `ETag`, so an update reaches visitors within about an hour. `s-maxage` lets a CDN in front
+  (Firebase Hosting) answer script requests without reaching the server.
 - Served with `Access-Control-Allow-Origin: *` and `Cross-Origin-Resource-Policy: cross-origin`,
   so it can be loaded from any site.
 

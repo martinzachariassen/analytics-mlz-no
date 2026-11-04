@@ -17,6 +17,7 @@ func TestClientIP(t *testing.T) {
 		{"spoofed entry ignored", "6.6.6.6, 203.0.113.5", 1, "203.0.113.5"},
 		{"two hops", "6.6.6.6, 203.0.113.5, 10.0.0.1", 2, "203.0.113.5"},
 		{"fewer entries than hops", "203.0.113.5", 3, "203.0.113.5"},
+		{"fewer entries than hops uses nearest proxy", "6.6.6.6, 203.0.113.5", 3, "203.0.113.5"},
 		{"no header falls back", "", 1, "192.0.2.1"},
 	}
 	for _, c := range cases {
@@ -30,6 +31,22 @@ func TestClientIP(t *testing.T) {
 				t.Fatalf("got %q, want %q", got, c.want)
 			}
 		})
+	}
+}
+
+func TestPeerIP(t *testing.T) {
+	r := httptest.NewRequest("GET", "/", nil)
+	r.RemoteAddr = "192.0.2.1:1234"
+	if got := PeerIP(r, 2); got != "192.0.2.1" {
+		t.Fatalf("no header: got %q", got)
+	}
+	// A direct request to Cloud Run with a forged header: Cloud Run appends the real address.
+	r.Header.Set("X-Forwarded-For", "6.6.6.6, 198.51.100.7")
+	if got := PeerIP(r, 2); got != "198.51.100.7" {
+		t.Fatalf("got %q, want the rightmost entry", got)
+	}
+	if got := PeerIP(r, 0); got != "192.0.2.1" {
+		t.Fatalf("hops=0: got %q, want remote addr", got)
 	}
 }
 

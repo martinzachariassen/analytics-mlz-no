@@ -18,6 +18,7 @@ All notable changes are documented here. The format follows
 - Terraform: the backup schedules failed to create in regions without Cloud Scheduler (such as `europe-north1`). They now use `scheduler_region` (default `europe-west1`).
 
 ### Changed
+- **Breaking:** HTML event attributes are namespaced. `data-track="x"` is now `data-mlz-event="x"` and `data-track-plan="pro"` is now `data-mlz-event-plan="pro"`, so they cannot collide with other tools. The old names are no longer read. `window.mlz.track()` and event names are unchanged.
 - Tracking script is smaller (1.7 KB minified, 0.9 KB gzipped, down from 2.4/1.2 KB) and is served gzip-compressed. It now targets ES2022 (Safari 15.4+, Chrome 94+, Firefox 93+).
 - Repository restructured: `server/`, `web/`, `tracker/` moved to `apps/`, `deploy/` to `infra/docker/`, Terraform to `infra/terraform/`. Self-hosters now use `infra/docker/docker-compose.yml`. The Go module path is now `github.com/martinzachariassen/analytics-mlz-no/apps/server`.
 

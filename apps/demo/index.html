@@ -36,8 +36,8 @@
 
   <h3>Try the tracker</h3>
   <div class="row">
-    <button data-track="newsletter-signup" data-track-position="demo">Newsletter signup</button>
-    <button data-track="copy-code" data-track-lang="go">Copy code</button>
+    <button data-mlz-event="newsletter-signup" data-mlz-event-position="demo">Newsletter signup</button>
+    <button data-mlz-event="copy-code" data-mlz-event-lang="go">Copy code</button>
     <button id="custom">mlz.track("demo-click")</button>
   </div>
   <p>Outbound link: <a href="https://litestream.io/" target="_blank" rel="noopener">litestream.io</a></p>
@@ -71,8 +71,8 @@
     });
     window.addEventListener("popstate", render);
     document.addEventListener("click", (e) => {
-      const t = e.target.closest("[data-track]");
-      if (t) log(`event ${t.dataset.track}`);
+      const t = e.target.closest("[data-mlz-event]");
+      if (t) log(`event ${t.dataset.mlzEvent}`);
     });
     render();
 

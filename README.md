@@ -80,8 +80,12 @@ outbound links are tracked automatically. The script is ~0.9 KB gzipped and sets
 **Custom events**
 
 ```html
-<button data-track="signup" data-track-plan="pro">Sign up</button>
+<button data-mlz-event="signup" data-mlz-event-plan="pro">Sign up</button>
 ```
+
+The attributes carry the `mlz` prefix so they never collide with attributes of your own or of
+another tool on the page. The `data-mlz-event-*` attributes become properties of the event
+(`data-mlz-event-billing-cycle="yearly"` is sent as `billingCycle`).
 
 ```js
 window.mlz.track("signup", { plan: "pro", seats: 3 });

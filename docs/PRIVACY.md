@@ -24,7 +24,7 @@ uses one session cookie, `__session`, for signed-in users only.
 | browser, OS, device type | Derived from the user agent, e.g. "Firefox", "macOS", "mobile" |
 | visitor id | A one-way hash, see below |
 | session id | A random number, reused while the visitor stays active (30 minutes) |
-| custom event name and properties | Whatever **you** send with `mlz.track()` or `data-track` |
+| custom event name and properties | Whatever **you** send with `mlz.track()` or `data-mlz-event` |
 
 ## What is never stored
 

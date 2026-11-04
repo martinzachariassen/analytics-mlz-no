@@ -8,7 +8,8 @@ Options and custom events are described in the [README](../README.md#tracking-yo
 
 ## Size and caching
 
-- About 1.7 KB minified, 0.9 KB gzipped, no dependencies.
+- About 1.9 KB minified, 1 KB gzipped, no dependencies. CI fails if the gzipped script grows
+  past 1024 bytes (`npm run check-size` in `apps/tracker`).
 - Served gzip-compressed when the browser accepts it (compressed once at startup).
 - Targets ES2022 (Chrome/Edge 94+, Firefox 93+, Safari 15.4+). Older browsers fail to parse it and
   are simply not counted; the page itself is unaffected.
@@ -41,8 +42,9 @@ as an outbound link. From JavaScript, use `window.mlz.track("signup", { plan: "p
 
 ## Bots and automation
 
-The script does nothing when `navigator.webdriver` is set and does not count prerendered pages.
-The server drops known bots and non-browser clients; see [BOTS.md](BOTS.md).
+The script does nothing when `navigator.webdriver` is set. A prerendered page (Speculation
+Rules) is counted only when the visitor actually navigates to it. The server drops known bots and
+non-browser clients; see [BOTS.md](BOTS.md).
 
 ## Do Not Track and opt-out
 
@@ -51,8 +53,19 @@ The server drops known bots and non-browser clients; see [BOTS.md](BOTS.md).
 
 ## What it sends
 
-The page URL, the referrer and, for custom events, a name and properties. The server reduces this
-to the fields listed in [PRIVACY.md](PRIVACY.md). The script reads and writes no cookies.
+The page URL, the referrer and, for custom events, a name and properties. Clicks on links to
+other sites send an `outbound-link` event with the link's origin and path, never its query string
+or fragment. The server reduces all of this to the fields listed in [PRIVACY.md](PRIVACY.md). The
+script reads and writes no cookies.
+
+## Page views in single-page apps
+
+`history.pushState` and `history.replaceState` are wrapped, and `popstate` is observed, so router
+navigations and redirects count as page views. A page restored from the back-forward cache counts
+again. The same URL in a row is counted once. With `data-hash="true"`, `hashchange` counts too and
+the fragment is sent; the server keeps it only when it looks like a route (`#/docs`, `#!/docs`).
+
+Nothing the script does can throw into your page: a failure to send is swallowed.
 
 ## Building from source
 

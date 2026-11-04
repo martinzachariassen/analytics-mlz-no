@@ -79,7 +79,7 @@ Add the script to every page (replace the host and site id):
 ```
 
 That's it — page views (including SPA navigation via `history.pushState`) and clicks on
-outbound links are tracked automatically. The script is ~0.9 KB gzipped and sets no cookies.
+outbound links are tracked automatically. The script is ~1 KB gzipped and sets no cookies.
 
 **Custom events**
 
@@ -92,7 +92,7 @@ another tool on the page. The `data-mlz-event-*` attributes become properties of
 (`data-mlz-event-billing-cycle="yearly"` is sent as `billingCycle`).
 
 ```js
-window.mlz.track("signup", { plan: "pro", seats: 3 });
+window.mlz?.track("signup", { plan: "pro", seats: 3 }); // optional chaining: the script loads with defer
 ```
 
 **Script options**

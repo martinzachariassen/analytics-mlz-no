@@ -44,6 +44,54 @@ func TestDevLogin(t *testing.T) {
 	}
 }
 
+func TestValidation(t *testing.T) {
+	cases := map[string]struct {
+		env     map[string]string
+		wantErr string
+	}{
+		"defaults":           {nil, ""},
+		"negative hops":      {map[string]string{"PROXY_HOPS": "-1"}, "PROXY_HOPS"},
+		"non-numeric rate":   {map[string]string{"INGEST_RATE_LIMIT": "lots"}, "INGEST_RATE_LIMIT"},
+		"client id alone":    {map[string]string{"GITHUB_CLIENT_ID": "id"}, "must be set together"},
+		"secret alone":       {map[string]string{"GITHUB_CLIENT_SECRET": "s"}, "must be set together"},
+		"empty allowlist":    {map[string]string{"GITHUB_CLIENT_ID": "id", "GITHUB_CLIENT_SECRET": "s"}, "ALLOWED_GITHUB_USERS"},
+		"relative url":       {map[string]string{"PUBLIC_URL": "analytics.example.com"}, "absolute http(s) URL"},
+		"url with path":      {map[string]string{"PUBLIC_URL": "https://example.com/stats"}, "without a path"},
+		"url with query":     {map[string]string{"PUBLIC_URL": "https://example.com/?x"}, "without a path"},
+		"trailing slash ok":  {map[string]string{"PUBLIC_URL": "https://example.com/"}, ""},
+		"http on lan, no ui": {map[string]string{"PUBLIC_URL": "http://stats.lan"}, ""},
+		"http on lan, login": {map[string]string{"PUBLIC_URL": "http://stats.lan", "GITHUB_CLIENT_ID": "id", "GITHUB_CLIENT_SECRET": "s", "ALLOWED_GITHUB_USERS": "me"}, "must use https"},
+		"http localhost ok":  {map[string]string{"PUBLIC_URL": "http://localhost:5173", "GITHUB_CLIENT_ID": "id", "GITHUB_CLIENT_SECRET": "s", "ALLOWED_GITHUB_USERS": "me"}, ""},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			for _, k := range []string{"GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "ALLOWED_GITHUB_USERS", "DEV_LOGIN", "PUBLIC_URL", "PROXY_HOPS", "INGEST_RATE_LIMIT"} {
+				t.Setenv(k, "")
+			}
+			for k, v := range c.env {
+				t.Setenv(k, v)
+			}
+			_, err := Load()
+			if c.wantErr == "" {
+				if err != nil {
+					t.Fatalf("Load() error = %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), c.wantErr) {
+				t.Fatalf("Load() error = %v, want %q", err, c.wantErr)
+			}
+		})
+	}
+}
+
+func TestLogValueHidesSecret(t *testing.T) {
+	c := Config{GitHubClientID: "id", GitHubClientSecret: "hunter2", PublicURL: "https://x"}
+	if s := c.LogValue().String(); strings.Contains(s, "hunter2") || !strings.Contains(s, "github=true") {
+		t.Fatalf("LogValue = %s", s)
+	}
+}
+
 func TestLogLevel(t *testing.T) {
 	cases := map[string]struct {
 		want    slog.Level

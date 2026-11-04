@@ -2,11 +2,21 @@ version: "2"
 linters:
   enable:
     - bodyclose
+    - contextcheck
     - errorlint
+    - exhaustive
+    - gocritic
     - gosec
     - misspell
+    - nilerr
+    - noctx
+    - perfsprint
     - revive
+    - rowserrcheck
+    - sqlclosecheck
     - unconvert
+    - unparam
+    - usestdlibvars
   settings:
     gosec:
       excludes:
@@ -16,9 +26,10 @@ linters:
     paths:
       - node_modules
     rules:
-      # Tests build request cookies and fixture URLs that gosec misreads as unsafe.
+      # Tests build request cookies and fixture URLs that gosec misreads as unsafe,
+      # and call helpers without contexts on purpose.
       - path: _test\.go
-        linters: [gosec]
+        linters: [gosec, noctx, contextcheck]
 formatters:
   enable:
     - gofmt

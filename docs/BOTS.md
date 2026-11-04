@@ -19,31 +19,40 @@ browser headers can still add noise, which you can delete afterwards.
 
 ## How events are filtered
 
-`POST /api/event` runs these checks in order. Only an event that passes all of them is stored.
+`POST /api/event` runs these checks in order (`apps/server/internal/ingest/ingest.go`). Only an
+event that passes all of them is stored. The cheap checks come first, so a flood is refused
+before it costs anything.
 
-1. **Site and host.** The site id must exist, the page URL's host must be the site's domain or a
-   subdomain, and `Origin` must be present and match the same domain (`null` is allowed for
-   sandboxed contexts). Mismatches get `400`. Browsers always send `Origin` on a `POST`, including
-   `sendBeacon`, so this stops naive replays from `curl`.
-2. **Bots.** An empty user agent, anything the user-agent parser flags as a bot, and a list of
+1. **Rate limits by address.** First per upstream address as seen by Cloud Run, which cannot be
+   forged with `X-Forwarded-For` (50 requests/s, burst 200), then per client address (10/s, burst
+   30). Both answer `429`. Addresses are parsed before they are used as limiter keys: a forged
+   header that is not an IP address falls back to the real peer, so junk headers cannot grow the
+   limiter's memory.
+2. **Global limit and capacity.** `INGEST_RATE_LIMIT` (default 50 events/s in Terraform) and the
+   database size cap `MAX_DATABASE_MB` (default 200 in Terraform) answer `503`. On Cloud Run the
+   database lives in the instance's 512 MiB of memory, so the cap is what keeps a flood from
+   crashing the service.
+3. **Bots.** An empty user agent, anything the user-agent parser flags as a bot, and a list of
    markers (`bot`, `crawl`, `spider`, `headless`, `lighthouse`, `curl/`, `python-requests`,
    `go-http-client`, `gtmetrix`, `nagios`, `statuscake`, ...) are dropped. The answer is `202`,
    the same as for a real visitor, so a scraper gets no signal about why.
-3. **Text cleanup.** Control characters and bidirectional overrides are stripped from stored text,
-   and referrers with an invalid host are discarded.
-4. **Rate limits**, each answered so that a flood is cheap to refuse:
-   - per client address: 10 requests/s, burst 30 (`429`),
-   - per upstream address as seen by Cloud Run (cannot be forged with `X-Forwarded-For`): 50/s,
-     burst 200 (`429`),
-   - per visitor (site plus the daily hash): about 1 event/s, burst 60 (answered `202`, dropped),
-   - global, `INGEST_RATE_LIMIT` (default 50 events/s in Terraform): `503` when exceeded.
-5. **Capacity.** A bounded write queue (`503` when full) and an optional database size cap,
-   `MAX_DATABASE_MB` (default 200 in Terraform), after which new events get `503`. On Cloud Run the
-   database lives in the instance's 512 MiB of memory, so this cap is what keeps a flood from
-   crashing the service.
+4. **Payload.** At most 8 KB (`413`) of valid JSON (`400`).
+5. **Site, host and origin.** The site id must have the shape of a real id and exist, the page
+   URL must be `http(s)` and its host the site's domain or a subdomain, and `Origin` must be
+   present and match the same domain (`null` is allowed for sandboxed contexts). Mismatches get
+   `400`. Browsers always send `Origin` on a `POST`, including `sendBeacon`, so this stops naive
+   replays from `curl`.
+6. **Text cleanup.** Control characters and bidirectional overrides are stripped from stored text,
+   referrers with an invalid host are discarded, and the `outbound-link` event's URL is reduced to
+   origin and path.
+7. **Per-visitor limit.** About 1 event/s, burst 60, per site and daily visitor hash. Excess is
+   answered `202` and dropped, so a script replaying one visitor cannot inflate counts.
+8. **Write queue.** A bounded number of concurrent inserts; a request that waits more than two
+   seconds for a slot gets `503`.
 
-Sign-in endpoints have their own limit (5 requests/s per client, burst 30). Mutating dashboard
-endpoints require `Content-Type: application/json`, which is the CSRF protection.
+Sign-in endpoints have their own limits (5 requests/s per client, burst 30, and 20/s per upstream
+address). Mutating dashboard endpoints require `Content-Type: application/json`, or for requests
+without a body the dashboard's own `Origin`; that is the CSRF protection.
 
 Nothing in these checks stores an IP address or a raw user agent. See [PRIVACY.md](PRIVACY.md).
 

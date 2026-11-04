@@ -4,6 +4,7 @@
 //	analytics sites add -domain mlz.no [-name "My site"]
 //	analytics sites list
 //	analytics events purge -site ID -from 2026-11-01 -to 2026-11-02 [-path /x]   delete spam
+//	analytics sessions revoke [-user LOGIN]   sign a user (or everyone) out everywhere
 //	analytics seed [-days 730] [-scale 1] [-reset]   demo sites with synthetic data for local development
 //	analytics version                         print the version
 package main
@@ -121,10 +122,12 @@ func run(args []string, log *slog.Logger, level *slog.LevelVar) error {
 		return sites(cfg, args)
 	case "events":
 		return events(cfg, args)
+	case "sessions":
+		return sessions(cfg, args)
 	case "seed":
 		return seed(cfg, args)
 	default:
-		return fmt.Errorf("unknown command %q (want: serve, sites, events, seed, version)", cmd)
+		return fmt.Errorf("unknown command %q (want: serve, sites, events, sessions, seed, version)", cmd)
 	}
 }
 
@@ -155,9 +158,10 @@ func serve(cfg config.Config, log *slog.Logger) error {
 	}
 	switch {
 	case cfg.DevLogin:
-		// config.Load only allows this on localhost.
+		// config.Load only allows this on localhost; LoopbackOnly keeps the LAN out too.
 		authn.Provider = auth.Dev{}
 		authn.Allowed = []string{auth.DevLogin}
+		authn.LoopbackOnly = true
 		log.Warn("DEV_LOGIN=1: everyone who opens the dashboard is signed in as \"dev\"; local development only", "public_url", cfg.PublicURL)
 	case cfg.GitHubEnabled():
 		authn.Provider = &auth.GitHub{ClientID: cfg.GitHubClientID, ClientSecret: cfg.GitHubClientSecret}
@@ -178,11 +182,12 @@ func serve(cfg config.Config, log *slog.Logger) error {
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       120 * time.Second,
 		MaxHeaderBytes:    16 << 10,
+		ErrorLog:          slog.NewLogLogger(log.Handler(), slog.LevelWarn),
 	}
 
 	errCh := make(chan error, 1)
 	go func() {
-		log.Info("listening", "version", buildVersion(), "addr", cfg.Addr, "db", cfg.DatabasePath, "log_level", severity(cfg.LogLevel))
+		log.Info("listening", "version", buildVersion(), "addr", cfg.Addr, "db", cfg.DatabasePath, "log_level", severity(cfg.LogLevel), "config", cfg)
 		errCh <- srv.ListenAndServe()
 	}()
 
@@ -191,13 +196,16 @@ func serve(cfg config.Config, log *slog.Logger) error {
 		return err
 	case <-ctx.Done():
 	}
+	// Restore default signal handling, so a second signal during shutdown ends the process.
+	stop()
 
 	// Cloud Run allows 10s after SIGTERM; leave time for Litestream's final sync.
 	log.Info("shutting down")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := srv.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		return err
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Warn("shutdown timed out; closing open connections", "err", err)
+		_ = srv.Close()
 	}
 	return nil
 }
@@ -300,6 +308,31 @@ func events(cfg config.Config, args []string) error {
 	return nil
 }
 
+// sessions manages dashboard sign-ins. "revoke" signs a user out everywhere, or everyone
+// when no user is given: use it after removing someone from ALLOWED_GITHUB_USERS, or if a
+// session token may have leaked.
+func sessions(cfg config.Config, args []string) error {
+	if len(args) == 0 || args[0] != "revoke" {
+		return errors.New("usage: analytics sessions revoke [-user LOGIN]")
+	}
+	fs := flag.NewFlagSet("sessions revoke", flag.ExitOnError)
+	user := fs.String("user", "", "only this user's sessions (default: everyone's)")
+	_ = fs.Parse(args[1:])
+
+	ctx := context.Background()
+	st, err := store.Open(ctx, cfg.DatabasePath)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = st.Close() }()
+	n, err := st.RevokeSessions(ctx, *user)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Revoked %d sessions.\n", n)
+	return nil
+}
+
 func parseTime(s string) (time.Time, error) {
 	if t, err := time.Parse(time.DateOnly, s); err == nil {
 		return t, nil
@@ -323,8 +356,11 @@ func seed(cfg config.Config, args []string) error {
 	fs := flag.NewFlagSet("seed", flag.ExitOnError)
 	days := fs.Int("days", 730, "days of history")
 	scale := fs.Float64("scale", 1, "multiply the amount of traffic")
-	reset := fs.Bool("reset", false, "delete the demo sites and their events first")
+	reset := fs.Bool("reset", false, "delete the demo sites and their events first (requires DEV_LOGIN=1)")
 	_ = fs.Parse(args)
+	if *reset && !cfg.DevLogin {
+		return errors.New("seed -reset deletes sites and is only allowed with DEV_LOGIN=1")
+	}
 
 	ctx := context.Background()
 	st, err := store.Open(ctx, cfg.DatabasePath)

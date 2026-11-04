@@ -58,12 +58,16 @@ docker compose -f infra/docker/docker-compose.yml exec analytics analytics sites
 2. Set `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` and `ALLOWED_GITHUB_USERS` (comma-separated GitHub usernames).
 
 There are no passwords. On first sign-in a username is bound to its GitHub account id,
-so a renamed-and-reregistered username cannot take over access.
+so a renamed-and-reregistered username cannot take over access. Sessions last 7 days
+without use and are extended while in use. Removing a username from `ALLOWED_GITHUB_USERS`
+signs that user out at their next request; `analytics sessions revoke [-user LOGIN]` does it
+immediately. `PUBLIC_URL` must be `https://` when sign-in is enabled (localhost excepted).
 
 Send a test event:
 
 ```sh
-curl -A "Mozilla/5.0" --data '{"site":"<site-id>","url":"https://example.com/"}' http://localhost:8080/api/event
+curl -A "Mozilla/5.0" -H "Origin: https://example.com" \
+  --data '{"site":"<site-id>","url":"https://example.com/"}' http://localhost:8080/api/event
 ```
 
 ## Tracking your site

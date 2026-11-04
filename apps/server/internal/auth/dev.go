@@ -12,18 +12,19 @@ const DevLogin = "dev"
 // server: its "provider page" redirects straight back to the callback.
 // It runs through the normal state check and session handling, so the rest
 // of the app behaves exactly as with a real provider.
-// Only enable it on localhost (config enforces this for DEV_LOGIN).
+// Only enable it on localhost (config enforces this for DEV_LOGIN) and with
+// Service.LoopbackOnly, so nothing else on the network can use it.
 type Dev struct{}
 
 // Name implements Provider.
 func (Dev) Name() string { return "dev" }
 
 // AuthCodeURL implements Provider.
-func (Dev) AuthCodeURL(state, redirectURI string) string {
+func (Dev) AuthCodeURL(state, redirectURI, _ string) string {
 	return redirectURI + "?" + url.Values{"code": {"dev"}, "state": {state}}.Encode()
 }
 
 // Identify implements Provider.
-func (Dev) Identify(context.Context, string, string) (Identity, error) {
+func (Dev) Identify(context.Context, string, string, string) (Identity, error) {
 	return Identity{ID: "dev", Login: DevLogin}, nil
 }

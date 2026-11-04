@@ -51,8 +51,20 @@ type Config struct {
 // GitHubEnabled reports whether GitHub login is configured.
 func (c Config) GitHubEnabled() bool { return c.GitHubClientID != "" }
 
-// CookieSecure reports whether session cookies should have the Secure flag.
-func (c Config) CookieSecure() bool { return strings.HasPrefix(c.PublicURL, "https://") }
+// LogValue implements slog.LogValuer so a logged Config never shows the client secret.
+func (c Config) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("addr", c.Addr),
+		slog.String("database_path", c.DatabasePath),
+		slog.String("public_url", c.PublicURL),
+		slog.Int("proxy_hops", c.ProxyHops),
+		slog.Int("retention_days", c.RetentionDays),
+		slog.Int("ingest_rate_limit", c.IngestRate),
+		slog.Int("max_database_mb", c.MaxDatabaseMB),
+		slog.Bool("github", c.GitHubEnabled()),
+		slog.Bool("dev_login", c.DevLogin),
+	)
+}
 
 // Load reads configuration from the environment.
 func Load() (Config, error) {
@@ -82,14 +94,18 @@ func Load() (Config, error) {
 	if c.MaxDatabaseMB, err = envInt("MAX_DATABASE_MB", 0); err != nil {
 		return c, err
 	}
-	if u, err := url.Parse(c.PublicURL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		return c, fmt.Errorf("PUBLIC_URL must be an absolute http(s) URL, got %q", c.PublicURL)
+	if err := validatePublicURL(c.PublicURL); err != nil {
+		return c, err
 	}
 	if (c.GitHubClientID == "") != (c.GitHubClientSecret == "") {
 		return c, errors.New("GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET must be set together")
 	}
 	if c.GitHubEnabled() && len(c.AllowedGitHubUsers) == 0 {
 		return c, errors.New("ALLOWED_GITHUB_USERS must list at least one GitHub username")
+	}
+	// Sessions over plain HTTP would be sent without the Secure flag; only localhost is exempt.
+	if c.GitHubEnabled() && strings.HasPrefix(c.PublicURL, "http://") && !isLocalhost(c.PublicURL) {
+		return c, fmt.Errorf("PUBLIC_URL must use https when sign-in is enabled, got %q", c.PublicURL)
 	}
 	if c.DevLogin {
 		if !isLocalhost(c.PublicURL) {
@@ -100,6 +116,18 @@ func Load() (Config, error) {
 		}
 	}
 	return c, nil
+}
+
+// validatePublicURL requires an absolute origin with no path, query or fragment.
+func validatePublicURL(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return fmt.Errorf("PUBLIC_URL must be an absolute http(s) URL, got %q", raw)
+	}
+	if u.Path != "" || u.RawQuery != "" || u.Fragment != "" || u.User != nil {
+		return fmt.Errorf("PUBLIC_URL must be an origin without a path, got %q", raw)
+	}
+	return nil
 }
 
 // isLocalhost reports whether rawURL is a plain-HTTP URL on the loopback interface.

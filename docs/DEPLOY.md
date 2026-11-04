@@ -11,7 +11,7 @@ Self-hosting without GCP? Use `docker compose -f infra/docker/docker-compose.yml
 - `gcloud`, signed in as an account that can create projects and use a billing account:
   `gcloud auth login && gcloud auth application-default login`
 - Terraform ≥ 1.9, Docker with `buildx`, Node (for the dashboard build), and the Firebase CLI (`firebase login`)
-- A domain whose DNS you control, e.g. `t.example.com`
+- A domain whose DNS you control, e.g. `analytics.example.com`. Optionally a second, short host for the tracking script (see [Extra domains](#extra-domains))
 - A **GitHub OAuth App** (Settings → Developer settings → OAuth Apps):
   - Homepage URL: `https://<domain>`
   - Authorization callback URL: `https://<domain>/api/auth/github/callback` (must match exactly)
@@ -38,7 +38,7 @@ The project has `deletion_policy = "PREVENT"`. To delete it, change that first.
 
 ```sh
 cd infra/terraform/main
-cp terraform.tfvars.example terraform.tfvars   # set project_id, domain, github_client_id, allowed_github_users
+cp terraform.tfvars.example terraform.tfvars   # set project_id, domain, extra_domains (optional), github_client_id, allowed_github_users
 terraform init -backend-config=bucket=<project_id>-tfstate
 terraform apply
 ```
@@ -50,7 +50,7 @@ Outputs:
 | Output | Use |
 |---|---|
 | `public_url` | Dashboard URL. The OAuth callback is `<public_url>/api/auth/github/callback`. |
-| `dns_records` | Records to create for the custom domain (usually one CNAME to `<site>.web.app`). |
+| `dns_records` | Records to create for the custom domain and any extra domains (usually one CNAME each to `<site>.web.app`). |
 | `image_repo` | Where `make deploy` pushes images. |
 | `cloud_run_url` | Direct service URL, for debugging. |
 
@@ -71,6 +71,29 @@ Avoid a trailing newline, because it becomes part of the secret. Cloud Run reads
 ## 4. DNS
 
 Create the records from `terraform output dns_records` at your DNS provider. Firebase verifies the domain and issues a TLS certificate on its own, which usually takes from a few minutes up to about an hour. Until then, the dashboard is reachable at `https://<site>.web.app`, but sign-in only works on the domain configured in the OAuth App.
+
+### Extra domains
+
+`extra_domains` serves the same site on more hostnames, for example a short, neutral host for the
+tracking script next to a readable dashboard host:
+
+```hcl
+domain        = "analytics.example.com"   # dashboard, sign-in, PUBLIC_URL
+extra_domains = ["t.example.com"]         # same content, script and events
+```
+
+Ad blockers often filter hostnames that contain "analytics", so sites may load
+`https://t.example.com/api/script.js` instead. Do not redirect one host to the other: a redirect
+breaks `POST /api/event` and `sendBeacon`. Sign-in only works on `domain`, because a GitHub OAuth App
+has one callback URL. Add one CNAME per host from `terraform output dns_records`.
+
+**Moving an existing domain.** If the host you used as `domain` before becomes an extra domain, move
+it in state first so Terraform does not destroy and re-issue its certificate:
+
+```sh
+terraform state mv 'google_firebase_hosting_custom_domain.this[0]' 'google_firebase_hosting_custom_domain.extra["t.example.com"]'
+terraform plan   # should only add the new primary domain and update the service
+```
 
 ## 5. Deploy
 
@@ -94,7 +117,7 @@ gcloud run services logs read analytics --region <region> --project <project_id>
 
 The logs should show Litestream either restoring from the bucket or reporting "no backup found, starting fresh", followed by "replicating to".
 
-Then sign in at `https://<domain>`, add a site and embed the tracking snippet shown in the dashboard.
+Then sign in at `https://<domain>`, add a site and embed the tracking snippet shown in the dashboard. If you use an extra domain for the script, replace the host in the snippet with it.
 
 **`PROXY_HOPS`.** The server takes the client IP from `X-Forwarded-For`, skipping `PROXY_HOPS` trusted proxies from the right. Firebase Hosting → Cloud Run is expected to be 2. If countries show up wrong, or every visitor looks the same, check the header Cloud Run receives and adjust `proxy_hops` in `terraform.tfvars`.
 

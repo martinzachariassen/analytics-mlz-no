@@ -14,7 +14,7 @@ browser headers can still add noise, which you can delete afterwards.
 | Search-engine and SEO crawlers (Googlebot, Bytespider, ...) | Hitting the dashboard or running the tracking script | Not counted. See [filtering](#how-events-are-filtered). Told not to index (see [indexing](#keeping-the-dashboard-out-of-search-engines)). |
 | Vulnerability scanners probing `/.env`, `/wp-login.php`, `/api/v1/.env`, ... | Request logs, mostly against the `run.app` URL | The server answers `404`. Nothing is stored and nothing is exposed. On the custom domain, Firebase Hosting answers unknown non-`/api` paths with the dashboard page (`200`), because the dashboard is a single-page app. That is a hosting limitation, not a leak. |
 | Uptime monitors, benchmarks, link-preview fetchers | `POST /api/event` from non-browser clients | Not counted (see the marker list in `apps/server/internal/ingest/ingest.go`). |
-| Headless browsers and test tools (Puppeteer, Playwright, Lighthouse) | The tracking script runs | The script does nothing when `navigator.webdriver` is set, and does not count prerendered pages. Headless Chrome that does not announce itself is dropped by its user agent where it says "Headless". |
+| Headless browsers and test tools (Puppeteer, Playwright, Lighthouse) | The tracking script runs | The script does nothing when `navigator.webdriver` is set, and counts a prerendered page only once the visitor navigates to it. Headless Chrome that does not announce itself is dropped by its user agent where it says "Headless". |
 | Scripts posting fake events (referrer spam, junk paths, floods) | `POST /api/event` | Rejected or dropped as described below. What gets through can be removed with the purge endpoint. |
 
 ## How events are filtered

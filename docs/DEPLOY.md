@@ -98,6 +98,17 @@ Then sign in at `https://<domain>`, add a site and embed the tracking snippet sh
 
 **`PROXY_HOPS`.** The server takes the client IP from `X-Forwarded-For`, skipping `PROXY_HOPS` trusted proxies from the right. Firebase Hosting → Cloud Run is expected to be 2. If countries show up wrong, or every visitor looks the same, check the header Cloud Run receives and adjust `proxy_hops` in `terraform.tfvars`.
 
+The service must also be reachable on its `run.app` URL, because Firebase Hosting rewrites go
+through it (disabling the default URL breaks them). A request sent there directly can forge
+`X-Forwarded-For`. The server therefore also rate-limits by the address Cloud Run itself saw
+(the rightmost entry), which cannot be forged.
+
+**Abuse limits.** `ingest_rate_limit` (default 50 events/s) and `max_database_mb` (default 200)
+bound how fast and how far a flood can grow the database, which on Cloud Run lives in the
+instance's 512 MiB of memory. Set `alert_email` to be told about memory pressure and load
+shedding. To remove spam afterwards, call `POST /api/sites/{id}/purge` while signed in (see
+docs/API.md), since Cloud Run has no shell for `analytics events purge`.
+
 ## Operations
 
 - **Logs:** `gcloud run services logs read analytics --region <region> --project <project_id>`

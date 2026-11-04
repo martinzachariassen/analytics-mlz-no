@@ -15,6 +15,9 @@ import {
 
 const OPS: FilterOp[] = ["is", "is_not", "contains"]
 
+/** The API accepts at most this many filters; extra ones in the URL are ignored. */
+export const MAX_FILTERS = 10
+
 /** Parses "dim:op:value"; the value may contain colons. */
 export function parseFilter(raw: string): Filter | null {
   const a = raw.indexOf(":")
@@ -66,6 +69,7 @@ export function useScope() {
       .getAll("f")
       .map(parseFilter)
       .filter((f): f is Filter => f !== null)
+      .slice(0, MAX_FILTERS)
 
     const d = params.get("detail")
     const df = d

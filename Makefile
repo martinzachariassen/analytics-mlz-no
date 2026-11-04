@@ -54,9 +54,11 @@ dev-demo:
 dev-reset:
 	rm -f data/dev.db data/dev.db-wal data/dev.db-shm
 
-# Production build of the dashboard into apps/web/dist.
+# Production build of the dashboard into apps/web/dist. TRACKER_ORIGIN is the host the
+# "Tracking code" page puts in the snippet (default: the dashboard's own origin).
+TRACKER_ORIGIN ?=
 web:
-	cd apps/web && npm run build
+	cd apps/web && VITE_TRACKER_ORIGIN=$(TRACKER_ORIGIN) npm run build
 
 # ---------------------------------------------------------------- production (see infra/terraform)
 

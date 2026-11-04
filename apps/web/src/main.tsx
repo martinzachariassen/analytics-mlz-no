@@ -1,6 +1,7 @@
 import { lazy, StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import {
+  MutationCache,
   QueryCache,
   QueryClient,
   QueryClientProvider,
@@ -13,6 +14,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "@/components/ui/sonner"
 import { ApiError } from "@/lib/api"
 import { AppLayout } from "@/routes/app-layout"
+import { ErrorPage } from "@/routes/error-page"
 import { HomePage } from "@/routes/home"
 import { SitesPage } from "@/routes/sites"
 
@@ -36,20 +38,21 @@ const SettingsPage = lazy(() =>
   import("@/routes/settings").then((m) => ({ default: m.SettingsPage }))
 )
 
+// A 401 anywhere means the session ended: re-check who we are, which redirects home.
+// Not for the "me" query itself: re-checking it on its own 401 would loop forever,
+// and the page would never leave its loading state.
+function onUnauthorized(err: unknown, key?: unknown) {
+  if (err instanceof ApiError && err.status === 401 && key !== "me") {
+    void queryClient.invalidateQueries({ queryKey: ["me"] })
+  }
+}
+
 const queryClient: QueryClient = new QueryClient({
   queryCache: new QueryCache({
-    // A 401 anywhere means the session ended: re-check who we are, which redirects home.
-    // Not for the "me" query itself: re-checking it on its own 401 would loop forever,
-    // and the page would never leave its loading state.
-    onError: (err, query) => {
-      if (
-        err instanceof ApiError &&
-        err.status === 401 &&
-        query.queryKey[0] !== "me"
-      ) {
-        void queryClient.invalidateQueries({ queryKey: ["me"] })
-      }
-    },
+    onError: (err, query) => onUnauthorized(err, query.queryKey[0]),
+  }),
+  mutationCache: new MutationCache({
+    onError: (err) => onUnauthorized(err),
   }),
   defaultOptions: {
     queries: {
@@ -65,10 +68,11 @@ const queryClient: QueryClient = new QueryClient({
 
 const router = createBrowserRouter([
   // Public: what this is, and sign-in. Signed-in visitors go on to /sites.
-  { path: "/", element: <HomePage /> },
+  { path: "/", element: <HomePage />, errorElement: <ErrorPage /> },
   { path: "/login", element: <Navigate to="/" replace /> },
   {
     element: <AppLayout />,
+    errorElement: <ErrorPage />,
     children: [
       { path: "/sites", element: <SitesPage /> },
       {

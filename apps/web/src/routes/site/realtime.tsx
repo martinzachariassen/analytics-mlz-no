@@ -3,6 +3,7 @@ import { format } from "date-fns"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 
 import { BarList } from "@/components/bar-list"
+import { ErrorNote } from "@/components/error-note"
 import { Panel } from "@/components/panel"
 import { AXIS_TICK, TipBox, TipRow } from "@/components/traffic-chart"
 import { ChartContainer, ChartTooltip } from "@/components/ui/chart"
@@ -26,6 +27,7 @@ export function RealtimePage() {
 
   return (
     <div className="flex flex-col gap-3 lg:gap-4">
+      {rt.isError && <ErrorNote error={rt.error} />}
       <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-3">
         <Stat
           label="Visitors now"
@@ -119,9 +121,19 @@ export function RealtimePage() {
       </Panel>
 
       <div className="grid gap-3 lg:grid-cols-3 lg:gap-4">
-        <LiveList title="Pages" dim="path" rows={d?.pages} />
-        <LiveList title="Referrers" dim="referrer" rows={d?.referrers} />
-        <LiveList title="Countries" dim="country" rows={d?.countries} />
+        <LiveList title="Pages" dim="path" rows={d?.pages} error={rt.error} />
+        <LiveList
+          title="Referrers"
+          dim="referrer"
+          rows={d?.referrers}
+          error={rt.error}
+        />
+        <LiveList
+          title="Countries"
+          dim="country"
+          rows={d?.countries}
+          error={rt.error}
+        />
       </div>
     </div>
   )
@@ -174,12 +186,21 @@ function LiveList({
   title,
   dim,
   rows,
+  error,
 }: {
   title: string
   dim: Dimension
   rows?: BreakdownRow[]
+  error?: unknown
 }) {
   const total = rows?.reduce((n, r) => n + r.visitors, 0)
+  if (error && !rows) {
+    return (
+      <Panel title={title} description="Last 30 minutes">
+        <ErrorNote error={error} className="py-2" />
+      </Panel>
+    )
+  }
   return (
     <Panel title={title} description="Last 30 minutes">
       <BarList

@@ -7,6 +7,8 @@ import { defineConfig } from "vite"
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
+    // The OAuth callback and PUBLIC_URL name this port; silently moving to 5174 would break sign-in.
+    strictPort: true,
     // The Go server runs on :8080 (`make run`). Same-origin /api keeps the session cookie simple,
     // exactly like Firebase Hosting's rewrite in production. API_PROXY points elsewhere.
     proxy: {

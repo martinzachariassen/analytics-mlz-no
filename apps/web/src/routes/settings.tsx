@@ -4,6 +4,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router"
 import { PartyPopper } from "lucide-react"
 import { toast } from "sonner"
 
+import { ErrorNote } from "@/components/error-note"
 import { TrackingSnippet } from "@/components/tracking-snippet"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
@@ -53,12 +54,14 @@ export function SettingsPage() {
           <CardTitle>Tracking code</CardTitle>
         </CardHeader>
         <CardContent>
-          <TrackingSnippet siteId={id} />
+          <TrackingSnippet siteId={site.data?.id ?? id} />
         </CardContent>
       </Card>
 
       {site.data ? (
         <GeneralForm key={site.data.id} site={site.data} />
+      ) : site.isError ? (
+        <ErrorNote error={site.error} />
       ) : (
         <Skeleton className="h-56" />
       )}

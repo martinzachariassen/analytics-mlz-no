@@ -18,7 +18,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       : init?.headers,
   })
   if (!res.ok) {
-    let message = res.statusText
+    // statusText is empty over HTTP/2, so the status itself is the fallback.
+    let message = res.statusText || `HTTP ${res.status}`
     try {
       message = ((await res.json()) as { error?: string }).error ?? message
     } catch {
@@ -131,6 +132,9 @@ function query(s: Partial<Scope>, extra: Params = {}): string {
   return q.toString()
 }
 
+/** The site's path segment. Ids are plain, but the value comes from the URL, so encode it. */
+const site = (id: string) => `/api/sites/${encodeURIComponent(id)}`
+
 export const api = {
   authConfig: () => request<{ providers: string[] }>("/api/auth/config"),
   me: () => request<User>("/api/auth/me"),
@@ -138,19 +142,18 @@ export const api = {
     request<void>("/api/auth/logout", { method: "POST", body: "{}" }),
 
   sites: () => request<Site[]>("/api/sites"),
-  site: (id: string) => request<Site>(`/api/sites/${id}`),
+  site: (id: string) => request<Site>(site(id)),
   createSite: (body: { name: string; domain: string }) =>
     request<Site>("/api/sites", { method: "POST", body: JSON.stringify(body) }),
   updateSite: (id: string, body: { name: string; domain: string }) =>
-    request<Site>(`/api/sites/${id}`, {
+    request<Site>(site(id), {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
-  deleteSite: (id: string) =>
-    request<void>(`/api/sites/${id}`, { method: "DELETE" }),
+  deleteSite: (id: string) => request<void>(site(id), { method: "DELETE" }),
 
   stats: (id: string, s: Scope, opts: { interval?: Interval } = {}) =>
-    request<Stats>(`/api/sites/${id}/stats?${query(s, opts)}`),
+    request<Stats>(`${site(id)}/stats?${query(s, opts)}`),
   breakdown: (
     id: string,
     s: Scope,
@@ -163,12 +166,12 @@ export const api = {
     } = {}
   ) =>
     request<BreakdownRow[]>(
-      `/api/sites/${id}/breakdown?${query(s, { dim, ...opts })}`
+      `${site(id)}/breakdown?${query(s, { dim, ...opts })}`
     ),
   heatmap: (id: string, s: Scope) =>
     request<Heatmap>(
-      `/api/sites/${id}/heatmap?${query({ ...s, compare: undefined })}`
+      `${site(id)}/heatmap?${query({ ...s, compare: undefined })}`
     ),
   realtime: (id: string, detail = false) =>
-    request<Realtime>(`/api/sites/${id}/realtime${detail ? "?detail=1" : ""}`),
+    request<Realtime>(`${site(id)}/realtime${detail ? "?detail=1" : ""}`),
 }

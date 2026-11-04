@@ -12,6 +12,16 @@ import {
 // Local noon avoids DST edge cases around midnight.
 const now = new Date(2026, 10, 4, 12)
 
+describe("isPeriod", () => {
+  it("accepts presets and rejects inherited property names", () => {
+    expect(isPeriod("7d")).toBe(true)
+    expect(isPeriod("custom")).toBe(false)
+    expect(isPeriod(null)).toBe(false)
+    for (const v of ["toString", "constructor", "__proto__"])
+      expect(isPeriod(v)).toBe(false)
+  })
+})
+
 describe("periodRange", () => {
   it("covers the last 7 days inclusive of today", () => {
     const r = periodRange("7d", now)

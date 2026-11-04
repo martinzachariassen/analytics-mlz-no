@@ -26,7 +26,7 @@ export type Period = keyof typeof PERIODS
 export const DEFAULT_PERIOD: Period = "7d"
 
 export function isPeriod(v: string | null): v is Period {
-  return v !== null && v in PERIODS
+  return v !== null && Object.hasOwn(PERIODS, v)
 }
 
 /** The browser's IANA time zone, so days match what the user sees on their clock. */

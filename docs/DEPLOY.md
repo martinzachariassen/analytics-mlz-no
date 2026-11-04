@@ -112,6 +112,10 @@ Ad blockers often filter hostnames that contain "analytics", so sites may load
 breaks `POST /api/event` and `sendBeacon`. Sign-in only works on `domain`, because a GitHub OAuth App
 has one callback URL. Add one CNAME per host from `terraform output dns_records`.
 
+To make the dashboard's "Tracking code" page hand out the short host, build it with
+`TRACKER_ORIGIN`: `make deploy-web TRACKER_ORIGIN=https://t.example.com` (it becomes
+`VITE_TRACKER_ORIGIN` for Vite). Without it the snippet uses the dashboard's own origin.
+
 **Moving an existing domain.** If the host you used as `domain` before becomes an extra domain, move
 it in state first so Terraform does not destroy and re-issue its certificate:
 

@@ -234,7 +234,23 @@ export function DataTable({
                 <TableRow
                   key={r.value}
                   onClick={onOpen ? () => onOpen(r) : undefined}
-                  className={cn("tnum text-xs", onOpen && "cursor-pointer")}
+                  onKeyDown={
+                    onOpen
+                      ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault()
+                            onOpen(r)
+                          }
+                        }
+                      : undefined
+                  }
+                  tabIndex={onOpen ? 0 : undefined}
+                  role={onOpen ? "button" : undefined}
+                  className={cn(
+                    "tnum text-xs",
+                    onOpen &&
+                      "cursor-pointer focus-visible:bg-accent focus-visible:outline-none"
+                  )}
                 >
                   <TableCell className="pl-4 text-right text-fg-muted">
                     {i + 1}

@@ -15,7 +15,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build -
 FROM --platform=$BUILDPLATFORM alpine:3.24 AS assets
 SHELL ["/bin/ash", "-o", "pipefail", "-c"]
 ARG TARGETARCH
-ARG LITESTREAM_VERSION=0.5.17
+ARG LITESTREAM_VERSION=0.5.18
 RUN apk add --no-cache curl
 # Litestream binary.
 RUN case "${TARGETARCH:-amd64}" in \

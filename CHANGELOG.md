@@ -15,6 +15,8 @@ All notable changes are documented here. The format follows
 ### Changed
 - Server logs use `severity` and `message` instead of `level` and `msg`, so Cloud Logging shows the level and `severity>=ERROR` finds app errors. Update log queries that matched on `msg` or `level`.
 
+- Dependencies updated: Litestream 0.5.18 in the Docker image, `modernc.org/sqlite` 1.62.0, and the dashboard's npm packages (Vite 8.3, Tailwind 4.3, TanStack Query 5.107).
+
 ### Fixed
 - Terraform: scheduled backups never ran. The scheduler's service account had `roles/run.invoker`, but the schedules pass `args` as an override, which needs `roles/run.jobsExecutorWithOverrides`. A new alert (`alert_email`) fires when no backup has succeeded for two hours.
 

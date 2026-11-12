@@ -1,23 +1,46 @@
 # Contributing
 
-Thanks for helping out! This is a small project; the goal is to keep it small, privacy-first and
-easy to self-host. Please read [docs/PLAN.md](docs/PLAN.md) for the design decisions before larger
-changes, and open an issue first if you are unsure whether something fits.
+> **TL;DR** — Run `make dev` to get everything running with demo data. Before a pull request, run
+> `make verify` (the same checks CI runs). Keep changes small and privacy-first, and update the docs page that
+> covers what you changed (see the [table below](#documentation)).
+
+Thanks for helping out! This is a small project, and the goal is to keep it small, privacy-first
+and easy to self-host. Read [docs/decisions.md](docs/decisions.md) before larger changes, and open
+an issue first if you are unsure whether something fits.
 
 ## Setup
 
 Every tool (Go, Bun, Node, Terraform, golangci-lint, shellcheck, hadolint, actionlint, tflint) is
-pinned in [`mise.toml`](mise.toml), so one command installs them all:
+pinned in [`mise.toml`](mise.toml), so one command installs them all. You also need Python 3
+(serves the demo site) and, optionally, Docker.
 
 ```sh
-mise install
-bun install     # JavaScript packages for the dashboard and tracker; also wires up the pre-commit hook
-```
-
-```sh
-make dev        # API :8080, dashboard :5173, demo site :8081, with synthetic data and one-click sign-in
+mise install    # the pinned tools
+bun install     # JavaScript packages (workspaces apps/web and apps/tracker); also wires up the pre-commit hook
+make dev        # API :8080, dashboard :5173, demo site :8081, synthetic data, one-click sign-in
 make dev-reset  # start over with fresh data
 ```
+
+[docs/getting-started.md](docs/getting-started.md) walks through it, including a tour of the
+dashboard. To try real GitHub sign-in locally instead of the dev login, set the variables listed
+in [docs/reference/configuration.md](docs/reference/configuration.md) and run `make run`.
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `make dev` | API, dashboard and demo site with seeded data |
+| `make run` | Server only, on :8080, data in `./data` |
+| `make dev-web` | Dashboard only, on :5173 (proxies `/api` to :8080) |
+| `make verify` | The full quality gate, `scripts/verify.sh`: lint, go, tracker, web, infra |
+| `make test` | Go (vet, race tests, golangci-lint), tracker and dashboard checks |
+| `make lint` | Biome (format + lint), gofmt and golangci-lint |
+| `make format` | Fix formatting (Biome and gofmt) |
+| `make tracker` | Rebuild `apps/server/internal/script/script.js` from `apps/tracker/src` |
+| `docker compose -f infra/docker/docker-compose.yml up --build` | Production image locally |
+| `infra/docker/test-restore.sh` | Check Litestream backup and restore |
+| `infra/docker/test-backup.sh` | Check the standalone backup script (`backup.sh`) |
+| `go run ./apps/server/cmd/loadtest` | Ingest load test |
 
 ## Checks before you open a pull request
 
@@ -29,35 +52,83 @@ make verify     # everything: lint, go, tracker, web, infra
 make test       # go, tracker and web only
 make lint       # Biome (format + lint) and gofmt, then golangci-lint
 make format     # fix formatting
+make tracker    # if apps/tracker/src changed; commit script.js
 ```
 
-The pre-commit hook (`.githooks/pre-commit`, installed by `bun install`) runs `bun run lint`;
-don't bypass it with `--no-verify`. CI also runs `govulncheck`, `bun audit` and a Docker build.
+| Group | Checks |
+|---|---|
+| `lint` | `biome ci .` and `gofmt -l` |
+| `go` | `go vet`, `go test -race`, `golangci-lint run` |
+| `tracker` | Types, tests, a rebuild that fails if the committed `script.js` is stale, the 1 KB gzip budget |
+| `web` | Types, tests, production build |
+| `infra` | `terraform fmt`/`validate`, shellcheck, hadolint, actionlint |
+
+Run one or more groups with `./scripts/verify.sh go web`. The pre-commit hook
+(`.githooks/pre-commit`, installed by `bun install`) runs `bun run lint`; don't bypass it with
+`--no-verify`. CI also runs `govulncheck`, `bun audit`, a docs link check and a Docker build.
 
 ## Rules of the codebase
 
-- **Privacy:** never store IP addresses or raw user agents. Only derived, coarse fields.
-- **Migrations:** add a new numbered file in `apps/server/internal/store/migrations/`. Never edit one
-  that has been released.
-- **SQL:** breakdown dimensions are a whitelist in `store.Dimensions`. Never interpolate user input.
+The reasons are in [ARCHITECTURE.md](ARCHITECTURE.md#invariants).
+
+- **Privacy:** never store or log IP addresses or raw user agents. Only derived, coarse fields.
+- **Migrations:** add a new numbered file in `apps/server/internal/store/migrations/`. Never edit
+  one that has been released.
+- **SQL:** dimensions are whitelists (`store.Dimensions`, `store.FilterDims`). Never interpolate
+  user input.
 - **Auth:** OAuth only. Mutating dashboard endpoints use `httpx.ReadJSON`, which requires
   `application/json` and is the CSRF protection.
 - **Session cookie** must be named `__session` (the only cookie Firebase Hosting forwards).
-- **Go:** pure Go, no CGO, standard library routing.
+- **Go:** pure Go, no CGO, standard library routing. Configuration is read only in `internal/config`.
 - **Dashboard:** components in `apps/web/src/components/ui/` are generated by shadcn
-  (`cd apps/web && bunx shadcn@latest add <name>`); restyle through `src/index.css` instead of
-  editing them. Biome does not format or lint that folder.
+  (`cd apps/web && bunx shadcn@latest add <name>`). Restyle them through `src/index.css` instead
+  of editing them. Biome does not format or lint that folder.
 - **Formatting and linting:** Biome for TypeScript (`biome.json`), gofmt and golangci-lint for Go.
   No comments unless they explain a non-obvious *why*.
-- **Embedded tracker:** `apps/server/internal/script/script.js` is built from `apps/tracker/`; do not edit it by hand.
+- **Embedded tracker:** `apps/server/internal/script/script.js` is built from `apps/tracker/`. Do
+  not edit it by hand.
 - Code, comments and docs are in English.
+
+## Documentation
+
+Docs are part of the change, in the same pull request. Every page starts with a TL;DR. The
+style is described in [docs/README.md](docs/README.md#how-these-docs-are-written).
+
+> [!IMPORTANT]
+> **Golden rule:** before opening a PR, search the docs for every name you touched (env var,
+> flag, endpoint, command, file path) and update every hit. When you remove or replace
+> something, rewrite the affected pages so they stay as complete as before. Never leave a
+> page thinner or out of date. A PR that changes behaviour without matching docs is not done.
+
+| If you change… | Update |
+|---|---|
+| An environment variable or Terraform variable | [docs/reference/configuration.md](docs/reference/configuration.md) |
+| An API endpoint, parameter, response or status code | [docs/reference/api.md](docs/reference/api.md) and `apps/web/src/lib/api.ts` |
+| A CLI command or flag | [docs/reference/cli.md](docs/reference/cli.md) |
+| What is stored or logged | [docs/privacy.md](docs/privacy.md) |
+| Tracker options or behaviour | [docs/guides/tracking.md](docs/guides/tracking.md) |
+| Bot filtering or rate limits | [docs/operations/bots.md](docs/operations/bots.md) |
+| Deployment, alerts, backups | [docs/guides/deploy-gcp.md](docs/guides/deploy-gcp.md) and [docs/operations/runbook.md](docs/operations/runbook.md) |
+| A package, invariant or data flow | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| A metric's meaning | [docs/concepts.md](docs/concepts.md) and `apps/web/src/lib/metrics.ts` |
+| An architectural decision | [docs/decisions.md](docs/decisions.md) |
+| Anything users notice | A line under "Unreleased" in [CHANGELOG.md](CHANGELOG.md) |
+
+Two kinds of checks catch the most common drift:
+
+- **Links.** The `docs` CI job runs [lychee](https://lychee.cli.rs) offline on every Markdown
+  file, so a renamed page or heading fails the build. Run it locally with
+  `lychee --offline --include-fragments '**/*.md'`.
+- **Reference tables.** `TestEveryVariableIsDocumented` (`internal/config`) fails when an
+  environment variable is missing from `configuration.md`, and `TestDimensionsAreDocumented`
+  (`internal/store`) when a dimension or filter operator is missing from `api.md`. Both run in
+  `make test`.
 
 ## Pull requests
 
-- Keep them focused; one concern per pull request.
+- Keep them focused, one concern per pull request.
 - Add or update tests for behaviour changes.
-- Add a line under "Unreleased" in [CHANGELOG.md](CHANGELOG.md) for user-visible changes.
-- Update `docs/` and the README when you change configuration or behaviour.
+- Fill in the checklist in the pull request template.
 
 ## Security issues
 

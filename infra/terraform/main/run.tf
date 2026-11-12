@@ -3,7 +3,7 @@
 # SQLite allows one writer, so max_instance_count = 1. Litestream restores the database
 # from GCS on cold start and replicates every second while the instance has CPU.
 # Known trade-off: during a deploy the new instance restores while the old one still
-# serves, so events from those few seconds can be lost. See docs/DEPLOY.md.
+# serves, so events from those few seconds can be lost. See docs/operations/runbook.md.
 resource "google_cloud_run_v2_service" "this" {
   name                = var.service_name
   location            = var.region

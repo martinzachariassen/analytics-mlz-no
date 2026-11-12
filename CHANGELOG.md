@@ -6,7 +6,16 @@ All notable changes are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Documentation reorganised around reader needs: a start page with reading paths (`docs/README.md`), guides, reference (API, configuration, CLI), an operations runbook, and development guides. Every page starts with a TL;DR.
+- Terraform: an alert (`alert_email`) when the server logs an error, at most one email per hour. `docs/operations/runbook.md` lists useful Logs Explorer filters.
+- `LOG_LEVEL` (`debug`, `info`, `warn`, `error`; Terraform `log_level`). Rejected events log why (`event rejected` with a `reason`, never the IP or user agent): bad payloads at `INFO`, rate limits, bots and load shedding at `DEBUG`.
+- Terraform: an "Analytics" operations dashboard in Cloud Monitoring (requests by status, latency, memory, CPU, instances, backups, uptime, server warnings). `terraform output dashboard_url` and `logs_url` link to it and to the logs.
+- `analytics sessions revoke [-user LOGIN]` signs dashboard users out everywhere.
+- Terraform: `require_replica` (see Fixed), labels on every resource, lock files for Linux and macOS, `terraform_version < 2.0`, and an outputs table plus a restore playbook (`docs/guides/deploy-gcp.md`, `docs/operations/runbook.md`). The Docker image records which DB-IP month it carries in `/usr/share/geoip/VERSION`.
+
 ### Security
+- Built with Go 1.27.4, which fixes a vulnerability in `net/http` ([GO-2026-6859](https://pkg.go.dev/vuln/GO-2026-6859)).
 - Supply chain: base images and the Litestream binary are pinned by digest (Litestream 0.5.18 now comes from its official image instead of a `curl | tar`), GitHub Actions are pinned to commits, `actions/checkout` no longer persists credentials, the CI image is scanned with Trivy, CodeQL runs on Go, TypeScript and the workflows, and releases carry an SBOM and signed build provenance for the image and the binaries (`gh attestation verify`). Release images pin the GeoIP month (`DBIP_MONTH`), so a rebuilt tag is the same image.
 - Docker: the container runs as `10001:10001` with a group, has a `HEALTHCHECK`, and `docker-compose.yml` binds to `127.0.0.1`, runs read-only with all capabilities dropped and `no-new-privileges`, limits memory and log size, and reads secrets from `infra/docker/.env` (`.env.example`) instead of inline values. `.dockerignore` keeps databases, env files and node_modules out of the build context.
 - Terraform: the default compute service account loses its project-wide `roles/editor` (`google_project_default_service_accounts`, `DEPRIVILEGE`); the state, replica and backup buckets have `prevent_destroy`; variables are validated (`extra_domains` needs `domain`, limits have ranges, `alert_email` is an address).
@@ -25,7 +34,7 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 - Terraform: `public_url` was `https://https://<site>.web.app` when `domain` was empty, which broke the OAuth callback for installs without a custom domain.
-- A lost Litestream replica was invisible: the next cold start began with an empty database and replicated that over the bucket, while the backup job kept succeeding on nothing. `require_replica = true` (`REQUIRE_REPLICA=1`, `BACKUP_EXPECT_DATA=1`) makes an empty replica a startup failure and a failed backup, and a new alert fires on Litestream errors and "no backup found" log lines. `docs/DEPLOY.md` has a restore runbook.
+- A lost Litestream replica was invisible: the next cold start began with an empty database and replicated that over the bucket, while the backup job kept succeeding on nothing. `require_replica = true` (`REQUIRE_REPLICA=1`, `BACKUP_EXPECT_DATA=1`) makes an empty replica a startup failure and a failed backup, and a new alert fires on Litestream errors and "no backup found" log lines. `docs/operations/runbook.md` has a restore playbook.
 - The uptime check fetched `/api/script.js`, which the CDN caches for an hour, so it could pass while Cloud Run was down. It now expects a `401` from the uncached `/api/auth/me`. Cloud Run gets a liveness probe, so a hung instance is replaced.
 - `backup.sh` retries uploads, names files with seconds and the execution id (a retry could not overwrite a partial object), and the test scripts fail when the server never becomes healthy. `test-restore.sh` also covers `REQUIRE_REPLICA` and a database newer than the replica; `test-backup.sh` covers `BACKUP_EXPECT_DATA`. CI runs both on every push, for amd64 and arm64.
 - `make deploy` runs the quality gate and refuses uncommitted, untracked, unpushed or non-`main` changes unless `FORCE=1`; it deploys the server before the dashboard and installs dashboard packages from the lockfile first.
@@ -39,6 +48,7 @@ All notable changes are documented here. The format follows
 - `PATCH /api/sites/{id}` with only `name` failed with "domain is required". Fields are now optional.
 - A database error while looking up a visitor's session started a new session instead of failing the insert. Unique-constraint errors are detected by SQLite error code instead of message text. Duplicate migration version numbers fail at startup instead of being skipped.
 - Shutdown: a second signal ends the process, a shutdown timeout closes open connections instead of exiting non-zero, and `net/http`'s own errors are logged as JSON.
+- Terraform: scheduled backups never ran. The scheduler's service account had `roles/run.invoker`, but the schedules pass `args` as an override, which needs `roles/run.jobsExecutorWithOverrides`. A new alert (`alert_email`) fires when no backup has succeeded for two hours.
 
 ### Changed
 - Tooling: every tool is pinned in `mise.toml` (`mise install`), JavaScript packages are one Bun workspace (`bun install`), Biome replaces eslint and prettier, a pre-commit hook runs `bun run lint`, and `scripts/verify.sh` (`make verify`) is the one quality gate that CI runs too, including Terraform `fmt`/`validate`, shellcheck, hadolint and actionlint.
@@ -46,21 +56,11 @@ All notable changes are documented here. The format follows
 - Statistics queries are cancelled after 10 seconds.
 - Site creation, changes, deletion and purges are logged with the signed-in user.
 - `ReadJSON` rejects trailing data after the JSON body.
-- Dashboard: `make web TRACKER_ORIGIN=https://t.example.com` builds the "Tracking code" page with that host in the snippet (`docs/DEPLOY.md`). Vite refuses to start on another port than 5173, since the OAuth callback names it. `shadcn`, `tailwindcss` and `@tailwindcss/vite` are dev dependencies, so `npm audit --omit=dev` covers only what ships.
-- Tracker: CI fails if the gzipped script grows past 1024 bytes (`npm run check-size`). It is now 1.9 KB minified and 1.0 KB gzipped.
+- Dashboard: `make web TRACKER_ORIGIN=https://t.example.com` builds the "Tracking code" page with that host in the snippet (`docs/guides/deploy-gcp.md`). Vite refuses to start on another port than 5173, since the OAuth callback names it. `shadcn`, `tailwindcss` and `@tailwindcss/vite` are dev dependencies, so `bun audit --prod` covers only what ships.
+- Tracker: CI fails if the gzipped script grows past 1024 bytes (`bun run check-size`). It is now 1.9 KB minified and 1.0 KB gzipped.
 - More `golangci-lint` linters (`gocritic`, `noctx`, `sqlclosecheck`, `rowserrcheck`, `nilerr`, `usestdlibvars`, `unparam`, `perfsprint`, `exhaustive`, `contextcheck`).
-
-### Added
-- Terraform: `require_replica` (see Fixed), labels on every resource, lock files for Linux and macOS, `terraform_version < 2.0`, and an outputs table plus restore runbook in `docs/DEPLOY.md`. The Docker image records which DB-IP month it carries in `/usr/share/geoip/VERSION`.
-- Terraform: an alert (`alert_email`) when the server logs an error, at most one email per hour. `docs/DEPLOY.md` lists useful Logs Explorer filters.
-- `LOG_LEVEL` (`debug`, `info`, `warn`, `error`; Terraform `log_level`). Rejected events log why (`event rejected` with a `reason`, never the IP or user agent): bad payloads at `INFO`, rate limits, bots and load shedding at `DEBUG`.
-- Terraform: an "Analytics" operations dashboard in Cloud Monitoring (requests by status, latency, memory, CPU, instances, backups, uptime, server warnings). `terraform output dashboard_url` and `logs_url` link to it and to the logs.
-
-### Changed
 - Server logs use `severity` and `message` instead of `level` and `msg`, so Cloud Logging shows the level and `severity>=ERROR` finds app errors. Update log queries that matched on `msg` or `level`.
-
-### Fixed
-- Terraform: scheduled backups never ran. The scheduler's service account had `roles/run.invoker`, but the schedules pass `args` as an override, which needs `roles/run.jobsExecutorWithOverrides`. A new alert (`alert_email`) fires when no backup has succeeded for two hours.
+- Dependencies updated: Litestream 0.5.18 in the Docker image, `modernc.org/sqlite` 1.62.0, and the dashboard's JavaScript packages (Vite 8.3, Tailwind 4.3, TanStack Query 5.107).
 
 ## [0.1.0] - 2026-11-04
 
@@ -89,7 +89,7 @@ All notable changes are documented here. The format follows
 - Release pipeline: multi-arch image on GHCR and static binaries on GitHub Releases.
 - CI: dashboard type checking and unit tests, `govulncheck`, `npm audit`, Dependabot.
 - `infra/docker/test-restore.sh` (backup/restore check) and `apps/server/cmd/loadtest` (ingest load test).
-- Documentation: bots, scanners and robots ([docs/BOTS.md](docs/BOTS.md)), privacy, upgrading, tracker and release guides; contributing and security policies.
+- Documentation: bots, scanners and robots ([docs/operations/bots.md](docs/operations/bots.md)), privacy, upgrading, tracker and release guides; contributing and security policies.
 
 ### Earlier work
 - Event ingestion, cookie-free visitor counting, tracking script, GitHub sign-in, sites and

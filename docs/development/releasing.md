@@ -1,12 +1,18 @@
 # Releasing
 
+> **TL;DR** — Move the "Unreleased" changelog entries under a new version, then push a tag
+> `vX.Y.Z`. `.github/workflows/release.yml` builds the multi-arch image for GHCR and the static
+> binaries, and creates the GitHub release.
+
+**Read this if:** you maintain the project and are about to publish a version.
+
 Releases are cut by pushing a version tag. The pipeline in `.github/workflows/release.yml` does the rest.
 
 ## Pre-release checklist
 
 Code and docs are ready; these steps need real infrastructure and are not automated.
 
-- [ ] **Production domain** chosen and DNS pointed at Firebase Hosting ([DEPLOY.md](DEPLOY.md)).
+- [ ] **Production domain** chosen and DNS pointed at Firebase Hosting ([deploy-gcp.md](../guides/deploy-gcp.md)).
 - [ ] **`PROXY_HOPS` verified** on Cloud Run behind Firebase Hosting. Log `X-Forwarded-For` for a
       request, count the proxies, and confirm the stored country and visitor hash match your own
       IP. A wrong value breaks rate limiting and visitor counting.
@@ -18,13 +24,8 @@ Code and docs are ready; these steps need real infrastructure and are not automa
 - [ ] `CHANGELOG.md`: move "Unreleased" under the new version heading with today's date.
 - [ ] `main` is green in CI.
 
-### Known gap: dashboard for self-hosters
-
-The Docker image contains the API only. The dashboard (`apps/web/`) is deployed to Firebase Hosting and
-reaches the API through a same-origin rewrite. Someone running `docker compose` therefore has a
-working collector but no dashboard unless they serve `apps/web/dist` themselves behind the same
-origin. Decide before 1.0 whether to embed `apps/web/dist` in the Go binary (simplest for
-self-hosting) or document a reverse-proxy recipe.
+Also settle the open item about the dashboard for self-hosters in
+[decisions.md](../decisions.md#open-items) before 1.0.
 
 ## Cutting a release
 

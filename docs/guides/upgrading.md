@@ -1,12 +1,19 @@
 # Upgrading
 
+> **TL;DR** — Read the changelog, take a backup, then pull the new image (or binary) and restart.
+> Migrations run automatically at startup and only move forward, so rolling back means restoring
+> the backup.
+
+**Read this if:** you run your own instance and a new version is out.
+
 ## Before you upgrade
 
-1. Read [CHANGELOG.md](../CHANGELOG.md) for the versions you skip. Before 1.0, minor versions
+1. Read [CHANGELOG.md](../../CHANGELOG.md) for the versions you skip. Before 1.0, minor versions
    (0.x) may contain breaking changes.
 2. **Take a backup.** Migrations only move forward.
    - On Cloud Run: `gcloud run jobs execute analytics-backup --args daily --region <region>`
-     writes a fresh standalone file to the backups bucket (see [DEPLOY.md](DEPLOY.md)).
+     writes a fresh standalone file to the backups bucket (see
+     [backups in the runbook](../operations/runbook.md#restore-the-database-from-a-backup)).
    - With Litestream elsewhere, the replica already is a backup; confirm it is recent.
    - Otherwise copy the SQLite file while the server is stopped, or use
      `sqlite3 analytics.db ".backup backup.db"`. Copying the file of a running server can give an
@@ -51,7 +58,7 @@ far back as its retention (hours); for anything older, use a standalone backup f
 
 Cloud Run runs the old and new revision side by side for a moment. The new one restores from the
 replica while the old one still serves, so events from those seconds can be lost. Deploy when
-traffic is quiet. See [DEPLOY.md](DEPLOY.md).
+traffic is quiet. See [deploy-gcp.md](deploy-gcp.md) and the [runbook](../operations/runbook.md#known-trade-offs).
 
 Rolling back a Cloud Run revision (`gcloud run services update-traffic`) runs the old binary
 against a database the new one may already have migrated. That only works when the release notes

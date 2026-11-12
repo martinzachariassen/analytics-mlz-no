@@ -12,8 +12,10 @@ import { api, type Site } from "@/lib/api"
 import { formatNumber } from "@/lib/format"
 import { periodRange } from "@/lib/period"
 import { useSites } from "@/lib/queries"
+import { useTitle } from "@/lib/use-title"
 
 export function SitesPage() {
+  useTitle("Sites")
   const sites = useSites()
   const count = sites.data?.length
 

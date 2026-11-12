@@ -71,10 +71,15 @@ direct Cloud Run URL and self-hosted instances get them without a proxy.
 | `GET` | `/healthz` | Health check: `200 {"status":"ok"}`, or `503` when the database does not answer within 2 seconds |
 
 `GET /healthz` is JSON and never cached (`Cache-Control: no-store`). Probes only need the
-status code:
+status code. `200` body:
 
 ```json
 { "status": "ok" }
+```
+
+`503` body:
+
+```json
 { "status": "unavailable", "error": "database unavailable" }
 ```
 

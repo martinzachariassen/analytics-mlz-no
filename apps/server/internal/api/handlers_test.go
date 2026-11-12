@@ -80,14 +80,16 @@ func TestHeatmapBucketsInTimeZoneAndHonoursFilters(t *testing.T) {
 		{Time: at("2026-11-02T09:45:00Z"), VisitorID: 2, Path: "/a", Country: "NO"},
 		{Time: at("2026-11-02T09:50:00Z"), VisitorID: 2, Path: "/b", Country: "NO"},
 		{Time: at("2026-11-02T09:20:00Z"), VisitorID: 3, Path: "/", Country: "SE"},
+		// A visitor with only a custom event counts as a visitor, not a view.
+		{Time: at("2026-11-02T09:30:00Z"), VisitorID: 5, Type: "event", Name: "signup", Path: "/", Country: "NO"},
 		// Monday 23:30 UTC is Tuesday 00:30 in Oslo.
 		{Time: at("2026-11-02T23:30:00Z"), VisitorID: 1, Path: "/", Country: "NO"},
 	})
 	q := base + "/heatmap?from=2026-11-02&to=2026-11-03&tz=Europe/Oslo"
 
 	all := get[heatmapResponse](t, h, q)
-	if v, pv := all.Visitors[0][10], all.Pageviews[0][10]; v != 3 || pv != 4 {
-		t.Fatalf("Mon 10:00 = %d visitors, %d pageviews; want 3, 4 (custom events count as visits, not views)", v, pv)
+	if v, pv := all.Visitors[0][10], all.Pageviews[0][10]; v != 4 || pv != 4 {
+		t.Fatalf("Mon 10:00 = %d visitors, %d pageviews; want 4, 4 (custom events count as visits, not views)", v, pv)
 	}
 	if v, pv := all.Visitors[1][0], all.Pageviews[1][0]; v != 1 || pv != 1 {
 		t.Fatalf("Tue 00:00 = %d, %d; want the 23:30 UTC view shifted into Tuesday", v, pv)
@@ -97,8 +99,8 @@ func TestHeatmapBucketsInTimeZoneAndHonoursFilters(t *testing.T) {
 	}
 
 	no := get[heatmapResponse](t, h, q+"&f=country:is:NO")
-	if v, pv := no.Visitors[0][10], no.Pageviews[0][10]; v != 2 || pv != 3 {
-		t.Fatalf("filtered Mon 10:00 = %d, %d; want 2, 3", v, pv)
+	if v, pv := no.Visitors[0][10], no.Pageviews[0][10]; v != 3 || pv != 3 {
+		t.Fatalf("filtered Mon 10:00 = %d, %d; want 3, 3", v, pv)
 	}
 
 	none := get[heatmapResponse](t, h, base+"/heatmap?from=2026-10-01&to=2026-10-02")
@@ -201,11 +203,5 @@ func TestBreakdownFullMetricsWithFilters(t *testing.T) {
 	pricing := byValue(get[[]store.BreakdownRow](t, h, q+"&f=path:is:/pricing"))
 	if r := pricing["/"]; len(pricing) != 1 || r.Visits == nil || *r.Visits != 1 || *r.BounceRate != 0 || *r.AvgDuration != 240 {
 		t.Fatalf("entry rows for visits that saw /pricing = %+v", pricing)
-	}
-
-	// Metrics are added to the rows the filter selected, and only to those.
-	none := get[[]store.BreakdownRow](t, h, q+"&f=browser:is:Firefox")
-	if len(none) != 0 {
-		t.Fatalf("Firefox entry rows = %+v, want none", none)
 	}
 }

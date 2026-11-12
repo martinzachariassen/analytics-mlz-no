@@ -24,7 +24,8 @@ This page records the architectural decisions and open items. Read it before lar
 | Dimensions (v1) | Views, uniques, bounce rate, top pages, referrer + UTM, browser/OS/device, country (DB-IP Lite, CC BY 4.0). |
 | Retention | Keep forever by default; `RETENTION_DAYS` deletes older events. |
 | Infra | Terraform, new GCP project. |
-| CI | GitHub Actions: Go test + golangci-lint + web build. |
+| CI | GitHub Actions running `scripts/verify.sh` (the same file as `make verify`), one group per job, plus a docs link check, `govulncheck`, `bun audit` and a Docker build. |
+| Tooling | Tool versions pinned in `mise.toml`; one Bun workspace (`apps/web`, `apps/tracker`) with a root `bun.lock`; Biome for TypeScript formatting and linting, gofmt and golangci-lint for Go. |
 
 ## Milestones
 

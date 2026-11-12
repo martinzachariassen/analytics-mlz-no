@@ -1,6 +1,4 @@
-import { useEffect } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { useNavigate, useParams } from "react-router"
 import {
   CalendarDays,
   GitCompare,
@@ -9,6 +7,8 @@ import {
   Moon,
   X,
 } from "lucide-react"
+import { useEffect } from "react"
+import { useNavigate, useParams } from "react-router"
 
 import { VIEWS } from "@/components/app-sidebar"
 import { useTheme } from "@/components/theme-provider"

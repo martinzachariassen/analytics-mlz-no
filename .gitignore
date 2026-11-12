@@ -10,9 +10,10 @@
 *.mmdb
 /data/
 
-# Node
+# Node / Bun
 node_modules/
 dist/
+*.log
 
 # Firebase CLI cache
 .firebase/

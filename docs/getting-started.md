@@ -1,6 +1,6 @@
 # Getting started
 
-> **TL;DR** — Install Go, Node and Python 3, run `make dev`, then open <http://localhost:5173> and
+> **TL;DR** — Run `mise install && bun install`, then `make dev`, then open <http://localhost:5173> and
 > click **Open demo dashboard**. You get two demo sites with two years of synthetic traffic and a
 > demo page that sends real events. No accounts, no configuration.
 
@@ -11,15 +11,15 @@ will have seen every part of the system working, and you will know where to look
 
 | Tool | Version | Why |
 |---|---|---|
-| Go | as in `apps/server/go.mod` | The server |
-| Node + npm | as in `.github/workflows/ci.yml` | Dashboard dev server, tracker build and tests |
+| [mise](https://mise.jdx.dev) | any | Installs every other tool at the version pinned in `mise.toml`: Go (the server), Bun and Node (dashboard and tracker), Terraform and the linters |
 | Python 3 | any | Serves the demo site (`python3 -m http.server`) |
 | Docker | optional | Only to test the production image |
 
-Install the JavaScript dependencies once:
+Install the tools and the JavaScript dependencies once:
 
 ```sh
-(cd apps/web && npm ci) && (cd apps/tracker && npm ci)
+mise install    # Go, Bun, Node, Terraform, linters (versions in mise.toml)
+bun install     # one Bun workspace for apps/web and apps/tracker; also enables the pre-commit hook
 ```
 
 ## 2. Start everything
@@ -98,7 +98,7 @@ without `-H Origin` (`400`) to see the filters at work. Why they behave that way
 - **Server:** edit Go code, stop `make dev` with <kbd>Ctrl+C</kbd> and start it again.
 - **Dashboard:** edit `apps/web/src`. Vite reloads the browser.
 - **Tracking script:** edit `apps/tracker/src`, run `make tracker`, and restart.
-- **Before a pull request:** `make test && make lint`. See [CONTRIBUTING.md](../CONTRIBUTING.md).
+- **Before a pull request:** `make verify`, the same checks CI runs. See [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 Start over with fresh data: `make dev-reset && make dev`.
 

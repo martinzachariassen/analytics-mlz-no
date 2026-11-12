@@ -1,0 +1,11 @@
+#!/bin/sh
+# Installed by `bun install` (package.json "prepare" sets core.hooksPath). Skip once with
+# `git commit --no-verify`.
+set -e
+
+if ! command -v bun >/dev/null 2>&1 || [ ! -x node_modules/.bin/biome ]; then
+  echo "pre-commit: bun or Biome is missing. Run 'mise install && bun install' at the repository root." >&2
+  exit 1
+fi
+
+bun run lint

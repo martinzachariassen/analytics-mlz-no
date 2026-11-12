@@ -42,15 +42,16 @@ All notable changes are documented here. The format follows
 - Terraform: scheduled backups never ran. The scheduler's service account had `roles/run.invoker`, but the schedules pass `args` as an override, which needs `roles/run.jobsExecutorWithOverrides`. A new alert (`alert_email`) fires when no backup has succeeded for two hours.
 
 ### Changed
+- Tooling: every tool is pinned in `mise.toml` (`mise install`), JavaScript packages are one Bun workspace (`bun install`), Biome replaces eslint and prettier, a pre-commit hook runs `bun run lint`, and `scripts/verify.sh` (`make verify`) is the one quality gate that CI runs too, including Terraform `fmt`/`validate`, shellcheck, hadolint and actionlint.
 - `404`, `405` and `429` responses are JSON like the API's other errors.
 - Statistics queries are cancelled after 10 seconds.
 - Site creation, changes, deletion and purges are logged with the signed-in user.
 - `ReadJSON` rejects trailing data after the JSON body.
-- Dashboard: `make web TRACKER_ORIGIN=https://t.example.com` builds the "Tracking code" page with that host in the snippet (`docs/guides/deploy-gcp.md`). Vite refuses to start on another port than 5173, since the OAuth callback names it. `shadcn`, `tailwindcss` and `@tailwindcss/vite` are dev dependencies, so `npm audit --omit=dev` covers only what ships.
-- Tracker: CI fails if the gzipped script grows past 1024 bytes (`npm run check-size`). It is now 1.9 KB minified and 1.0 KB gzipped.
+- Dashboard: `make web TRACKER_ORIGIN=https://t.example.com` builds the "Tracking code" page with that host in the snippet (`docs/guides/deploy-gcp.md`). Vite refuses to start on another port than 5173, since the OAuth callback names it. `shadcn`, `tailwindcss` and `@tailwindcss/vite` are dev dependencies, so `bun audit --prod` covers only what ships.
+- Tracker: CI fails if the gzipped script grows past 1024 bytes (`bun run check-size`). It is now 1.9 KB minified and 1.0 KB gzipped.
 - More `golangci-lint` linters (`gocritic`, `noctx`, `sqlclosecheck`, `rowserrcheck`, `nilerr`, `usestdlibvars`, `unparam`, `perfsprint`, `exhaustive`, `contextcheck`).
 - Server logs use `severity` and `message` instead of `level` and `msg`, so Cloud Logging shows the level and `severity>=ERROR` finds app errors. Update log queries that matched on `msg` or `level`.
-- Dependencies updated: Litestream 0.5.18 in the Docker image, `modernc.org/sqlite` 1.62.0, and the dashboard's npm packages (Vite 8.3, Tailwind 4.3, TanStack Query 5.107).
+- Dependencies updated: Litestream 0.5.18 in the Docker image, `modernc.org/sqlite` 1.62.0, and the dashboard's JavaScript packages (Vite 8.3, Tailwind 4.3, TanStack Query 5.107).
 
 ## [0.1.0] - 2026-11-04
 

@@ -12,10 +12,15 @@
 
 ```sh
 make dev                                  # API + dashboard on :5173 + demo site, seeded data
+./scripts/verify.sh lint web              # what CI checks: Biome, then types, tests and build
 cd apps/web
-npm run typecheck && npm run lint         # what CI checks
-npm test                                  # vitest unit tests
+bun run typecheck
+bun run test                              # vitest unit tests
 ```
+
+Packages come from `bun install` at the repository root (one Bun workspace for `apps/web` and
+`apps/tracker`). Formatting and linting is Biome (`biome.json` at the root); `make format` fixes
+both TypeScript and Go.
 
 The Vite dev server proxies `/api` to `http://localhost:8080` (override with `API_PROXY`). In
 production, Firebase Hosting does the same rewrite, so the dashboard always calls the API on its
@@ -151,9 +156,9 @@ Use these before writing new layout:
 - The series colours have a fixed order, checked for colour vision deficiency in both themes.
   Do not reorder them or add colours without checking again.
 - Type is Geist and Geist Mono. `src/styles/mlz-brand.css` only provides the wordmark font.
-- shadcn components: add with `npx shadcn@latest add <name>`. Change their look in
-  `index.css` through `[data-slot="…"]` selectors, not by editing files in `components/ui/`, so
-  they can be regenerated.
+- shadcn components: add with `bunx shadcn@latest add <name>` (in `apps/web`). Change their look
+  in `index.css` through `[data-slot="…"]` selectors, not by editing files in `components/ui/`,
+  so they can be regenerated. Biome does not format or lint that folder.
 
 ## Recipes
 

@@ -1,5 +1,5 @@
-import { Link } from "react-router"
 import { ArrowUpRight, ListFilter } from "lucide-react"
+import { Link } from "react-router"
 
 import { BarList } from "@/components/bar-list"
 import { Delta } from "@/components/delta"
@@ -15,11 +15,11 @@ import {
 } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { Dimension, FilterDim, Scope } from "@/lib/api"
-import { DIMS, DIM_VIEW, formatValue } from "@/lib/dims"
+import { DIM_VIEW, DIMS, formatValue } from "@/lib/dims"
 import { formatPercent } from "@/lib/format"
 import { METRIC, type MetricKey } from "@/lib/metrics"
 import { useBreakdown, useStats } from "@/lib/queries"
-import { useScope, type Detail } from "@/lib/use-scope"
+import { type Detail, useScope } from "@/lib/use-scope"
 
 /** What to break a value down by, per kind of dimension. */
 const RELATED: Record<string, Dimension[]> = {

@@ -1,7 +1,7 @@
-import type { ReactNode } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { Link, Navigate, useSearchParams } from "react-router"
 import { ArrowRight, CircleAlert } from "lucide-react"
+import type { ReactNode } from "react"
+import { Link, Navigate, useSearchParams } from "react-router"
 
 import { Wordmark } from "@/components/brand-mark"
 
@@ -339,7 +339,7 @@ function DashboardPreview() {
         ].map(([label, value, delta], i) => (
           <div
             key={label}
-            className={"flex flex-col gap-2 p-4 " + (i < 2 ? "border-r" : "")}
+            className={`flex flex-col gap-2 p-4 ${i < 2 ? "border-r" : ""}`}
           >
             <span className="eyebrow">{label}</span>
             <span className="figure text-[26px]">{value}</span>
@@ -352,6 +352,7 @@ function DashboardPreview() {
           viewBox={`0 0 ${w} ${h}`}
           className="h-28 w-full"
           preserveAspectRatio="none"
+          aria-hidden="true"
         >
           <polygon
             points={`0,${h} ${pts} ${w},${h}`}

@@ -88,7 +88,9 @@ See [docs/development/dashboard.md](docs/development/dashboard.md).
 | `infra/docker` | `Dockerfile` (static binary, DB-IP database, Litestream), `entrypoint.sh`, `docker-compose.yml`, `test-restore.sh`, `backup.sh` |
 | `infra/terraform/bootstrap` | GCP project, APIs, state bucket, budget |
 | `infra/terraform/main` | Cloud Run service and backup job, buckets, Secret Manager, Firebase Hosting, monitoring dashboard and alerts |
-| `.github/workflows` | `ci.yml` (Go, tracker, web, Docker, security) and `release.yml` (images and binaries on tag) |
+| `.github/workflows` | `ci.yml` (one job per `scripts/verify.sh` group, plus docs links, Docker, security) and `release.yml` (images and binaries on tag) |
+| `scripts/verify.sh` | The quality gate: groups `lint`, `go`, `tracker`, `web`, `infra`. `make verify` and CI run it |
+| `mise.toml`, `package.json`, `bun.lock`, `biome.json`, `.githooks/` | Pinned tool versions, the Bun workspace (`apps/web`, `apps/tracker`), Biome config, the pre-commit hook |
 
 ## Data model
 

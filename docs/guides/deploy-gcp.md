@@ -30,7 +30,7 @@ to GCS, which come to roughly $1 a month. The hourly and daily backups add a few
 
 - `gcloud`, signed in as an account that can create projects and use a billing account:
   `gcloud auth login && gcloud auth application-default login`
-- Terraform ≥ 1.9, Docker with `buildx`, Node (for the dashboard build), and the Firebase CLI (`firebase login`)
+- Terraform ≥ 1.9, Docker with `buildx`, and Bun for the dashboard build (`mise install && bun install` gives you the pinned Terraform and Bun, plus the Firebase CLI as a dev dependency). Sign in to Firebase once with `bunx firebase-tools login`
 - A domain whose DNS you control, e.g. `analytics.example.com`. Optionally a second, short host for the tracking script (see [Extra domains](#extra-domains))
 - A **GitHub OAuth App** (Settings → Developer settings → OAuth Apps):
   - Homepage URL: `https://<domain>`

@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react"
 import { geoEqualEarth, geoPath } from "d3-geo"
-import { feature } from "topojson-client"
 import type { Feature, FeatureCollection, Geometry } from "geojson"
-import type { GeometryCollection, Topology } from "topojson-specification"
 import countries from "i18n-iso-countries"
+import { useMemo, useState } from "react"
+import { feature } from "topojson-client"
+import type { GeometryCollection, Topology } from "topojson-specification"
 import atlas from "world-atlas/countries-110m.json"
 
 import { ramp } from "@/components/heatmap"
@@ -82,6 +82,7 @@ export function WorldMap({
         {all.map((s) => {
           const v = byCode.get(s.alpha2) ?? 0
           return (
+            // biome-ignore lint/a11y/noStaticElementInteractions: an SVG path is the only clickable shape a map has; it gets a role, a label and a key handler
             <path
               key={s.id}
               d={s.d}

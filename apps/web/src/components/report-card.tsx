@@ -1,10 +1,10 @@
-import { useState, type ReactNode } from "react"
+import { type ReactNode, useState } from "react"
 
 import { BarList, ViewAll } from "@/components/bar-list"
 import { ErrorNote } from "@/components/error-note"
 import { Panel, TextTabs } from "@/components/panel"
 import type { Dimension } from "@/lib/api"
-import { DIMS, DIM_VIEW, isFilterDim } from "@/lib/dims"
+import { DIM_VIEW, DIMS, isFilterDim } from "@/lib/dims"
 import { useBreakdown } from "@/lib/queries"
 import { useScope } from "@/lib/use-scope"
 

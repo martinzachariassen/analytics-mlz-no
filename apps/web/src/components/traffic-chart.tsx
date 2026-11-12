@@ -10,9 +10,9 @@ import {
 } from "recharts"
 
 import {
+  type ChartConfig,
   ChartContainer,
   ChartTooltip,
-  type ChartConfig,
 } from "@/components/ui/chart"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { Interval, Stats } from "@/lib/api"

@@ -88,7 +88,8 @@ export function RealtimePage() {
                 cursor={{ fill: "var(--ui-accent)" }}
                 content={({ active, payload }) => {
                   const pt = payload?.[0]?.payload as
-                    (typeof data)[number] | undefined
+                    | (typeof data)[number]
+                    | undefined
                   if (!active || !pt) return null
                   return (
                     <TipBox>

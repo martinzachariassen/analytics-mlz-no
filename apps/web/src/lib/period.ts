@@ -134,7 +134,9 @@ export const INTERVALS: Record<Interval, string> = {
 
 export function isDay(v: string | null): v is string {
   return (
-    v !== null && /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(parseISO(v).getTime())
+    v !== null &&
+    /^\d{4}-\d{2}-\d{2}$/.test(v) &&
+    !Number.isNaN(parseISO(v).getTime())
   )
 }
 

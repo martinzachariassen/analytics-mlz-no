@@ -11,13 +11,14 @@ To *use* the script, read [guides/tracking.md](../guides/tracking.md) instead.
 ## The basics
 
 ```sh
+bun install                  # once, at the repository root (Bun workspace)
 cd apps/tracker
-npm ci
-npm test            # vitest with happy-dom
-npm run typecheck
-npm run size        # build, then check the gzipped size (fails above 1024 bytes)
-npm run check-size  # the same check without rebuilding (what CI runs)
-cd ../.. && make tracker   # build script.js (same as npm run build)
+bun run test                 # vitest with happy-dom
+bun run typecheck
+bun run size                 # build, then check the gzipped size (fails above 1024 bytes)
+bun run check-size           # the same check without rebuilding
+cd ../.. && make tracker     # build script.js (same as bun run build)
+./scripts/verify.sh tracker  # everything CI checks for the tracker
 ```
 
 After `make tracker`, restart the server (it embeds the file at build time) and commit
@@ -62,7 +63,7 @@ lets the server keep only what it needs.
 
 - **No cookies, no storage writes, no fingerprinting.** The only storage read is the
   `mlz_ignore` opt-out. See [privacy.md](../privacy.md).
-- **Small.** Check `npm run size` before and after. Every byte is downloaded on every tracked
+- **Small.** Check `bun run size` before and after. Every byte is downloaded on every tracked
   page. Prefer removing code to adding options.
 - **Never throw on the host page.** Failures to send are swallowed.
 - **ES2022** is the build target (Safari 15.4+, Chrome 94+, Firefox 93+).
@@ -83,8 +84,9 @@ package `internal/script` embeds the result with `//go:embed`, gzips it once at 
 serves it with an `ETag` and `Cache-Control: public, max-age=3600`. A change can therefore take
 up to an hour (plus CDN caching) to reach visitors.
 
-CI (`.github/workflows/ci.yml`, job `tracker`) runs typecheck and tests, rebuilds, fails if
-`git diff` shows that `script.js` changed, and then runs `npm run check-size`.
+CI (`.github/workflows/ci.yml`, job `tracker`) runs `./scripts/verify.sh tracker`: typecheck and
+tests, a rebuild that fails if the committed `script.js` changed, and then `bun run check-size`.
+`make verify` runs the same steps locally.
 
 </details>
 

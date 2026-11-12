@@ -1,6 +1,6 @@
 module github.com/martinzachariassen/analytics-mlz-no/apps/server
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/mileusna/useragent v1.3.5

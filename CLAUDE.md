@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Self-hostable, cookie-free web analytics. Plan and all architectural decisions: `docs/PLAN.md` — read it before larger changes.
+Self-hostable, cookie-free web analytics. Read `ARCHITECTURE.md` (code map, invariants) and `docs/decisions.md` (architectural decisions) before larger changes. Docs index: `docs/README.md`.
 
 ## Layout
 
@@ -8,7 +8,7 @@ Monorepo: `apps/` holds everything that runs (`server`, `web`, `tracker`, `demo`
 
 - `apps/server/cmd/analytics` — main binary (`serve`, `sites add|list`, `events purge`, `sessions revoke`, `seed`, `version`)
 - `apps/server/internal/` — `config`, `store` (SQLite + embedded migrations, stats queries), `ingest` (POST /api/event), `visitor` (daily salt + hashing), `geo`, `httpx` (client IP, rate limit, JSON), `auth` (GitHub OAuth + sessions), `api` (sites + stats endpoints), `script` (embedded tracking script), `server` (router)
-- API reference: `docs/API.md`; privacy facts `docs/PRIVACY.md` (update when stored fields change); release process `docs/RELEASING.md` + `.github/workflows/release.yml`; `CHANGELOG.md` gets a line per user-visible change
+- Docs: API `docs/reference/api.md`; env/Terraform vars `docs/reference/configuration.md`; CLI `docs/reference/cli.md`; privacy facts `docs/privacy.md` (update when stored fields change); operations `docs/operations/runbook.md`; release process `docs/development/releasing.md` + `.github/workflows/release.yml`; `CHANGELOG.md` gets a line per user-visible change. The "If you change…, update…" table in `CONTRIBUTING.md` says which page to update. Docs changes go in the same PR as the code.
 - `apps/server/internal/devdata` — synthetic traffic for `analytics seed`; `apps/demo/` — demo site for `make dev`
 - `infra/docker/` — Dockerfile, docker-compose, Litestream config, entrypoint, restore test
 - `apps/tracker/` — TypeScript tracking script (`src/core.ts` logic, `src/index.ts` entry). Built with esbuild into `apps/server/internal/script/script.js`, which is committed and embedded in the Go binary. Run `make tracker` after changes; CI fails if it's stale.
@@ -16,7 +16,7 @@ Monorepo: `apps/` holds everything that runs (`server`, `web`, `tracker`, `demo`
   - Structure: `routes/app-layout.tsx` (auth + sidebar shell), `routes/site/` (per-site views: overview, realtime, pages/sources/locations/devices via `report.tsx`, events; `layout.tsx` has the top bar). Period, comparison, interval, filters (`f=dim:op:value`) and the detail sheet (`detail=dim:value`) live in the URL via `lib/use-scope.ts`, shared by all views. Dimension labels in `lib/dims.ts`, metrics in `lib/metrics.ts`, query hooks in `lib/queries.ts`.
   - Look: Linear/Vercel-style, dark first (`index.html` + `theme-provider`). Neutral tokens, one violet accent, `--positive`/`--negative` for deltas, and `--series-1..6` as the categorical chart palette in fixed order (validated for colour vision deficiency in both themes; do not reorder). All defined in `src/index.css`; `src/styles/mlz-brand.css` only supplies the wordmark face. Type is Geist plus Geist Mono. shadcn components are restyled from `index.css` via `data-slot`, not by editing them.
   - App primitives: `panel.tsx`, `kpi-strip.tsx`, `traffic-chart.tsx`, `bar-list.tsx`, `data-table.tsx`, `report-card.tsx`, `filter-bar.tsx`, `date-range-picker.tsx`, `detail-sheet.tsx`, `delta.tsx`.
-- `infra/terraform/` — Terraform for GCP: `bootstrap` (project, APIs, state bucket, budget; local state) and `main` (Cloud Run, GCS replica bucket, Secret Manager, Firebase Hosting; GCS state). Deploy guide: `docs/DEPLOY.md`
+- `infra/terraform/` — Terraform for GCP: `bootstrap` (project, APIs, state bucket, budget; local state) and `main` (Cloud Run, GCS replica bucket, Secret Manager, Firebase Hosting; GCS state). Deploy guide: `docs/guides/deploy-gcp.md`
 
 ## Commands
 

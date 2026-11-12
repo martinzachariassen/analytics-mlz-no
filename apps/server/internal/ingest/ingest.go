@@ -187,7 +187,7 @@ func unavailable(w http.ResponseWriter) {
 
 // reject logs why an event was not stored. It records only coarse, non-identifying facts:
 // the reason, the status sent, the Origin's hostname and the site id from the payload. Never
-// the IP address or the user agent (see docs/PRIVACY.md). Floods log at DEBUG, so they only
+// the IP address or the user agent (see docs/privacy.md). Floods log at DEBUG, so they only
 // show up with LOG_LEVEL=debug.
 func (h *Handler) reject(r *http.Request, level slog.Level, reason string, status int, site string) {
 	if h.Log == nil || !h.Log.Enabled(r.Context(), level) {

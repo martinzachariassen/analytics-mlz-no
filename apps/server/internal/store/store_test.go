@@ -37,6 +37,11 @@ func TestNormalizeDomain(t *testing.T) {
 		"<b>.example.com":                 "",
 		"":                                "",
 		"https://":                        "",
+		"..":                              "",
+		".com":                            "",
+		"a..b.com":                        "",
+		"-a.com":                          "",
+		"a-.com":                          "",
 		strings.Repeat("a", 250) + ".com": "",
 	} {
 		if got := NormalizeDomain(in); got != want {

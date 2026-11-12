@@ -53,4 +53,6 @@
 Every page starts with a **TL;DR**, then the basics, then details. Advanced material is folded
 into collapsible sections. Code paths such as `apps/server/internal/ingest` are named so you can
 check every statement against the code. If you change behaviour, update the page that describes it
-(see [CONTRIBUTING](../CONTRIBUTING.md#documentation)).
+(see [CONTRIBUTING](../CONTRIBUTING.md#documentation)). CI checks that every relative link and
+anchor resolves, and Go tests check that every environment variable and API dimension is
+documented.

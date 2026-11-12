@@ -46,7 +46,8 @@ cd apps/web && npm run typecheck      # if the dashboard changed
 make tracker                          # if apps/tracker/src changed; commit script.js
 ```
 
-CI runs the same checks plus `govulncheck`, `npm audit`, a stale `script.js` check and a Docker build.
+CI runs the same checks plus `govulncheck`, `npm audit`, a stale `script.js` check, a docs link
+check and a Docker build.
 
 ## Rules of the codebase
 
@@ -85,6 +86,16 @@ style is described in [docs/README.md](docs/README.md#how-these-docs-are-written
 | A metric's meaning | [docs/concepts.md](docs/concepts.md) and `apps/web/src/lib/metrics.ts` |
 | An architectural decision | [docs/decisions.md](docs/decisions.md) |
 | Anything users notice | A line under "Unreleased" in [CHANGELOG.md](CHANGELOG.md) |
+
+Two kinds of checks catch the most common drift:
+
+- **Links.** The `docs` CI job runs [lychee](https://lychee.cli.rs) offline on every Markdown
+  file, so a renamed page or heading fails the build. Run it locally with
+  `lychee --offline --include-fragments '**/*.md'`.
+- **Reference tables.** `TestEveryVariableIsDocumented` (`internal/config`) fails when an
+  environment variable is missing from `configuration.md`, and `TestDimensionsAreDocumented`
+  (`internal/store`) when a dimension or filter operator is missing from `api.md`. Both run in
+  `make test`.
 
 ## Pull requests
 

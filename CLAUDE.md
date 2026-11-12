@@ -41,6 +41,7 @@ Tools are pinned in `mise.toml` (`mise install`); JavaScript packages are a Bun 
 - `make dev-web` — dashboard on :5173; set `PUBLIC_URL=http://localhost:5173` for the server
 - `docker compose -f infra/docker/docker-compose.yml up --build`
 - `infra/docker/test-restore.sh` — verifies Litestream backup/restore with the local Docker image; `infra/docker/test-backup.sh` — verifies `backup.sh`; `go run ./apps/server/cmd/loadtest` — ingest load test
+- `scripts/github-settings.sh` — GitHub settings and rulesets as code (`--check` for drift); a new CI job that runs on pull requests must be added to its required checks
 - `make deploy` — build/push the server image to Cloud Run and publish the dashboard to Firebase Hosting
 
 ## Conventions

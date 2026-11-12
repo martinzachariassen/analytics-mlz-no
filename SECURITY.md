@@ -56,7 +56,10 @@ the server guarantees instead:
   GitHub Actions by commit. CI scans the image with Trivy (accepted findings are listed with a
   reason and an expiry in `.trivyignore.yaml`) and runs CodeQL, `govulncheck` and `bun audit`.
   Releases carry an SBOM and signed build provenance, and Dependabot keeps every ecosystem
-  current.
+  current. `main` only changes through a pull request with signed commits and every check
+  green, administrators included, and release tags cannot be moved
+  (`scripts/github-settings.sh`); [OpenSSF Scorecard](https://scorecard.dev) grades these
+  practices weekly.
 
 What is not prevented: a distributed attack from many real IP addresses with browser-like
 requests can still add plausible-looking events, at up to the global rate. Purge them afterwards.

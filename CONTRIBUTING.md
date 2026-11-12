@@ -113,6 +113,7 @@ style is described in [docs/README.md](docs/README.md#how-these-docs-are-written
 | A package, invariant or data flow | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | A metric's meaning | [docs/concepts.md](docs/concepts.md) and `apps/web/src/lib/metrics.ts` |
 | An architectural decision | [docs/decisions.md](docs/decisions.md) |
+| A CI job that runs on pull requests, or a GitHub repository setting | `scripts/github-settings.sh` (required checks), then run it; [docs/development/releasing.md](docs/development/releasing.md#repository-settings) |
 | Anything users notice | A line under "Unreleased" in [CHANGELOG.md](CHANGELOG.md) |
 
 Two kinds of checks catch the most common drift:
@@ -130,6 +131,11 @@ Two kinds of checks catch the most common drift:
 - Keep them focused, one concern per pull request.
 - Add or update tests for behaviour changes.
 - Fill in the checklist in the pull request template.
+- Pull requests are squash-merged and the title becomes the commit on `main`, so write the title
+  as a [Conventional Commit](https://www.conventionalcommits.org/) (`feat(web): …`, `fix: …`).
+  Every check must pass on a branch that is up to date with `main`, and every review thread
+  must be resolved. The full list is in
+  [releasing.md](docs/development/releasing.md#repository-settings).
 
 ## Security issues
 

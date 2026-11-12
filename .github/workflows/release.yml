@@ -1,4 +1,4 @@
-name: Release
+name: Publish release
 
 # Publishes on a version tag: git tag v0.1.0 && git push origin v0.1.0
 # A tag with a suffix (v0.1.0-rc.1) is published as a pre-release and does not move `latest`.
@@ -15,9 +15,11 @@ permissions:
 
 jobs:
   ci:
+    name: CI
     uses: ./.github/workflows/ci.yml
 
   image:
+    name: Container image (GHCR)
     needs: ci
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -27,17 +29,22 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+      - name: Set up QEMU for arm64
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Log in to GHCR
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - id: meta
+      - name: Image tags and labels from the version tag
+        id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ghcr.io/${{ github.repository }}
@@ -47,11 +54,13 @@ jobs:
             type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
       # The GeoIP file is the month before the tagged commit: always published (a release on the
       # 1st cannot outrun DB-IP), and the same whenever this tag is rebuilt.
-      - id: month
+      - name: Pick the GeoIP month
+        id: month
         run: |
           first="$(git log -1 --format=%cd --date=format:%Y-%m-01)"
           echo "value=$(date -u -d "$first -1 month" +%Y-%m)" >> "$GITHUB_OUTPUT"
-      - id: build
+      - name: Build and push the image (amd64, arm64) with SBOM
+        id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
@@ -65,13 +74,15 @@ jobs:
           push: true
           sbom: true
           provenance: mode=max
-      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+      - name: Attest the image's build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
         with:
           subject-name: ghcr.io/${{ github.repository }}
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
 
   release:
+    name: Binaries and GitHub release
     needs: [ci, image]
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -80,10 +91,12 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
+      - name: Install the pinned tools (mise)
+        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
       # Static binaries (pure Go, no CGO). They contain no GeoIP database: set GEOIP_DB_PATH
       # to a DB-IP Lite country .mmdb file to record countries.
       - name: Build binaries
@@ -101,7 +114,8 @@ jobs:
             rm -r "dist/$name"
           done
           cd dist && sha256sum ./*.tar.gz > checksums.txt
-      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+      - name: Attest the binaries' build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
         with:
           subject-path: dist/*.tar.gz
       - name: Create GitHub release

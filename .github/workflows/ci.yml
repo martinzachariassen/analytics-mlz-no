@@ -15,75 +15,105 @@ concurrency:
 
 # Every job runs scripts/verify.sh with one group, so CI and `make verify` check the same things
 # with the same tool versions (mise.toml). Actions are pinned to commits; Dependabot bumps them.
+# Job names are the required checks in scripts/github-settings.sh: rename both together.
 jobs:
   lint:
+    name: Lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
-      - run: bun install --frozen-lockfile
-      - run: ./scripts/verify.sh lint
+      - name: Install the pinned tools (mise)
+        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
+      - name: Install JavaScript packages
+        run: bun install --frozen-lockfile
+      - name: Biome, gofmt and golangci-lint
+        run: ./scripts/verify.sh lint
 
   go:
+    name: Go tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
-      - run: ./scripts/verify.sh go
+      - name: Install the pinned tools (mise)
+        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
+      - name: Vet, test with the race detector and build the server
+        run: ./scripts/verify.sh go
 
   docs:
+    name: Docs links
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       # Relative links and #anchors only (--offline), so the job never fails on a flaky website.
-      - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+      - name: Check links and anchors in every Markdown file
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
           args: --offline --include-fragments --no-progress '**/*.md'
           fail: true
 
   tracker:
+    name: Tracker
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
-      - run: bun install --frozen-lockfile
-      - run: ./scripts/verify.sh tracker
+      - name: Install the pinned tools (mise)
+        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
+      - name: Install JavaScript packages
+        run: bun install --frozen-lockfile
+      - name: Types, tests, committed script.js is fresh, 1 KB gzip budget
+        run: ./scripts/verify.sh tracker
 
   web:
+    name: Dashboard
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
-      - run: bun install --frozen-lockfile
-      - run: ./scripts/verify.sh web
+      - name: Install the pinned tools (mise)
+        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
+      - name: Install JavaScript packages
+        run: bun install --frozen-lockfile
+      - name: Types, unit and component tests, build, size budgets
+        run: ./scripts/verify.sh web
 
   e2e:
+    name: Dashboard end-to-end
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
-      - run: bun install --frozen-lockfile
-      - run: cd apps/web && bunx playwright install --with-deps chromium
-      - run: ./scripts/verify.sh e2e
-      - if: failure()
+      - name: Install the pinned tools (mise)
+        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
+      - name: Install JavaScript packages
+        run: bun install --frozen-lockfile
+      - name: Install Chromium for Playwright
+        run: cd apps/web && bunx playwright install --with-deps chromium
+      - name: Playwright and axe against a seeded server
+        run: ./scripts/verify.sh e2e
+      - name: Upload Playwright traces
+        if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-traces
@@ -91,26 +121,34 @@ jobs:
           retention-days: 7
 
   infra:
+    name: Infra lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
-      - run: ./scripts/verify.sh infra
+      - name: Install the pinned tools (mise)
+        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
+      - name: Terraform fmt and validate, shellcheck, hadolint, actionlint
+        run: ./scripts/verify.sh infra
 
   # Builds the image for both platforms (arm64 under QEMU), scans it, and proves that the
   # Litestream restore and the standalone backup work end to end.
   docker:
+    name: Docker image
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Set up QEMU for arm64
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build (both platforms, not pushed)
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -134,25 +172,30 @@ jobs:
           ignore-unfixed: true
           severity: HIGH,CRITICAL
           trivyignores: .trivyignore.yaml
-      - run: sudo apt-get install -y --no-install-recommends sqlite3
+      - name: Install sqlite3 for the backup tests
+        run: sudo apt-get install -y --no-install-recommends sqlite3
       - name: Litestream restore works
         run: infra/docker/test-restore.sh
       - name: Standalone backup works
         run: infra/docker/test-backup.sh
 
   security:
+    name: Dependency audit
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
+      - name: Install the pinned tools (mise)
+        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
       - name: Known vulnerabilities in Go dependencies and the standard library
         working-directory: apps/server
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
-      - run: bun install --frozen-lockfile
+      - name: Install JavaScript packages
+        run: bun install --frozen-lockfile
       # Only what ships to users: production dependencies of the dashboard.
-      - name: bun audit (web)
+      - name: Known vulnerabilities in the dashboard's production packages
         working-directory: apps/web
         run: bun audit --audit-level=high --prod

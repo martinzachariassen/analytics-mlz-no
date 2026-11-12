@@ -3,6 +3,7 @@
 Lightweight, privacy-friendly, self-hostable web analytics written in Go.
 
 [![CI](https://github.com/martinzachariassen/analytics-mlz-no/actions/workflows/ci.yml/badge.svg)](https://github.com/martinzachariassen/analytics-mlz-no/actions/workflows/ci.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/martinzachariassen/analytics-mlz-no/badge)](https://scorecard.dev/viewer/?uri=github.com/martinzachariassen/analytics-mlz-no)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 - **Cookie-free and anonymous.** No IP addresses or user agents are stored. Visitors are counted with a hash that changes every day.

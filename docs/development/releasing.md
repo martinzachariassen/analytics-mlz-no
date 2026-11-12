@@ -60,17 +60,30 @@ Edit the generated notes afterwards if needed, copying the relevant part of the 
 - The first push of the package to GHCR is private by default: set its visibility to public under
   the repository's Packages settings once.
 
-## Repository settings (manual, once)
+## Repository settings
 
-Settings that cannot live in code:
+[`scripts/github-settings.sh`](../../scripts/github-settings.sh) applies the GitHub settings
+that cannot live in a workflow file, through the API, and is safe to run again. Run it as a
+repository admin after changing it; `scripts/github-settings.sh --check` only compares and exits
+with `1` on drift.
 
-- Description and topics (`analytics`, `privacy`, `self-hosted`, `go`, `sqlite`, `react`).
-- Branch protection on `main`: require a pull request and the CI jobs `lint`, `go`, `tracker`,
-  `web`, `infra`, `docker`, `security` and `CodeQL / analyze` to pass; enforce for administrators.
-- Enable private vulnerability reporting (Security → Advisories), which `SECURITY.md` points to.
-- Enable Dependabot alerts and security updates. The update schedule is in `.github/dependabot.yml`.
-- Code scanning uses the CodeQL workflow in the repo, not the default setup.
-- Create labels `bug` and `enhancement` (used by the issue templates), and `good first issue`.
+| Area | Setting |
+|---|---|
+| Merging | Squash only, with the pull request title as the commit title (so the title must be a Conventional Commit) and the branch's commit messages as the body. Branches are deleted after merge; "Update branch" and auto-merge are on. Wiki and Projects are off: the docs live in `docs/`. |
+| `main` ruleset | No direct pushes, force pushes or deletion; a pull request with every review thread resolved; linear history; signed commits (GitHub signs squash merges made on github.com); and these checks passing on a branch that is up to date with `main`: `Lint`, `Go tests`, `Docs links`, `Tracker`, `Dashboard`, `Dashboard end-to-end`, `Infra lint`, `Docker image`, `Dependency audit`, `CodeQL (go)`, `CodeQL (javascript-typescript)`, `CodeQL (actions)`. Repository admins can bypass it for an emergency fix or a stuck check; everyone else, Dependabot included, cannot. The checks are the jobs' `name:` in `ci.yml` and `codeql.yml`: a new or renamed job that runs on pull requests goes in the script's `checks` list too, because a required check that never runs blocks every pull request. |
+| `release tags` ruleset | Only admins create, move or delete `v*` tags. |
+| Security | Dependabot alerts and security updates (the schedule is in `.github/dependabot.yml`), private vulnerability reporting (which `SECURITY.md` points to), secret scanning with push protection. Generic-pattern detection and validity checks need GitHub Secret Protection, which this repository does not have, so the API ignores them. |
+| Actions | Every action must be pinned to a full commit SHA; `GITHUB_TOKEN` is read-only by default and cannot approve pull requests. |
+| Description and topics | Topics `analytics`, `web-analytics`, `privacy`, `cookie-free`, `self-hosted`, `go`, `sqlite`, `react`. |
+
+Also in the repository, not in the script: `.github/CODEOWNERS` (every pull request asks
+@martinzachariassen for review), code scanning through the CodeQL workflow rather than the
+default setup, and the [OpenSSF Scorecard](https://scorecard.dev) workflow
+(`.github/workflows/scorecard.yml`), which grades these settings weekly and on every push to
+`main`. The labels `bug`, `enhancement` and `good first issue` that the issue templates use
+exist already.
+
+Still manual: the GHCR package's visibility after the first release (see above).
 
 ## Performance reference
 

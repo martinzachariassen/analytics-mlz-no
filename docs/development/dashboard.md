@@ -139,16 +139,25 @@ back to `HTTP <status>`, because HTTP/2 has no status text). A `401` during a mu
 by `MutationCache.onError` the same way as for queries.
 
 **Error states.** A failed query shows `<ErrorNote>` (`components/error-note.tsx`) with the
-message, never a skeleton that loads forever. Use it in every new view: check `isError` before
-`isPending`. Pass the queries themselves: `ErrorNote` shows the first failure, and its "Try
-again" button refetches every query that failed (not the healthy ones). Give one note all the
-queries a view depends on, so a retry never leaves one of them broken:
+message, never a skeleton that loads forever. Use it in every new view and panel: check
+`isError` before `isPending`. Pass the queries themselves: `ErrorNote` renders nothing until one
+of them fails, then shows the first failure, and its "Try again" button refetches every query
+that failed (not the healthy ones). Give one note all the queries a view depends on, so a retry
+never leaves one of them broken:
 
 ```tsx
-{(stats.isError || rows.isError) && <ErrorNote queries={[stats, rows]} />}
+<ErrorNote queries={[stats, rows]} />
 ```
 
-`error` alone shows a message without a button, for panels whose query already has a note
+Panels below that note that need a failed query render `<Unavailable />` instead of their
+skeleton, so the failure is announced once and nothing waits forever. A panel with its own
+query (the heatmap, the overview map, the per-value series in `TopSeriesChart`) shows its own
+`ErrorNote` in place of the content.
+
+Only a click counts as retrying: the alert reads "Retrying…" until the refetches settle, so a
+retry that fails again is announced again, while background polls and refreshes leave it alone.
+The button uses `aria-disabled` rather than `disabled` during a retry so keyboard focus stays on
+it. `error` alone shows a message without a button, for panels whose query already has a note
 with a retry elsewhere on the page. `title` replaces "Could not load this" (the app shell uses
 "Could not reach the server").
 
@@ -228,8 +237,8 @@ There are three layers. Each one catches what the one before cannot.
 | Layer | Where | Runs with | What it covers |
 |---|---|---|---|
 | Unit | `src/lib/*.test.ts` | `bun run test` (vitest, Node) | The API client (error mapping, retry policy, headers, id encoding, query strings), URL state parsing and the `hasOwn` guards, period maths, metrics, dimensions, formatting, and the CSP hash of the theme script |
-| Component | `src/components/*.test.tsx` | `bun run test` (vitest, happy-dom, Testing Library) | Filter bar, date range picker and its shortcuts, detail sheet and `ErrorNote`, against a mocked `fetch`, with the URL as the observable state |
-| End to end | `e2e/*.spec.ts` | `bun run e2e` (Playwright) | The real Go server with seeded data and the production build: sign-in, every view of a site, filters, the detail sheet and settings, with an axe scan on every page |
+| Component | `src/components/*.test.tsx` | `bun run test` (vitest, happy-dom, Testing Library) | Filter bar, date range picker and its shortcuts, detail sheet and `ErrorNote` (retry, focus, no flip on background refetches), against a mocked `fetch`, with the URL as the observable state |
+| End to end | `e2e/*.spec.ts` | `bun run e2e` (Playwright) | The real Go server with seeded data and the production build: sign-in, every view of a site, filters, the detail sheet, settings, and a failed request recovering with "Try again", with an axe scan on every page |
 
 - **Unit tests:** put logic in `lib/` as plain functions when you can, so it is easy to test. If
   you edit the theme script in `index.html`, update its hash in `firebase.json`; `csp.test.ts`
@@ -249,6 +258,8 @@ There are three layers. Each one catches what the one before cannot.
   - Every test runs three times: desktop, mobile (Pixel 7) and the light theme.
   - `expectAccessible` fails on serious or critical WCAG 2.1 AA violations. Fix the cause (a
     token in `src/index.css`, a role, a label); don't exclude the rule.
+  - To test a failure, fail the request with `page.route(…)` and `route.fulfill({ status: 500 })`;
+    remember the query retries 5xx twice with backoff before the error shows.
   - On failure, `apps/web/test-results/` holds a trace (`bunx playwright show-trace …`). CI
     uploads it as the `playwright-traces` artifact.
 

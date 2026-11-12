@@ -107,3 +107,27 @@ test("settings shows the tracking code", async ({ page }) => {
   await expect(page.locator("pre").first()).toContainText("data-site")
   await expectAccessible(page)
 })
+
+test("a failed panel says so and recovers with Try again", async ({ page }) => {
+  let fail = true
+  await page.route("**/api/sites/*/heatmap*", (route) =>
+    fail
+      ? route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "database is locked" }),
+        })
+      : route.fallback()
+  )
+  await openSite(page, "Demo docs")
+  const alert = page.getByRole("alert")
+  // The query retries 5xx twice with backoff before giving up.
+  await expect(alert).toContainText("database is locked", { timeout: 15_000 })
+  await expect(alert).toHaveCount(1)
+
+  fail = false
+  await page.getByRole("button", { name: "Try again" }).click()
+  await expect(alert).toHaveCount(0)
+  await expect(page.getByText("Active hours")).toBeVisible()
+  await expectAccessible(page)
+})

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen } from "@testing-library/react"
+import { act, cleanup, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, type Mock, vi } from "vitest"
 
@@ -12,7 +12,6 @@ function query(error: Error | null = null) {
   return {
     error,
     isError: error !== null,
-    isFetching: false,
     refetch: vi.fn(),
   } as unknown as Retryable & { refetch: Mock }
 }
@@ -44,15 +43,33 @@ describe("ErrorNote", () => {
     expect(b.refetch).toHaveBeenCalledOnce()
     expect(ok.refetch).not.toHaveBeenCalled()
   })
-  it("is disabled and re-announces while retrying", () => {
+  it("re-announces and ignores clicks until the retry settles, keeping focus", async () => {
+    const q = query(new Error("boom"))
+    let settle = () => {}
+    q.refetch.mockReturnValue(new Promise<void>((r) => (settle = r)))
+    render(<ErrorNote queries={[q]} />)
+    const button = screen.getByRole("button", { name: "Try again" })
+
+    await userEvent.click(button)
+    expect(screen.getByRole("alert").textContent).toBe("Retrying…")
+    expect(button.getAttribute("aria-disabled")).toBe("true")
+    expect(document.activeElement).toBe(button)
+    await userEvent.click(button)
+    expect(q.refetch).toHaveBeenCalledOnce()
+
+    await act(async () => settle())
+    expect(screen.getByRole("alert").textContent).toContain("boom")
+    expect(button.getAttribute("aria-disabled")).toBe("false")
+  })
+  it("does not flip to retrying on background refetches", () => {
     const q = query(new Error("boom"))
     const { rerender } = render(<ErrorNote queries={[q]} />)
-    rerender(<ErrorNote queries={[{ ...q, isFetching: true }]} />)
-    expect(screen.getByRole("alert").textContent).toBe("Retrying…")
-    expect(
-      (screen.getByRole("button", { name: "Try again" }) as HTMLButtonElement)
-        .disabled
-    ).toBe(true)
+    rerender(<ErrorNote queries={[{ ...q, isFetching: true } as Retryable]} />)
+    expect(screen.getByRole("alert").textContent).toContain("boom")
+  })
+  it("renders nothing when nothing failed", () => {
+    const { container } = render(<ErrorNote queries={[query(), query()]} />)
+    expect(container.innerHTML).toBe("")
   })
   it("uses a custom title", () => {
     render(<ErrorNote error="down" title="Could not reach the server" />)

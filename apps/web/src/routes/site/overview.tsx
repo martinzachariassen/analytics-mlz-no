@@ -41,7 +41,7 @@ export function OverviewPage() {
   return (
     <div className="flex flex-col gap-3 lg:gap-4">
       <Insights stats={stats.data} />
-      {stats.isError && <ErrorNote queries={[stats]} className="py-2" />}
+      <ErrorNote queries={[stats]} className="py-2" />
       <KpiStrip
         stats={stats.data}
         metric={metric}
@@ -140,7 +140,9 @@ function MapCard({ className, total }: { className?: string; total?: number }) {
       className={className}
     >
       <Suspense fallback={<Skeleton className="aspect-2/1" />}>
-        {q.data ? (
+        {q.isError ? (
+          <ErrorNote queries={[q]} className="aspect-2/1 py-0" />
+        ) : q.data ? (
           <WorldMap
             rows={q.data}
             total={total}

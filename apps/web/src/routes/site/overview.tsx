@@ -41,14 +41,7 @@ export function OverviewPage() {
   return (
     <div className="flex flex-col gap-3 lg:gap-4">
       <Insights stats={stats.data} />
-      {stats.isError && (
-        <ErrorNote
-          error={stats.error}
-          onRetry={stats.refetch}
-          retrying={stats.isFetching}
-          className="py-2"
-        />
-      )}
+      {stats.isError && <ErrorNote queries={[stats]} className="py-2" />}
       <KpiStrip
         stats={stats.data}
         metric={metric}

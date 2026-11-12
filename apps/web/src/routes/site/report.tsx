@@ -108,20 +108,7 @@ export function ReportPage({ report }: { report: keyof typeof REPORTS }) {
   return (
     <div className="flex flex-col gap-3 lg:gap-4">
       <KpiStrip stats={stats.data} now={stats.dataUpdatedAt} />
-      {stats.isError && (
-        <ErrorNote
-          error={stats.error}
-          onRetry={stats.refetch}
-          retrying={stats.isFetching}
-        />
-      )}
-      {rows.isError && !stats.isError && (
-        <ErrorNote
-          error={rows.error}
-          onRetry={rows.refetch}
-          retrying={rows.isFetching}
-        />
-      )}
+      {(stats.isError || rows.isError) && <ErrorNote queries={[stats, rows]} />}
       {cfg.extra === "map" && (
         <Panel
           title="Visitor map"
@@ -183,19 +170,8 @@ export function EventsPage() {
   return (
     <div className="flex flex-col gap-3 lg:gap-4">
       <KpiStrip stats={stats.data} now={stats.dataUpdatedAt} />
-      {stats.isError && (
-        <ErrorNote
-          error={stats.error}
-          onRetry={stats.refetch}
-          retrying={stats.isFetching}
-        />
-      )}
-      {events.isError && !stats.isError && (
-        <ErrorNote
-          error={events.error}
-          onRetry={events.refetch}
-          retrying={events.isFetching}
-        />
+      {(stats.isError || events.isError) && (
+        <ErrorNote queries={[stats, events]} />
       )}
       <Panel
         title="Top events over time"
@@ -275,11 +251,7 @@ function Properties({
       }
     >
       {keys.isError || values.isError ? (
-        <ErrorNote
-          error={keys.error ?? values.error}
-          onRetry={() => (keys.isError ? keys.refetch() : values.refetch())}
-          retrying={keys.isFetching || values.isFetching}
-        />
+        <ErrorNote queries={[keys, values]} />
       ) : keys.data && keys.data.length === 0 ? (
         <p className="py-10 text-center text-xs text-fg-muted">
           This event has no properties.

@@ -28,8 +28,9 @@ TypeScript runs in strict mode with `noUncheckedIndexedAccess`: `rows[0]` is `Ro
 so handle the empty case instead of asserting it away with `!`.
 
 **Size budget.** After the production build, `bun run check-size` (`check-size.mjs`, part of
-the `web` verify group) fails when gzipped output grows past its budget: the entry script
-160 KB, CSS 25 KB, any lazy chunk 125 KB, all JavaScript 450 KB. Keep heavy libraries in lazy
+the `web` verify group) fails when gzipped output grows past its budget: the JavaScript
+`index.html` loads before the first render (entry script plus its `modulepreload`s) 215 KB, all
+CSS 25 KB, any single lazy chunk 125 KB, all JavaScript 450 KB. Keep heavy libraries in lazy
 routes or `lazy()` components (charts and the world map already are). If a budget has to grow,
 raise it in `check-size.mjs` and say why in the PR.
 
@@ -139,14 +140,17 @@ by `MutationCache.onError` the same way as for queries.
 
 **Error states.** A failed query shows `<ErrorNote>` (`components/error-note.tsx`) with the
 message, never a skeleton that loads forever. Use it in every new view: check `isError` before
-`isPending`, and pass the query's `refetch` and `isFetching` so the user gets a "Try again"
-button:
+`isPending`. Pass the queries themselves: `ErrorNote` shows the first failure, and its "Try
+again" button refetches every query that failed (not the healthy ones). Give one note all the
+queries a view depends on, so a retry never leaves one of them broken:
 
 ```tsx
-{q.isError && (
-  <ErrorNote error={q.error} onRetry={q.refetch} retrying={q.isFetching} />
-)}
+{(stats.isError || rows.isError) && <ErrorNote queries={[stats, rows]} />}
 ```
+
+`error` alone shows a message without a button, for panels whose query already has a note
+with a retry elsewhere on the page. `title` replaces "Could not load this" (the app shell uses
+"Could not reach the server").
 
 ## App primitives
 

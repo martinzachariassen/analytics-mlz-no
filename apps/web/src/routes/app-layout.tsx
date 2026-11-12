@@ -35,9 +35,8 @@ export function AppLayout() {
   if (me.isError) {
     return (
       <ErrorNote
-        error={me.error}
-        onRetry={me.refetch}
-        retrying={me.isFetching}
+        queries={[me]}
+        title="Could not reach the server"
         className="p-6"
       />
     )

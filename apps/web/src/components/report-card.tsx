@@ -58,14 +58,7 @@ export function ReportCard({
       }
     >
       {children?.(dim)}
-      {q.isError && (
-        <ErrorNote
-          error={q.error}
-          onRetry={q.refetch}
-          retrying={q.isFetching}
-          className="py-2"
-        />
-      )}
+      {q.isError && <ErrorNote queries={[q]} className="py-2" />}
       <BarList
         dim={dim}
         rows={q.data}

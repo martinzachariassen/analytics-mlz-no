@@ -331,12 +331,24 @@ func TestErrorsAreJSON(t *testing.T) {
 
 func TestHealthz(t *testing.T) {
 	h, _, st := setupWithStore(t)
-	if w := call(h, "GET", "/healthz", "", nil, ""); w.Code != http.StatusOK || w.Body.String() != "ok" {
-		t.Fatalf("healthz = %d %q", w.Code, w.Body)
+	health := func() (int, map[string]string, http.Header) {
+		w := call(h, "GET", "/healthz", "", nil, "")
+		var body map[string]string
+		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+			t.Fatalf("healthz body %q is not JSON: %v", w.Body, err)
+		}
+		return w.Code, body, w.Header()
+	}
+	code, body, hdr := health()
+	if code != http.StatusOK || body["status"] != "ok" {
+		t.Fatalf("healthz = %d %v", code, body)
+	}
+	if hdr.Get("Content-Type") != "application/json" || hdr.Get("Cache-Control") != "no-store" {
+		t.Fatalf("healthz headers = %v", hdr)
 	}
 	_ = st.Close()
-	if w := call(h, "GET", "/healthz", "", nil, ""); w.Code != http.StatusServiceUnavailable {
-		t.Fatalf("healthz with closed db = %d, want 503", w.Code)
+	if code, body, _ := health(); code != http.StatusServiceUnavailable || body["status"] != "unavailable" || body["error"] == "" {
+		t.Fatalf("healthz with closed db = %d %v, want 503 unavailable", code, body)
 	}
 }
 

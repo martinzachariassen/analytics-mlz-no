@@ -68,7 +68,20 @@ direct Cloud Run URL and self-hosted instances get them without a proxy.
 | `POST` | `/api/event` | Collect an event (used by `script.js`) |
 | `OPTIONS` | `/api/event` | CORS preflight: allows any origin, `POST`, `Content-Type` |
 | `GET` | `/api/script.js` | Tracking script (gzip, `ETag`, cached for an hour) |
-| `GET` | `/healthz` | Health check: `ok`, or `503` when the database does not answer |
+| `GET` | `/healthz` | Health check: `200 {"status":"ok"}`, or `503` when the database does not answer within 2 seconds |
+
+`GET /healthz` is JSON and never cached (`Cache-Control: no-store`). Probes only need the
+status code. `200` body:
+
+```json
+{ "status": "ok" }
+```
+
+`503` body:
+
+```json
+{ "status": "unavailable", "error": "database unavailable" }
+```
 
 `POST /api/event` body:
 

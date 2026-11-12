@@ -80,7 +80,7 @@ username that is renamed and registered again by someone else cannot take over a
 
 - `PUBLIC_URL` must be an origin (`https://analytics.example.com`, no path) and `https://` when
   sign-in is enabled. `http://localhost` is the exception.
-- Sessions last 7 days without use and are extended while in use.
+- Sessions last 7 days without use and are extended while in use, for at most 30 days.
 - Removing a username from `ALLOWED_GITHUB_USERS` signs that user out at their next request.
   `analytics sessions revoke [-user LOGIN]` does it immediately; see
   [cli.md](../reference/cli.md#sessions-revoke).

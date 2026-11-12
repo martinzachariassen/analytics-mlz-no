@@ -225,7 +225,8 @@ random id is used.
 **Authentication.** `/api/auth/{provider}/login` → GitHub (OAuth with PKCE S256, state valid for
 10 minutes) → `/callback` checks `ALLOWED_GITHUB_USERS`, binds the login to the GitHub account id
 on first sign-in, and sets `__session`. Sessions last 7 days without use (`auth.SessionTTL`) and
-are extended after a day of use (`SessionRenewAfter`). Only a hash of the token is stored.
+are extended after a day of use (`SessionRenewAfter`), up to 30 days after sign-in
+(`SessionMaxAge`). Only a hash of the token is stored.
 `auth.Service.Require` wraps every `/api/sites` route and checks the allowlist on every request,
 so removing a user signs them out. `analytics sessions revoke` deletes sessions directly.
 

@@ -297,6 +297,32 @@ func TestSessionSlidesWithUse(t *testing.T) {
 	}
 }
 
+// A session used every day still ends SessionMaxAge after the sign-in.
+func TestSessionMaxAge(t *testing.T) {
+	h := newHarness(t)
+	start := h.now
+	c := sessionCookie(h.signIn("martin"))
+
+	var last *http.Cookie
+	for h.now.Before(start.Add(SessionMaxAge - 2*24*time.Hour)) {
+		h.now = h.now.Add(25 * time.Hour)
+		w := h.do("GET", "/api/auth/me", c)
+		if w.Code != http.StatusOK {
+			t.Fatalf("day %d: me = %d, want 200", int(h.now.Sub(start).Hours()/24), w.Code)
+		}
+		if r := sessionCookie(w); r != nil {
+			last = r
+		}
+	}
+	if last == nil || !last.Expires.Equal(start.Add(SessionMaxAge)) {
+		t.Fatalf("last renewal expires %v, want the cap %v", last, start.Add(SessionMaxAge))
+	}
+	h.now = start.Add(SessionMaxAge + time.Second)
+	if me := h.do("GET", "/api/auth/me", c); me.Code != http.StatusUnauthorized {
+		t.Fatalf("me after max age = %d, want 401", me.Code)
+	}
+}
+
 func TestRemovedFromAllowlistIsSignedOut(t *testing.T) {
 	h := newHarness(t)
 	c := sessionCookie(h.signIn("martin"))

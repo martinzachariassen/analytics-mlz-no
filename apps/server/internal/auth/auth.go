@@ -36,6 +36,9 @@ const (
 	// SessionRenewAfter is how much of the lifetime must have passed before an
 	// authenticated request extends the session by a full SessionTTL.
 	SessionRenewAfter = 24 * time.Hour
+	// SessionMaxAge caps renewal: a sign-in ends this long after it started, however often
+	// it is used, so a leaked cookie stops working and the user signs in again.
+	SessionMaxAge = 30 * 24 * time.Hour
 	// stateTTL is how long the user has to complete the provider's sign-in page.
 	stateTTL    = 10 * time.Minute
 	statePrefix = "oauth."
@@ -61,8 +64,8 @@ type Provider interface {
 // Store is the persistence used by auth.
 type Store interface {
 	LoginUser(ctx context.Context, provider, providerID, login string, now time.Time) (store.User, error)
-	CreateSession(ctx context.Context, tokenHash []byte, userID int64, expires time.Time) error
-	UserBySession(ctx context.Context, tokenHash []byte, now time.Time) (store.User, time.Time, error)
+	CreateSession(ctx context.Context, tokenHash []byte, userID int64, created, expires time.Time) error
+	UserBySession(ctx context.Context, tokenHash []byte, now time.Time) (store.User, store.Session, error)
 	ExtendSession(ctx context.Context, tokenHash []byte, expires time.Time) error
 	DeleteSession(ctx context.Context, tokenHash []byte) error
 	DeleteUserSessions(ctx context.Context, userID int64) error
@@ -104,7 +107,7 @@ func UserFrom(ctx context.Context) (store.User, bool) {
 
 // Require rejects requests without a valid session with 401. The allowlist is checked on
 // every request, so removing a user from it signs them out at once; their sessions are
-// deleted. Sessions older than SessionRenewAfter are extended.
+// deleted. Sessions older than SessionRenewAfter are extended, but never past SessionMaxAge.
 func (s *Service) Require(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c, err := r.Cookie(CookieName)
@@ -114,7 +117,7 @@ func (s *Service) Require(next http.Handler) http.Handler {
 		}
 		now := s.now()
 		hash := hashToken(c.Value)
-		u, expires, err := s.Store.UserBySession(r.Context(), hash, now)
+		u, sess, err := s.Store.UserBySession(r.Context(), hash, now)
 		if errors.Is(err, store.ErrNotFound) {
 			httpx.Error(w, http.StatusUnauthorized, "not signed in")
 			return
@@ -131,14 +134,27 @@ func (s *Service) Require(next http.Handler) http.Handler {
 			httpx.Error(w, http.StatusUnauthorized, "not signed in")
 			return
 		}
-		if expires.Sub(now) < SessionTTL-SessionRenewAfter {
-			renewed := now.Add(SessionTTL)
+		if renewed := renewal(now, sess); renewed.After(sess.Expires) {
 			if err := s.Store.ExtendSession(r.Context(), hash, renewed); err == nil {
 				http.SetCookie(w, s.cookie(c.Value, renewed))
 			}
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), contextKey{}, u)))
 	})
+}
+
+// renewal returns the expiry a request at now should give the session: a full SessionTTL from
+// now once SessionRenewAfter has passed since the last renewal, capped at SessionMaxAge after
+// the sign-in. A result that is not after sess.Expires means no change.
+func renewal(now time.Time, sess store.Session) time.Time {
+	if sess.Expires.Sub(now) >= SessionTTL-SessionRenewAfter {
+		return sess.Expires
+	}
+	renewed := now.Add(SessionTTL)
+	if limit := sess.Created.Add(SessionMaxAge); renewed.After(limit) {
+		renewed = limit
+	}
+	return renewed
 }
 
 // config tells the dashboard which sign-in options exist.
@@ -213,8 +229,9 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	token := newToken()
-	expires := s.now().Add(SessionTTL)
-	if err := s.Store.CreateSession(ctx, hashToken(token), u.ID, expires); err != nil {
+	now := s.now()
+	expires := now.Add(SessionTTL)
+	if err := s.Store.CreateSession(ctx, hashToken(token), u.ID, now, expires); err != nil {
 		s.Log.Error("create session", "err", err)
 		s.fail(w, r, errFailed)
 		return

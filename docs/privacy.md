@@ -95,8 +95,9 @@ server checks hourly.
 ## Dashboard users
 
 Signing in uses GitHub OAuth. The database stores the GitHub username and numeric account id for
-each user who has signed in, and a SHA-256 hash of each session token. No passwords, emails or
-access tokens are stored. A session lasts 7 days without use and is extended while it is used;
+each user who has signed in, and a SHA-256 hash of each session token with when it was created and
+when it expires. No passwords, emails or access tokens are stored. A session lasts 7 days without
+use and is extended while it is used, for at most 30 days after the sign-in;
 removing a user from `ALLOWED_GITHUB_USERS` ends their sessions at their next request, and
 `analytics sessions revoke` ends them at once.
 

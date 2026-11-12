@@ -44,7 +44,7 @@ func setupWithStore(t *testing.T) (http.Handler, *http.Cookie, *store.Store) {
 	}
 	token := "test-session-token"
 	sum := sha256.Sum256([]byte(token))
-	if err := st.CreateSession(ctx, sum[:], u.ID, time.Now().Add(auth.SessionTTL)); err != nil {
+	if err := st.CreateSession(ctx, sum[:], u.ID, time.Now(), time.Now().Add(auth.SessionTTL)); err != nil {
 		t.Fatal(err)
 	}
 

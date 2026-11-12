@@ -25,8 +25,18 @@ jobs:
       - run: go test -race ./apps/server/...
       - uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.14
+          version: v2.15
           working-directory: apps/server
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Relative links and #anchors only (--offline), so the job never fails on a flaky website.
+      - uses: lycheeverse/lychee-action@v2.9.0
+        with:
+          args: --offline --include-fragments --no-progress '**/*.md'
+          fail: true
 
   docker:
     runs-on: ubuntu-latest

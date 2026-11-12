@@ -1,8 +1,14 @@
 # Upgrading
 
+> **TL;DR** — Read the changelog, take a backup, then pull the new image (or binary) and restart.
+> Migrations run automatically at startup and only move forward, so rolling back means restoring
+> the backup.
+
+**Read this if:** you run your own instance and a new version is out.
+
 ## Before you upgrade
 
-1. Read [CHANGELOG.md](../CHANGELOG.md) for the versions you skip. Before 1.0, minor versions
+1. Read [CHANGELOG.md](../../CHANGELOG.md) for the versions you skip. Before 1.0, minor versions
    (0.x) may contain breaking changes.
 2. **Take a backup.** Migrations only move forward.
    - With Litestream, the replica already is a backup; confirm it is recent.
@@ -46,4 +52,4 @@ Events collected after the backup are lost.
 
 Cloud Run runs the old and new revision side by side for a moment. The new one restores from the
 replica while the old one still serves, so events from those seconds can be lost. Deploy when
-traffic is quiet. See [DEPLOY.md](DEPLOY.md).
+traffic is quiet. See [deploy-gcp.md](deploy-gcp.md) and the [runbook](../operations/runbook.md#known-trade-offs).

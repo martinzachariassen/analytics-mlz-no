@@ -143,6 +143,16 @@ func (a *API) goalStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cmp := q.comparison(q.compare)
+	out := goalStatsResponse{Period: q.json(), Goals: make([]goalStatJSON, len(goals))}
+	if q.compare != "" {
+		pj := cmp.json()
+		out.Compare = &pj
+	}
+	// Without goals there is nothing to divide, so skip both scans of the range.
+	if len(goals) == 0 {
+		httpx.WriteJSON(w, http.StatusOK, out)
+		return
+	}
 	cur, err := a.Store.GoalStats(ctx, site.ID, q.rng(), q.filters, goals)
 	if err != nil {
 		a.internal(w, "goal stats", err)
@@ -153,11 +163,7 @@ func (a *API) goalStats(w http.ResponseWriter, r *http.Request) {
 		a.internal(w, "previous goal stats", err)
 		return
 	}
-
-	out := goalStatsResponse{
-		Period: q.json(), Visitors: cur.Visitors, PreviousVisitors: prev.Visitors,
-		Goals: make([]goalStatJSON, len(goals)),
-	}
+	out.Visitors, out.PreviousVisitors = cur.Visitors, prev.Visitors
 	for i, g := range cur.Goals {
 		p := prev.Goals[i]
 		out.Goals[i] = goalStatJSON{
@@ -165,10 +171,6 @@ func (a *API) goalStats(w http.ResponseWriter, r *http.Request) {
 			ConversionRate:   rate(g.Visitors, cur.Visitors),
 			PreviousVisitors: p.Visitors, PreviousConversionRate: rate(p.Visitors, prev.Visitors),
 		}
-	}
-	if q.compare != "" {
-		pj := cmp.json()
-		out.Compare = &pj
 	}
 	httpx.WriteJSON(w, http.StatusOK, out)
 }

@@ -28,6 +28,8 @@ describe("formatRate", () => {
     expect(formatRate(0)).toBe("0%")
     expect(formatRate(0.0042)).toBe("0.4%")
     expect(formatRate(0.0951)).toBe("9.5%")
+    expect(formatRate(0.0003)).toBe("<0.1%")
+    expect(formatRate(0.0996)).toBe("10%")
     expect(formatRate(0.456)).toBe("46%")
     expect(formatRate(1)).toBe("100%")
   })

@@ -186,7 +186,7 @@ func assertNoEventScan(t *testing.T, st *Store, query string, args ...any) {
 	}
 	// A MIN or MAX can also walk events_ts until a row matches, which is a scan too.
 	for _, d := range plan {
-		if strings.Contains(d, " events ") && !strings.Contains(d, "events_site_ts (site_id=?)") {
+		if strings.Contains(d, " events ") && !strings.Contains(d, "events_site_ts (site_id=?") {
 			t.Fatalf("query plan does not seek events by site: %q", plan)
 		}
 	}

@@ -115,6 +115,7 @@ What the server defends against, and what it does not, is in the
 | `internal/auth` | `Service`: GitHub OAuth (`github.go`), sessions, `Require` middleware, the `DEV_LOGIN` shortcut (`dev.go`). A `Provider` interface leaves room for more identity providers |
 | `internal/api` | `API.Register`: sites CRUD, purge (`api.go`), goals and goal stats (`goals.go`), and stats, breakdown, heatmap and realtime handlers with query parsing (`stats.go`) |
 | `internal/store` | All SQL. `store.go` opens SQLite (WAL) and runs `migrations/*.sql`. `events.go` inserts events and assigns sessions. `stats.go` holds `Summary`, `Timeseries`, `Breakdown` and `Dimensions`. `filter.go` turns `Filters` into SQL. `goals.go` holds goal CRUD and `GoalStats`. `sites.go` (with `sitecache.go`), `users.go` |
+| `internal/text` | `Clean` and `Truncate`: how ingest cleans browser strings before storing them, shared with goals so a goal typed as sent matches |
 | `internal/script` | Embeds `script.js` (built from `apps/tracker`) and serves it gzipped with an `ETag` |
 | `internal/devdata` | Synthetic traffic profiles for `analytics seed` |
 

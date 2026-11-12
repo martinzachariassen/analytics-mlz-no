@@ -183,12 +183,15 @@ evaluated when stats are read, so a new goal also counts past traffic.
 { "id": 3, "kind": "path", "value": "/blog/*", "created_at": "2026-11-12T10:00:00Z" }
 ```
 
-- **`kind: "event"`**: `value` is a custom event name (at most 64 characters), matched exactly.
-- **`kind: "path"`**: `value` starts with `/`, has no `?` or `#`, and is at most 1024
-  characters. `*` matches any characters, including `/`, so `/blog/*` is every page under
-  `/blog/`. No other character is special. Without `*` the path must match exactly.
+- **`kind: "event"`**: `value` is a custom event name, matched exactly.
+- **`kind: "path"`**: `value` starts with `/`. `*` matches any characters, including `/`, so
+  `/blog/*` is every page under `/blog/`. No other character is special, so hash-router routes
+  (`/#/pricing`) work as stored. Without `*` the path must match exactly; a path that contains a
+  literal `*` cannot be matched exactly.
 
-`value` is trimmed. Creating and deleting goals is logged with the signed-in user. Deleting a
+`value` is cleaned like ingest cleans what it stores (control characters and bidi overrides
+removed, surrounding space trimmed), and cut to the same length (64 bytes for event names, 1024
+for paths), so a value typed exactly as sent matches the stored events. Creating and deleting goals is logged with the signed-in user. Deleting a
 site deletes its goals.
 
 ## Statistics
@@ -310,11 +313,14 @@ Conversions for every goal of the site, for the period and filters:
 }
 ```
 
-- `visitors` (top level) is every visitor in the period. A goal's `visitors` reached it, and
+- `visitors` (top level) is every visitor in the period, the same number as `summary.visitors`
+  from `stats` with the same filters. A goal's `visitors` reached it, and
   `conversion_rate` is goal `visitors` / top-level `visitors` (0 when there are none).
 - `completions` counts events or page views that matched the goal.
 - `previous_*` always describe the comparison period: `previous` by default, or `year` with
   `compare=year`. `compare` (its dates) is only present when the parameter is given.
+- A site without goals gets `"goals": []` and `0` for both visitor counts; the range is not
+  counted.
 - Filters select whole visits, like visit metrics: with `f=path:is:/pricing`, a goal counts
   visitors who reached it in a visit that included `/pricing`.
 

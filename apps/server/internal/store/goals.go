@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/text"
 )
 
 // Errors returned by the goal methods.
@@ -18,8 +20,8 @@ var (
 // Limits on goals. Every goal adds two aggregates to the GoalStats query.
 const (
 	MaxGoals         = 50
-	maxGoalEventLen  = 64 // as ingest truncates event names
-	maxGoalPathLen   = 1024
+	maxGoalEventLen  = 64   // as ingest truncates event names
+	maxGoalPathLen   = 1024 // as ingest truncates paths
 	goalKindEvent    = "event"
 	goalKindPath     = "path"
 	goalPathWildcard = "*"
@@ -35,16 +37,20 @@ type Goal struct {
 	CreatedAt time.Time
 }
 
-// normalizeGoal trims the value and checks it against the kind.
+// normalizeGoal cleans and cuts the value the way ingest does with what it stores, so a
+// goal typed as sent matches the stored events, and checks it against the kind.
 func normalizeGoal(kind, value string) (string, error) {
-	value = strings.TrimSpace(value)
+	value = strings.TrimSpace(text.Clean(value))
 	switch kind {
 	case goalKindEvent:
-		if value == "" || len(value) > maxGoalEventLen {
+		value = text.Truncate(value, maxGoalEventLen)
+		if value == "" {
 			return "", ErrGoalInvalid
 		}
 	case goalKindPath:
-		if !strings.HasPrefix(value, "/") || len(value) > maxGoalPathLen || strings.ContainsAny(value, "?#") {
+		// Paths may contain # (hash-router routes) and ? (decoded from %3F) like stored ones.
+		value = text.Truncate(value, maxGoalPathLen)
+		if !strings.HasPrefix(value, "/") {
 			return "", ErrGoalInvalid
 		}
 	default:
@@ -129,8 +135,8 @@ type GoalResult struct {
 	Completions int64 // matching events or page views
 }
 
-// GoalStats is the conversion data for a range: Visitors is the denominator for each
-// goal's conversion rate.
+// GoalStats is the conversion data for a range: Visitors, the same number Summary reports,
+// is the denominator for each goal's conversion rate.
 type GoalStats struct {
 	Visitors int64
 	Goals    []GoalResult
@@ -158,25 +164,31 @@ func goalCond(g Goal) (string, any) {
 // filter, a conversion counts when it happened in a visit that viewed the page.
 func (s *Store) GoalStats(ctx context.Context, siteID string, r Range, f Filters, goals []Goal) (GoalStats, error) {
 	out := GoalStats{Goals: make([]GoalResult, len(goals))}
-	cols := make([]string, 0, 1+2*len(goals))
-	cols = append(cols, "COUNT(DISTINCT visitor_id)")
-	var args []any
+	dest := make([]any, 0, 1+2*len(goals))
+	dest = append(dest, &out.Visitors)
 	for i, g := range goals {
 		out.Goals[i].Goal = g
+		dest = append(dest, &out.Goals[i].Visitors, &out.Goals[i].Completions)
+	}
+	query, args := goalStatsSQL(siteID, r, f, goals)
+	err := s.db.QueryRowContext(ctx, query, args...).Scan(dest...)
+	return out, err
+}
+
+// goalStatsSQL selects the visitors as Summary counts them, then two aggregates per goal.
+func goalStatsSQL(siteID string, r Range, f Filters, goals []Goal) (string, []any) {
+	sc := scope{site: siteID, r: r, filters: f}
+	vwhere, args := sc.rows(false)
+	cols := make([]string, 0, 1+2*len(goals))
+	// Without INDEXED BY the planner walks the covering events_site_visitor index over the
+	// site's whole history instead of seeking the range.
+	cols = append(cols, "(SELECT COUNT(DISTINCT visitor_id) FROM events INDEXED BY events_site_ts WHERE "+vwhere+")")
+	for _, g := range goals {
 		c, a := goalCond(g)
 		cols = append(cols, "COUNT(DISTINCT CASE WHEN "+c+" THEN visitor_id END)", "COALESCE(SUM("+c+"), 0)")
 		args = append(args, a, a)
 	}
-	where, wargs := scope{site: siteID, r: r, filters: f}.rows(true)
-
-	dest := make([]any, 0, len(cols))
-	dest = append(dest, &out.Visitors)
-	for i := range out.Goals {
-		dest = append(dest, &out.Goals[i].Visitors, &out.Goals[i].Completions)
-	}
+	where, wargs := sc.rows(true)
 	// #nosec G202 -- cols and where are built from constants; values are placeholders.
-	err := s.db.QueryRowContext(ctx,
-		`SELECT `+strings.Join(cols, ", ")+` FROM events WHERE `+where,
-		append(args, wargs...)...).Scan(dest...)
-	return out, err
+	return `SELECT ` + strings.Join(cols, ", ") + ` FROM events WHERE ` + where, append(args, wargs...)
 }

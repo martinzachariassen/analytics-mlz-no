@@ -39,12 +39,25 @@ func TestGoalCRUD(t *testing.T) {
 	}
 
 	for _, bad := range []struct{ kind, value string }{
-		{"event", ""}, {"event", "   "}, {"event", strings.Repeat("x", 65)},
-		{"path", "blog"}, {"path", ""}, {"path", "/a?b=1"}, {"path", "/a#top"},
-		{"path", "/" + strings.Repeat("x", 1024)}, {"referrer", "google.com"},
+		{"event", ""}, {"event", "   "}, {"event", "\n\t"},
+		{"path", "blog"}, {"path", ""}, {"referrer", "google.com"},
 	} {
 		if _, err := st.CreateGoal(ctx, site.ID, bad.kind, bad.value); !errors.Is(err, ErrGoalInvalid) {
 			t.Errorf("CreateGoal(%q, %q) err = %v; want ErrGoalInvalid", bad.kind, bad.value, err)
+		}
+	}
+
+	// Values are cleaned and cut like ingest cleans what it stores, so a name typed as sent
+	// matches. Hash-router paths keep their #.
+	for _, c := range []struct{ kind, in, want string }{
+		{"event", "a\u202eb\n", "ab"},
+		{"event", strings.Repeat("ø", 40), strings.Repeat("ø", 32)},
+		{"path", "/#/pricing", "/#/pricing"},
+		{"path", "/" + strings.Repeat("x", 2000), "/" + strings.Repeat("x", 1023)},
+	} {
+		g, err := st.CreateGoal(ctx, other.ID, c.kind, c.in)
+		if err != nil || g.Value != c.want {
+			t.Errorf("CreateGoal(%q, %q) = %q, %v; want %q", c.kind, c.in, g.Value, err, c.want)
 		}
 	}
 
@@ -156,6 +169,25 @@ func TestGoalStats(t *testing.T) {
 	check("country", Filters{{Dim: "country", Op: "is", Value: "SE"}}, 2, []want{{1, 1}, {0, 0}, {0, 0}, {1, 1}, {0, 0}})
 	// A path filter selects whole visits: visitor 1's signups happened in a visit that viewed /blog/a.
 	check("path", Filters{{Dim: "path", Op: "is", Value: "/blog/a"}}, 2, []want{{1, 2}, {2, 3}, {0, 0}, {0, 0}, {0, 0}})
+
+	// is_not keeps visits without the page, so visitor 1's signups drop out; the
+	// denominator stays the KPI strip's visitors, which still include visitor 1.
+	check("path is_not", Filters{{Dim: "path", Op: "is_not", Value: "/blog/a"}}, 3, []want{{1, 1}, {0, 0}, {0, 0}, {1, 1}, {0, 0}})
+	for _, f := range []Filters{nil, {{Dim: "path", Op: "is_not", Value: "/blog/a"}}, {{Dim: "event", Op: "is", Value: "signup"}}} {
+		sum, err := st.Summary(ctx, site.ID, r, f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		gs, err := st.GoalStats(ctx, site.ID, r, f, goals)
+		if err != nil || gs.Visitors != sum.Visitors {
+			t.Errorf("filters %v: goal visitors = %d, %v; want Summary's %d", f, gs.Visitors, err, sum.Visitors)
+		}
+	}
+
+	for _, f := range []Filters{nil, {{Dim: "path", Op: "is_not", Value: "/blog/a"}}, {{Dim: "entry", Op: "is", Value: "/"}}} {
+		q, args := goalStatsSQL(site.ID, r, f, goals)
+		assertNoEventScan(t, st, q, args...)
+	}
 
 	if gs, err := st.GoalStats(ctx, site.ID, r, nil, nil); err != nil || gs.Visitors != 4 || len(gs.Goals) != 0 {
 		t.Fatalf("no goals = %+v, %v", gs, err)

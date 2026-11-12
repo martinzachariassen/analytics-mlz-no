@@ -26,16 +26,6 @@ func TestGoalStatsConversionAndComparison(t *testing.T) {
 		{Time: day(1, 1), VisitorID: 5, Type: "event", Name: "signup", Path: "/"},
 		{Time: day(1, 0), VisitorID: 6, Path: "/docs/a"},
 	})
-	for _, body := range []string{`{"kind":"event","value":"signup"}`, `{"kind":"path","value":"/docs/*"}`} {
-		req := httptest.NewRequest(http.MethodPost, base+"/goals", strings.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		w := httptest.NewRecorder()
-		h.ServeHTTP(w, req)
-		if w.Code != http.StatusCreated {
-			t.Fatalf("create %s = %d %s", body, w.Code, w.Body)
-		}
-	}
-
 	type stats struct {
 		V     int64 `json:"visitors"`
 		PV    int64 `json:"previous_visitors"`
@@ -48,6 +38,21 @@ func TestGoalStatsConversionAndComparison(t *testing.T) {
 		}
 		Compare *periodJSON
 	}
+	// No goals: an empty list (not null), and no counting.
+	if s := get[stats](t, h, base+"/goals/stats?from=2026-11-02&to=2026-11-02&compare=previous"); s.Goals == nil || len(s.Goals) != 0 || s.V != 0 || s.Compare == nil {
+		t.Fatalf("no goals = %+v; want an empty list, zero visitors and the compare period", s)
+	}
+
+	for _, body := range []string{`{"kind":"event","value":"signup"}`, `{"kind":"path","value":"/docs/*"}`} {
+		req := httptest.NewRequest(http.MethodPost, base+"/goals", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("create %s = %d %s", body, w.Code, w.Body)
+		}
+	}
+
 	s := get[stats](t, h, base+"/goals/stats?from=2026-11-02&to=2026-11-02")
 	if s.V != 4 || s.PV != 2 || len(s.Goals) != 2 || s.Compare != nil {
 		t.Fatalf("stats = %+v; want 4 visitors, 2 before, two goals, no compare", s)

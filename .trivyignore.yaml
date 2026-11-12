@@ -1,0 +1,18 @@
+# Findings that CI's image scan may ignore, each with a reason and an expiry. When one expires
+# the scan fails again, so every entry is re-examined instead of forgotten.
+vulnerabilities:
+  - id: CVE-2026-116587
+    # In the Litestream binary (go-jose, used for Google Cloud auth), not in our code. Denial of
+    # service through a crafted JWS; Litestream only parses tokens from Google's own token
+    # endpoint. Waiting for a Litestream release built against go-jose >= 4.1.6.
+    paths:
+      - usr/local/bin/litestream
+    expired_at: 2026-12-15
+  - id: CVE-2026-78661
+    # In the Litestream binary (golang.org/x/net/html, an indirect dependency), not in our code.
+    # Denial of service through crafted HTML; Litestream never imports the html package, so the
+    # vulnerable code is never reached. Litestream main already has x/net 0.62.0; waiting for
+    # the release after 0.5.18.
+    paths:
+      - usr/local/bin/litestream
+    expired_at: 2026-12-15

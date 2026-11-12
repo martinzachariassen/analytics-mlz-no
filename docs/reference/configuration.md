@@ -9,8 +9,9 @@
 
 ## Environment variables
 
-Read by `apps/server/internal/config/config.go`, except `LITESTREAM_REPLICA_URL`, which
-`infra/docker/entrypoint.sh` reads.
+Read by `apps/server/internal/config/config.go`, except `LITESTREAM_REPLICA_URL` and
+`REQUIRE_REPLICA`, which `infra/docker/entrypoint.sh` reads. For Docker, copy
+`infra/docker/.env.example` to `infra/docker/.env` and edit it; the compose file loads it.
 
 | Variable | Default | Description |
 |---|---|---|
@@ -25,7 +26,8 @@ Read by `apps/server/internal/config/config.go`, except `LITESTREAM_REPLICA_URL`
 | `PUBLIC_URL` | `http://localhost:8080` | Dashboard URL. Used for the OAuth callback and as the only origin allowed to log out or delete sites. Must be an origin with no path. Must be `https://` when GitHub sign-in is on (localhost excepted); https also turns on Secure cookies and HSTS |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | – | GitHub OAuth App credentials. Setting the id turns on sign-in |
 | `ALLOWED_GITHUB_USERS` | – | Comma-separated GitHub usernames allowed to sign in. Checked on every request: removing a name signs that user out |
-| `LITESTREAM_REPLICA_URL` | – | Docker image only: continuous backup, e.g. `gs://bucket/analytics` or `s3://bucket/analytics` |
+| `LITESTREAM_REPLICA_URL` | – | Docker image only: continuous backup, e.g. `gs://bucket/analytics` or `s3://bucket/analytics`. S3 needs `LITESTREAM_ACCESS_KEY_ID` and `LITESTREAM_SECRET_ACCESS_KEY` (or the `AWS_*` variables); GCS outside Google Cloud needs `GOOGLE_APPLICATION_CREDENTIALS` pointing at a mounted service-account key |
+| `REQUIRE_REPLICA` | `0` | Docker image only: `1` makes a missing database plus an empty replica a startup error instead of a fresh, empty start. Leave it `0` for the very first start; set it once the replica holds data, so a lost replica stops the server instead of quietly starting with nothing |
 | `DEV_LOGIN` | – | `1` signs everyone in as `dev`. Local development only: refused unless `PUBLIC_URL` is on `localhost` and GitHub sign-in is off, and the dev sign-in only answers connections from the loopback interface. Also required for `analytics seed -reset` |
 
 > [!WARNING]
@@ -48,10 +50,24 @@ Read by `apps/server/internal/config/config.go`, except `LITESTREAM_REPLICA_URL`
 | `github_client_id` | `GITHUB_CLIENT_ID` | – |
 | `allowed_github_users` | `ALLOWED_GITHUB_USERS` | `[]` |
 | (Secret Manager `github-client-secret`) | `GITHUB_CLIENT_SECRET` | placeholder; see [deploy guide](../guides/deploy-gcp.md#3-github-client-secret) |
-| (bucket `<project_id>-db`) | `LITESTREAM_REPLICA_URL` | set automatically |
+| `replica_path` (in bucket `<project_id>-db`) | `LITESTREAM_REPLICA_URL` (`gs://<project_id>-db/<replica_path>`, service and backup job) | `analytics` |
+| `require_replica` | `REQUIRE_REPLICA` on the service, `BACKUP_EXPECT_DATA` on the backup job | `false` |
+
+`require_replica` must stay `false` for the very first deploy, because the replica is empty by
+design. Set it to `true` once the service has data: a lost replica then stops the service from
+starting empty, and the backup job fails (and alerts) instead of reporting "nothing to back up".
+Change `replica_path` only when restoring from a backup file; see
+[the runbook](../operations/runbook.md#restore-the-database-from-a-backup).
 
 Other variables only affect infrastructure: `region`, `scheduler_region`, `service_name`,
 `extra_domains`, `alert_email`, `backup_hourly_retention_days` and `backup_daily_retention_days`.
+
+## Build arguments (Docker image)
+
+| Argument | Default | Description |
+|---|---|---|
+| `VERSION` | `dev` | Printed by `analytics version`; the release workflow sets it to the tag |
+| `DBIP_MONTH` | empty | DB-IP Lite Country release to bundle, as `YYYY-MM`. Empty takes this month, falling back to last month early in the month. Set it for a reproducible build. The release workflow sets it to the month before the tagged commit, which is always published and the same on every rebuild |
 
 ## `PROXY_HOPS`
 

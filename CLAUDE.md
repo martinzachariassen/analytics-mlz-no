@@ -20,7 +20,7 @@ Monorepo: `apps/` holds everything that runs (`server`, `web`, `tracker`, `demo`
 - `apps/server/internal/` — `config`, `store` (SQLite + embedded migrations, stats queries), `ingest` (POST /api/event), `visitor` (daily salt + hashing), `geo`, `httpx` (client IP, rate limit, JSON), `auth` (GitHub OAuth + sessions), `api` (sites + stats endpoints), `script` (embedded tracking script), `server` (router)
 - Docs: API `docs/reference/api.md`; env/Terraform vars `docs/reference/configuration.md`; CLI `docs/reference/cli.md`; privacy facts `docs/privacy.md` (update when stored fields change); operations `docs/operations/runbook.md`; release process `docs/development/releasing.md` + `.github/workflows/release.yml`; `CHANGELOG.md` gets a line per user-visible change. The "If you change…, update…" table in `CONTRIBUTING.md` says which page to update. Docs changes go in the same PR as the code.
 - `apps/server/internal/devdata` — synthetic traffic for `analytics seed`; `apps/demo/` — demo site for `make dev`
-- `infra/docker/` — Dockerfile, docker-compose, Litestream config, entrypoint, restore test
+- `infra/docker/` — Dockerfile, docker-compose, Litestream config, entrypoint, standalone backup script, restore and backup tests
 - `apps/tracker/` — TypeScript tracking script (`src/core.ts` logic, `src/index.ts` entry). Built with esbuild into `apps/server/internal/script/script.js`, which is committed and embedded in the Go binary. Run `make tracker` after changes; CI fails if it's stale or over 1024 B gzipped.
 - `apps/web/` — dashboard: React 19 + Vite + Tailwind v4 + shadcn/ui (radix-nova), TanStack Query, React Router. `src/lib/api.ts` is the typed API client; `src/components/ui/` is shadcn-generated (add with `cd apps/web && bunx shadcn@latest add <name>`, avoid hand-editing; Biome skips that folder). Dev server proxies `/api` to :8080 (override with `API_PROXY`), same as Firebase Hosting in production.
   - Structure: `routes/app-layout.tsx` (auth + sidebar shell), `routes/site/` (per-site views: overview, realtime, pages/sources/locations/devices via `report.tsx`, events; `layout.tsx` has the top bar). Period, comparison, interval, filters (`f=dim:op:value`) and the detail sheet (`detail=dim:value`) live in the URL via `lib/use-scope.ts`, shared by all views. Dimension labels in `lib/dims.ts`, metrics in `lib/metrics.ts`, query hooks in `lib/queries.ts`.
@@ -39,7 +39,7 @@ Tools are pinned in `mise.toml` (`mise install`); JavaScript packages are a Bun 
 - `make dev` — local test environment: API + dashboard + demo site (:8081), two demo sites with two years of synthetic data in `data/dev.db`, one-click sign-in via `DEV_LOGIN=1` (localhost only). `make dev-reset` wipes it.
 - `make dev-web` — dashboard on :5173; set `PUBLIC_URL=http://localhost:5173` for the server
 - `docker compose -f infra/docker/docker-compose.yml up --build`
-- `infra/docker/test-restore.sh` — verifies Litestream backup/restore with the local Docker image; `go run ./apps/server/cmd/loadtest` — ingest load test
+- `infra/docker/test-restore.sh` — verifies Litestream backup/restore with the local Docker image; `infra/docker/test-backup.sh` — verifies `backup.sh`; `go run ./apps/server/cmd/loadtest` — ingest load test
 - `make deploy` — build/push the server image to Cloud Run and publish the dashboard to Firebase Hosting
 
 ## Conventions

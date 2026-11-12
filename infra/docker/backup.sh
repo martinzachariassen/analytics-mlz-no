@@ -9,6 +9,10 @@
 #
 # Uploads to BACKUP_BUCKET with the service account of the Cloud Run Job (metadata server).
 # For tests, set BACKUP_DEST_DIR to write to a local folder instead.
+#
+# An empty replica normally means "nothing to back up yet" and exits 0. With
+# BACKUP_EXPECT_DATA=1 it is an error: once a service has data, an empty replica means it was
+# lost, and a backup run that succeeds anyway would hide that.
 set -eu
 
 prefix=${1:-hourly}
@@ -20,6 +24,10 @@ trap 'rm -rf "$tmp"' EXIT
 # Exits 0 without writing a file when the replica has no backups yet.
 litestream restore -if-replica-exists -o "$tmp/analytics.db" "$LITESTREAM_REPLICA_URL"
 if [ ! -s "$tmp/analytics.db" ]; then
+  if [ "${BACKUP_EXPECT_DATA:-0}" = "1" ]; then
+    echo "backup: the replica is empty but BACKUP_EXPECT_DATA=1; the database may have been lost" >&2
+    exit 1
+  fi
   echo "backup: no data in the replica yet, nothing to back up"
   exit 0
 fi
@@ -30,7 +38,9 @@ if [ "$(head -c 15 "$tmp/analytics.db")" != "SQLite format 3" ]; then
   exit 1
 fi
 
-name="$prefix/$(date -u +%Y-%m-%dT%H%MZ).db.gz"
+# Seconds plus the Cloud Run execution id keep retries from colliding with a partial earlier
+# upload: the job may only create objects, never overwrite them.
+name="$prefix/$(date -u +%Y-%m-%dT%H%M%SZ)${CLOUD_RUN_EXECUTION:+-${CLOUD_RUN_EXECUTION##*-}}.db.gz"
 gzip -c "$tmp/analytics.db" > "$tmp/backup.db.gz"
 size=$(wc -c < "$tmp/backup.db.gz")
 
@@ -39,7 +49,7 @@ if [ -n "${BACKUP_DEST_DIR:-}" ]; then
   cp "$tmp/backup.db.gz" "$BACKUP_DEST_DIR/$name"
 else
   : "${BACKUP_BUCKET:?BACKUP_BUCKET is required}"
-  token=$(curl -fsS -H "Metadata-Flavor: Google" \
+  token=$(curl -fsS --retry 3 --retry-all-errors -H "Metadata-Flavor: Google" \
     "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" |
     sed -n 's/.*"access_token" *: *"\([^"]*\)".*/\1/p')
   if [ -z "$token" ]; then
@@ -47,7 +57,7 @@ else
     exit 1
   fi
   encoded=$(printf '%s' "$name" | sed 's#/#%2F#g')
-  curl -fsS -X POST \
+  curl -fsS --retry 3 --retry-all-errors -X POST \
     -H "Authorization: Bearer $token" \
     -H "Content-Type: application/gzip" \
     --data-binary "@$tmp/backup.db.gz" \

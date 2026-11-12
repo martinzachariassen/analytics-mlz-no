@@ -30,6 +30,7 @@ setup. Tools (Go, Bun, Node, Terraform, linters) are pinned in `mise.toml`. Next
 ## Host it
 
 ```sh
+cp infra/docker/.env.example infra/docker/.env   # then edit it
 docker compose -f infra/docker/docker-compose.yml up -d --build
 docker compose -f infra/docker/docker-compose.yml exec analytics analytics sites add -domain example.com
 ```

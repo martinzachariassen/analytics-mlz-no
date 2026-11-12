@@ -1,9 +1,14 @@
 # Self-hosting:
+#   cp infra/docker/.env.example infra/docker/.env   # then edit it
 #   docker compose -f infra/docker/docker-compose.yml up -d --build
 #   docker compose -f infra/docker/docker-compose.yml exec analytics analytics sites add -domain example.com
 #
 # To run a published release instead of building from source:
 #   ANALYTICS_IMAGE=ghcr.io/martinzachariassen/analytics-mlz-no:0.1.0 docker compose -f infra/docker/docker-compose.yml up -d --no-build
+#
+# The port binds to localhost: put a reverse proxy (Caddy, nginx, Traefik) with TLS in front and
+# set PROXY_HOPS=1 in .env. The container runs read-only as an unprivileged user with no
+# capabilities; /data is the only writable volume.
 services:
   analytics:
     build:
@@ -12,21 +17,35 @@ services:
     image: ${ANALYTICS_IMAGE:-analytics-mlz-no:local}
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     volumes:
       - analytics-data:/data
-    environment:
-      # Number of reverse proxies in front of the server (0 = direct). Set to 1 behind nginx/Caddy/Traefik.
-      PROXY_HOPS: "0"
-      # Dashboard sign-in via a GitHub OAuth App (callback: <PUBLIC_URL>/api/auth/github/callback).
-      PUBLIC_URL: "http://localhost:8080"
-      GITHUB_CLIENT_ID: ""
-      GITHUB_CLIENT_SECRET: ""
-      ALLOWED_GITHUB_USERS: ""
-      # Delete events older than N days (0 = keep forever).
-      RETENTION_DAYS: "0"
-      # Optional off-site backup, e.g. s3://bucket/analytics or gs://bucket/analytics.
-      # LITESTREAM_REPLICA_URL: ""
+    env_file:
+      - path: .env
+        required: false
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 3s
+      start_period: 20s
+      retries: 3
 
 volumes:
   analytics-data:

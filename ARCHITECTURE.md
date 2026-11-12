@@ -85,10 +85,11 @@ See [docs/development/dashboard.md](docs/development/dashboard.md).
 | Path | What |
 |---|---|
 | `apps/demo` | Static demo site for `make dev` |
-| `infra/docker` | `Dockerfile` (static binary, DB-IP database, Litestream), `entrypoint.sh`, `docker-compose.yml`, `test-restore.sh`, `backup.sh` |
+| `infra/docker` | `Dockerfile` (static binary, DB-IP database, Litestream), `entrypoint.sh` (Litestream restore and replicate, `REQUIRE_REPLICA`), `docker-compose.yml` (hardened; settings from `.env`, template `.env.example`), `backup.sh` (the standalone backup job), `test-restore.sh`, `test-backup.sh` |
 | `infra/terraform/bootstrap` | GCP project, APIs, state bucket, budget |
 | `infra/terraform/main` | Cloud Run service and backup job, buckets, Secret Manager, Firebase Hosting, monitoring dashboard and alerts |
-| `.github/workflows` | `ci.yml` (one job per `scripts/verify.sh` group, plus docs links, Docker, security) and `release.yml` (images and binaries on tag) |
+| `.github/workflows` | `ci.yml` (one job per `scripts/verify.sh` group, plus docs links, Docker, security) `codeql.yml` (CodeQL for Go, TypeScript and the workflows) and `release.yml` (images with SBOM and provenance attestations, binaries on tag) |
+| `.trivyignore.yaml` | Image-scan findings CI may ignore, each with a reason and an expiry |
 | `scripts/verify.sh` | The quality gate: groups `lint`, `go`, `tracker`, `web`, `infra`. `make verify` and CI run it |
 | `mise.toml`, `package.json`, `bun.lock`, `biome.json`, `.githooks/` | Pinned tool versions, the Bun workspace (`apps/web`, `apps/tracker`), Biome config, the pre-commit hook |
 

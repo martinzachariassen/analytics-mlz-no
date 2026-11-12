@@ -15,6 +15,11 @@ resource "google_storage_bucket" "backups" {
   location                    = var.region
   uniform_bucket_level_access = true
   public_access_prevention    = "enforced"
+  labels                      = local.labels
+
+  lifecycle {
+    prevent_destroy = true
+  }
 
   lifecycle_rule {
     condition {
@@ -60,6 +65,7 @@ resource "google_cloud_run_v2_job" "backup" {
   name                = "${var.service_name}-backup"
   location            = var.region
   deletion_protection = true
+  labels              = local.labels
 
   template {
     template {
@@ -82,11 +88,16 @@ resource "google_cloud_run_v2_job" "backup" {
 
         env {
           name  = "LITESTREAM_REPLICA_URL"
-          value = "gs://${google_storage_bucket.db.name}/analytics"
+          value = "gs://${google_storage_bucket.db.name}/${var.replica_path}"
         }
         env {
           name  = "BACKUP_BUCKET"
           value = google_storage_bucket.backups.name
+        }
+        env {
+          # Once the service has data, an empty replica is a lost database, not "nothing yet".
+          name  = "BACKUP_EXPECT_DATA"
+          value = var.require_replica ? "1" : "0"
         }
       }
     }

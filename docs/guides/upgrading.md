@@ -11,7 +11,10 @@
 1. Read [CHANGELOG.md](../../CHANGELOG.md) for the versions you skip. Before 1.0, minor versions
    (0.x) may contain breaking changes.
 2. **Take a backup.** Migrations only move forward.
-   - With Litestream, the replica already is a backup; confirm it is recent.
+   - On Cloud Run: `gcloud run jobs execute analytics-backup --args daily --region <region>`
+     writes a fresh standalone file to the backups bucket (see
+     [backups in the runbook](../operations/runbook.md#restore-the-database-from-a-backup)).
+   - With Litestream elsewhere, the replica already is a backup; confirm it is recent.
    - Otherwise copy the SQLite file while the server is stopped, or use
      `sqlite3 analytics.db ".backup backup.db"`. Copying the file of a running server can give an
      inconsistent copy because of WAL mode.
@@ -29,7 +32,9 @@ docker compose -f infra/docker/docker-compose.yml exec analytics analytics versi
 ## Binary
 
 Download the archive for your platform from the GitHub release, verify it against
-`checksums.txt` (`sha256sum -c`), replace the old binary and restart.
+`checksums.txt` (`sha256sum -c checksums.txt`, or `shasum -a 256 -c checksums.txt` on macOS) or
+its provenance (`gh attestation verify <file> --owner martinzachariassen`), replace the old
+binary and restart.
 
 ## What happens on start
 
@@ -46,10 +51,16 @@ Old binaries do not understand a database that a newer version has migrated. To 
    with a timestamp, or copy your file back).
 3. Start the older image or binary.
 
-Events collected after the backup are lost.
+Events collected after the backup are lost. Litestream's point-in-time restore only reaches as
+far back as its retention (hours); for anything older, use a standalone backup file.
 
 ## Cloud Run
 
 Cloud Run runs the old and new revision side by side for a moment. The new one restores from the
 replica while the old one still serves, so events from those seconds can be lost. Deploy when
 traffic is quiet. See [deploy-gcp.md](deploy-gcp.md) and the [runbook](../operations/runbook.md#known-trade-offs).
+
+Rolling back a Cloud Run revision (`gcloud run services update-traffic`) runs the old binary
+against a database the new one may already have migrated. That only works when the release notes
+say the schema did not change; otherwise restore a backup first, as above. Old images are kept for
+7 days or the last 3 deploys, whichever is longer (Artifact Registry cleanup policy).

@@ -1,10 +1,11 @@
 # Bootstrap: creates the GCP project, links billing, enables APIs and creates the
-# bucket that stores Terraform state for infra/terraform/main. Uses local state (small, no secrets).
+# bucket that stores Terraform state for infra/terraform/main. Its own state starts local and
+# moves into that bucket afterwards (backend.tf.example, docs/guides/deploy-gcp.md).
 #
 #   cd infra/terraform/bootstrap && terraform init && terraform apply
 
 terraform {
-  required_version = ">= 1.9"
+  required_version = ">= 1.9, < 2.0"
   required_providers {
     google = {
       source  = "hashicorp/google"
@@ -76,6 +77,9 @@ resource "google_storage_bucket" "tfstate" {
     action {
       type = "Delete"
     }
+  }
+  lifecycle {
+    prevent_destroy = true
   }
   depends_on = [google_project_service.this]
 }

@@ -1,8 +1,23 @@
+# Only apps/server and infra/docker are copied into the image; keep the rest out of the build
+# context so a build never ships a database, a secret or a node_modules tree.
 .git
+.github
+.githooks
+.claude
+docs
 data
 bin
-apps/web/node_modules
-apps/tracker/node_modules
-apps/web/dist
+scripts
+**/node_modules
+**/dist
+**/.firebase
+**/.env
+**/.env.*
+**/*.db
+**/*.db-*
+**/*.mmdb
+**/*.log
 infra/terraform
-*.db*
+apps/web
+apps/tracker
+apps/demo

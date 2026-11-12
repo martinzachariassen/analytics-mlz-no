@@ -9,6 +9,7 @@ resource "google_cloud_run_v2_service" "this" {
   location            = var.region
   ingress             = "INGRESS_TRAFFIC_ALL"
   deletion_protection = true
+  labels              = local.labels
 
   template {
     service_account                  = google_service_account.run.email
@@ -63,7 +64,11 @@ resource "google_cloud_run_v2_service" "this" {
       }
       env {
         name  = "LITESTREAM_REPLICA_URL"
-        value = "gs://${google_storage_bucket.db.name}/analytics"
+        value = "gs://${google_storage_bucket.db.name}/${var.replica_path}"
+      }
+      env {
+        name  = "REQUIRE_REPLICA"
+        value = var.require_replica ? "1" : "0"
       }
       env {
         name  = "GITHUB_CLIENT_ID"
@@ -91,6 +96,16 @@ resource "google_cloud_run_v2_service" "this" {
         period_seconds        = 2
         timeout_seconds       = 2
         failure_threshold     = 30 # up to ~60s for a large restore
+      }
+
+      # A hung instance (database locked, goroutine stuck) is replaced instead of serving errors.
+      liveness_probe {
+        http_get {
+          path = "/healthz"
+        }
+        period_seconds    = 30
+        timeout_seconds   = 5
+        failure_threshold = 3
       }
     }
   }

@@ -8,7 +8,7 @@ import { Panel } from "@/components/panel"
 import { AXIS_TICK, TipBox, TipRow } from "@/components/traffic-chart"
 import { ChartContainer, ChartTooltip } from "@/components/ui/chart"
 import { Skeleton } from "@/components/ui/skeleton"
-import { api, type BreakdownRow, type Dimension } from "@/lib/api"
+import { api, type BreakdownRow, type FilterDim } from "@/lib/api"
 import { formatNumber } from "@/lib/format"
 import { useScope } from "@/lib/use-scope"
 
@@ -190,10 +190,11 @@ function LiveList({
   error,
 }: {
   title: string
-  dim: Dimension
+  dim: FilterDim
   rows?: BreakdownRow[]
   error?: unknown
 }) {
+  const sc = useScope()
   const total = rows?.reduce((n, r) => n + r.visitors, 0)
   if (error && !rows) {
     return (
@@ -211,6 +212,7 @@ function LiveList({
         loading={!rows}
         total={total}
         rowsShown={10}
+        onOpen={(r) => sc.openDetail({ dim, value: r.value })}
       />
     </Panel>
   )

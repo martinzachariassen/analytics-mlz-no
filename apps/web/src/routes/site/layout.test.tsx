@@ -108,4 +108,20 @@ describe("SiteLayout onboarding", () => {
     expect(calls.filter((c) => c === "/api/sites/abc")).toHaveLength(1)
     expect(screen.queryByText(/Waiting for the first event/)).toBeNull()
   })
+
+  it("names the browser tab after the view and the site", async () => {
+    mockFetch({
+      "/api/sites/abc": {
+        ...waiting,
+        first_event_at: "2026-11-01T00:00:00Z",
+        last_event_at: "2026-11-12T09:00:00Z",
+      },
+    })
+    const { unmount } = renderInSite(layout)
+    await waitFor(() =>
+      expect(document.title).toBe("Overview · Blog · mlz. analytics")
+    )
+    unmount()
+    expect(document.title).toBe("mlz. analytics")
+  })
 })

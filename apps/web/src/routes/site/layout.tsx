@@ -16,6 +16,7 @@ import { WaitingForData } from "@/components/waiting-for-data"
 import { ApiError } from "@/lib/api"
 import { useSite } from "@/lib/queries"
 import { useScope } from "@/lib/use-scope"
+import { useTitle } from "@/lib/use-title"
 
 /**
  * Everything under /sites/:id: the top bar with the period, comparison and
@@ -30,6 +31,8 @@ export function SiteLayout() {
   const sub = pathname.slice(`/sites/${sc.siteId}`.length).replace(/^\//, "")
   const settings = sub === "settings"
   const view = VIEWS.find((v) => v.path === sub)
+  const viewLabel = settings ? "Settings" : (view?.label ?? "Overview")
+  useTitle(viewLabel, site.data?.name)
 
   if (site.error instanceof ApiError && site.error.status === 404) {
     return (
@@ -48,9 +51,7 @@ export function SiteLayout() {
         {site.data?.name ?? " "}
       </span>
       <ChevronRight className="size-3.5 shrink-0 text-fg-muted max-sm:hidden" />
-      <span className="truncate">
-        {settings ? "Settings" : (view?.label ?? "Overview")}
-      </span>
+      <span className="truncate">{viewLabel}</span>
     </span>
   )
 

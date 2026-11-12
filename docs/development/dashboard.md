@@ -108,6 +108,8 @@ It reads and writes these query parameters:
 | `f` (repeated) | `country:is:NO` | Filters, `dim:op:value`. One per dimension and operator |
 | `detail` | `path:/blog` | The open detail sheet |
 | `tab` | `utm_source` | The tab in a report view (read in `report.tsx`) |
+| `metric` | `pageviews` | The metric in the overview chart. Missing means visitors |
+| `event`, `prop` | `signup`, `plan` | The picked event and property on the Events view. A value that is not in the period's data falls back to the top one |
 
 It returns the parsed state, a ready-made `scope` object for API calls, actions (`setPeriod`,
 `addFilter`, `openDetail`, …) and `search`, the query string without `detail`. Use `search` in
@@ -115,6 +117,10 @@ links between views so the period and filters follow the user.
 
 Do not keep this kind of state in `useState`. If it should survive a reload or a shared link,
 it belongs in the URL.
+
+**Tab titles.** Call `useTitle(...parts)` (`src/lib/use-title.ts`) in a page to set the browser
+tab title, for example `Pages · mlz.no · mlz. analytics`. The site layout does it for every site
+view and settings; the title goes back to `mlz. analytics` when the page unmounts.
 
 URL parameters are untrusted input. Look values up with `Object.hasOwn(TABLE, key)`, never
 `key in TABLE`: `?period=toString` or `?metric=constructor` pass an `in` check and crash the page.
@@ -134,7 +140,8 @@ Filters beyond `MAX_FILTERS` (10, the API's limit) are dropped instead of turnin
   arrived. `waitingPoll` in `lib/queries.ts` sets the pace: every 5 s (`WAITING_POLL_MS`) in
   the first hour after the site was added, then every 60 s (`IDLE_POLL_MS`), so a site that
   was never installed does not keep open tabs busy. `useSites()` polls the list at the pace of
-  its fastest waiting site. Settings uses `useSite(id, { live: true })`, which keeps polling
+  its fastest waiting site; use it for the site list everywhere (the sidebar and the <kbd>⌘K</kbd>
+  menu do), so every view shares one polling rule. Settings uses `useSite(id, { live: true })`, which keeps polling
   every 60 s once there is data, so "Last event … ago" stays current.
 - `useGoals(siteId)` and `useGoalStats(siteId, scope)` share the `["goals", siteId]` key
   prefix, so invalidating it after a goal is added or removed refreshes the list, the overview
@@ -193,7 +200,7 @@ Use these before writing new layout:
 | `kpi-strip.tsx` | The row of key numbers with deltas, driven by `METRICS` |
 | `traffic-chart.tsx`, `top-series-chart.tsx` | Time series charts |
 | `bar-list.tsx` | Ranked list with proportional bars, click to open a detail |
-| `data-table.tsx` | Full table with all metrics |
+| `data-table.tsx` | Full table with all metrics. Its search filters the loaded rows; `ReportPage` passes `search`/`onSearch` and, when the first page is full (the server may have more), also asks the API with a `contains` filter on the dimension (debounced, not for countries, whose labels the server does not know) |
 | `report-card.tsx` | A `Panel` with a `BarList` for one dimension, used on the overview |
 | `filter-bar.tsx` | Active filters as removable chips |
 | `date-range-picker.tsx` | Period, custom range and interval selects |

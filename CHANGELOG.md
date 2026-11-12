@@ -23,6 +23,8 @@ All notable changes are documented here. The format follows
 - Dashboard tests: component tests (Testing Library, happy-dom) for the filter bar, date range picker, detail sheet and error note, and Playwright end-to-end tests against a seeded server on desktop, mobile and the light theme, with an axe accessibility scan on every page. They run as the new `e2e` group of `scripts/verify.sh` and a CI job that uploads traces on failure.
 - Dashboard: a failed view shows a "Try again" button that refetches every request the view needs that failed, and nothing else. The overview and the "Could not reach the server" page now use the same error message as the other views, and a retry that fails again is announced to screen readers again. Background polling no longer flips the message to "Retrying…", and focus stays on the button during a retry.
 - Dashboard: the heatmap, the visitor map and the "Top … over time" chart show an error with a retry instead of a skeleton that never ends when their request fails; report panels that depend on a failed request say "Not available" under the page's error message.
+- Dashboard: the browser tab is named after the view and the site (`Pages · mlz.no · mlz. analytics`), so several open tabs and the history can be told apart.
+- Dashboard: rows in the Realtime lists open the detail sheet, like everywhere else.
 - Dashboard: gzipped size budgets for the production build (JavaScript loaded before the first render, all CSS, the largest lazy chunk, all JavaScript), checked by `bun run check-size` in the `web` verify group. TypeScript also checks `noUncheckedIndexedAccess`.
 
 ### Security
@@ -47,6 +49,8 @@ All notable changes are documented here. The format follows
 - Tracker: nothing the script does can throw into the host page; a failure to send is swallowed.
 
 ### Fixed
+- Dashboard: searching a report table now also finds values beyond the rows loaded so far. When the first page is full, the search asks the server too, instead of answering "No matches" for a page that exists.
+- Dashboard: the picked event and property on the Events view are kept in the URL (`?event=`, `?prop=`), so they survive a reload and a shared link, and an event missing from a newly chosen period falls back to the top one instead of staying selected.
 - Ingestion no longer drops events with `503` while the dashboard loads a long period: statistics run on a separate read-only SQLite connection pool, and writes have a connection of their own. Health checks use the read pool, so a busy writer does not fail them.
 - Site domains with empty labels or labels starting or ending with a hyphen (`..`, `.com`, `a..b.com`, `-a.com`) are rejected; before, `..` was accepted as the domain `.`. Found by the new fuzz tests (`FuzzEvent`, `FuzzClientIP`, `FuzzNormalizeDomain`, `FuzzCell`; see `docs/development/backend.md#fuzzing`).
 - Terraform: `public_url` was `https://https://<site>.web.app` when `domain` was empty, which broke the OAuth callback for installs without a custom domain.

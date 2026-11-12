@@ -1,4 +1,3 @@
-import { useQuery } from "@tanstack/react-query"
 import {
   CalendarDays,
   GitCompare,
@@ -22,8 +21,8 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@/components/ui/command"
-import { api } from "@/lib/api"
 import { PERIODS, type Period } from "@/lib/period"
+import { useSites } from "@/lib/queries"
 import { useScope } from "@/lib/use-scope"
 
 /** ⌘K: jump to a view or site, change the period, toggle things. */
@@ -38,7 +37,7 @@ export function CommandMenu({
   const { id } = useParams()
   const sc = useScope()
   const { theme, setTheme } = useTheme()
-  const sites = useQuery({ queryKey: ["sites"], queryFn: api.sites })
+  const sites = useSites()
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {

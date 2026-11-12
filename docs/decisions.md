@@ -7,7 +7,7 @@
 **Read this if:** you are about to make a larger change, or wonder why something is the way it is.
 
 Lightweight, privacy-friendly, self-hostable web analytics (inspired by Umami/Plausible, but smaller).
-This page records the architectural decisions, open items and what must be settled before 1.0. Read it before larger changes.
+This page records the architectural decisions, open items, what comes next and what must be settled before 1.0. Read it before larger changes.
 
 ## Decisions
 
@@ -44,6 +44,23 @@ This page records the architectural decisions, open items and what must be settl
 - ✅ Production domain: `analytics.mlz.no` (dashboard and API), `t.mlz.no` (tracking script).
 - ✅ `PROXY_HOPS=2` on Cloud Run behind Firebase Hosting: production events carry the right country and one visitor per person.
 - The rest of the pre-release checklist in [releasing.md](development/releasing.md#pre-release-checklist), then the first tag.
+
+## Next
+
+The product roadmap after the quality base, in order. Each is one pull request with its docs.
+
+1. ✅ **Onboarding and empty states**: "waiting for the first event" with polling,
+   `first_event_at`/`last_event_at` on sites.
+2. **Goals and conversions**: `goals` table (event name or path, `*` wildcard), conversions
+   and rate per goal on the overview, management in settings.
+3. **CSV export**: breakdowns and time series with the same period and filter parameters,
+   formula-escaped cells.
+4. **Shareable read-only links**: hashed tokens, a read-only `/api/share/{token}/…`, revocable
+   from settings.
+
+Later, not scheduled: the dashboard embedded in the binary and OIDC (see below), an OpenAPI
+spec and `/api/v1`, rollup tables if queries get slow, email reports, funnels, property
+filters, and `utm_term`/`utm_content`.
 
 ## Before 1.0
 

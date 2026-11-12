@@ -130,6 +130,12 @@ Filters beyond `MAX_FILTERS` (10, the API's limit) are dropped instead of turnin
   `lib/api.ts`). A `401` from any query re-checks `/api/auth/me`, which sends the user to
   sign-in.
 - Realtime refetches every 10 s, the sidebar's live counts every 15 s (`refetchInterval`).
+- `useSite(siteId)` polls while the site's `first_event_at` is `null` and stops once data has
+  arrived. `waitingPoll` in `lib/queries.ts` sets the pace: every 5 s (`WAITING_POLL_MS`) in
+  the first hour after the site was added, then every 60 s (`IDLE_POLL_MS`), so a site that
+  was never installed does not keep open tabs busy. `useSites()` polls the list at the pace of
+  its fastest waiting site. Settings uses `useSite(id, { live: true })`, which keeps polling
+  every 60 s once there is data, so "Last event … ago" stays current.
 - Changes use `useMutation` around an `api.*` call and invalidate the affected queries on
   success (see `components/add-site-dialog.tsx`).
 
@@ -160,6 +166,17 @@ The button uses `aria-disabled` rather than `disabled` during a retry so keyboar
 it. `error` alone shows a message without a button, for panels whose query already has a note
 with a retry elsewhere on the page. `title` replaces "Could not load this" (the app shell uses
 "Could not reach the server").
+
+**Onboarding.** A site that has never received an event has nothing to chart, so
+`routes/site/layout.tsx` shows `<WaitingForData>` (`components/waiting-for-data.tsx`) instead of
+any view: a live "Waiting for the first event…" status, the snippet, and what to check if nothing
+arrives. When polling sees `first_event_at`, the layout swaps in the dashboard and toasts "First
+event received". Settings shows the same status (with "Site added." after `?new=1`, then
+"Receiving data" with a link to the dashboard) and "Last event … ago" once there is data. The
+site list shows "Waiting for first event" and skips the stats request for such sites. Use
+`first_event_at === null` for "no stored events" and the usual "Nothing in this period" for an
+empty period. Onboarding follows the stored events, not history: a site whose events have all
+been purged or aged out by `RETENTION_DAYS` shows it again until the next event.
 
 ## App primitives
 
@@ -237,8 +254,8 @@ There are three layers. Each one catches what the one before cannot.
 | Layer | Where | Runs with | What it covers |
 |---|---|---|---|
 | Unit | `src/lib/*.test.ts` | `bun run test` (vitest, Node) | The API client (error mapping, retry policy, headers, id encoding, query strings), URL state parsing and the `hasOwn` guards, period maths, metrics, dimensions, formatting, and the CSP hash of the theme script |
-| Component | `src/components/*.test.tsx` | `bun run test` (vitest, happy-dom, Testing Library) | Filter bar, date range picker and its shortcuts, detail sheet and `ErrorNote` (retry, focus, no flip on background refetches), against a mocked `fetch`, with the URL as the observable state |
-| End to end | `e2e/*.spec.ts` | `bun run e2e` (Playwright) | The real Go server with seeded data and the production build: sign-in, every view of a site, filters, the detail sheet, settings, and a failed request recovering with "Try again", with an axe scan on every page |
+| Component | `src/components/*.test.tsx`, `src/routes/**/*.test.tsx` | `bun run test` (vitest, happy-dom, Testing Library) | Filter bar, date range picker and its shortcuts, detail sheet, `ErrorNote` (retry, focus, no flip on background refetches) and onboarding in the site layout (polling until the first event, then the dashboard), against a mocked `fetch`, with the URL as the observable state |
+| End to end | `e2e/*.spec.ts` | `bun run e2e` (Playwright) | The real Go server with seeded data and the production build: sign-in, every view of a site, filters, the detail sheet, settings, a failed request recovering with "Try again", and a new site waiting for its first event and switching to the dashboard when one is sent, with an axe scan on every page |
 
 - **Unit tests:** put logic in `lib/` as plain functions when you can, so it is easy to test. If
   you edit the theme script in `index.html`, update its hash in `firebase.json`; `csp.test.ts`

@@ -220,3 +220,34 @@ func TestBreakdownFullMetricsWithFilters(t *testing.T) {
 		t.Fatalf("entry / for visits that saw /pricing = %d, %v, %vs; want 1, 0, 240", v, b, d)
 	}
 }
+
+func TestSiteActivityFields(t *testing.T) {
+	now := time.Date(2026, 11, 2, 12, 0, 0, 0, time.UTC)
+	empty, emptyBase := newTestAPI(t, now, nil)
+	w := httptest.NewRecorder()
+	empty.ServeHTTP(w, httptest.NewRequest(http.MethodGet, emptyBase, nil))
+	var raw map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &raw); err != nil {
+		t.Fatal(err)
+	}
+	// The dashboard tells "no data yet" apart from a missing field, so null must be sent.
+	for _, k := range []string{"first_event_at", "last_event_at"} {
+		if v, ok := raw[k]; !ok || v != nil {
+			t.Fatalf("%s = %v (present %v), want null", k, v, ok)
+		}
+	}
+
+	h, base := newTestAPI(t, now, []store.Event{
+		{Time: now.Add(-3 * time.Hour), VisitorID: 1, Path: "/"},
+		{Time: now.Add(-time.Minute), VisitorID: 2, Path: "/"},
+	})
+	site := get[siteJSON](t, h, base)
+	if site.FirstEventAt == nil || !site.FirstEventAt.Equal(now.Add(-3*time.Hour)) ||
+		site.LastEventAt == nil || !site.LastEventAt.Equal(now.Add(-time.Minute)) {
+		t.Fatalf("site = %+v, want events from 09:00 to 11:59", site)
+	}
+	list := get[[]siteJSON](t, h, "/api/sites")
+	if len(list) != 1 || list[0].FirstEventAt == nil || !list[0].LastEventAt.Equal(*site.LastEventAt) {
+		t.Fatalf("list = %+v, want the same activity as the site", list)
+	}
+}

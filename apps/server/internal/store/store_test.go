@@ -121,6 +121,77 @@ func TestSites(t *testing.T) {
 	}
 }
 
+func TestSiteActivity(t *testing.T) {
+	ctx := context.Background()
+	st := openTemp(t)
+	site, err := st.CreateSite(ctx, "", "mlz.no")
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := st.CreateSite(ctx, "", "other.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a, err := st.SiteActivity(ctx, site.ID); err != nil || !a.FirstEvent.IsZero() || !a.LastEvent.IsZero() {
+		t.Fatalf("activity before any event = %+v, %v; want zero", a, err)
+	}
+
+	t0 := time.Date(2026, 11, 2, 10, 0, 0, 0, time.UTC)
+	for i, ts := range []time.Time{t0.Add(time.Hour), t0, t0.Add(30 * time.Minute)} {
+		e := Event{SiteID: site.ID, Time: ts, Type: "pageview", VisitorID: int64(i + 1), Hostname: "mlz.no", Path: "/"}
+		if err := st.InsertEvent(ctx, e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// A later event on another site must not leak into this one.
+	if err := st.InsertEvent(ctx, Event{SiteID: other.ID, Time: t0.Add(5 * time.Hour), Type: "pageview", VisitorID: 9, Hostname: "other.example", Path: "/"}); err != nil {
+		t.Fatal(err)
+	}
+	a, err := st.SiteActivity(ctx, site.ID)
+	if err != nil || !a.FirstEvent.Equal(t0) || !a.LastEvent.Equal(t0.Add(time.Hour)) {
+		t.Fatalf("activity = %+v, %v; want %s..%s", a, err, t0, t0.Add(time.Hour))
+	}
+
+	all, err := st.AllSiteActivity(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if all[site.ID] != a || !all[other.ID].FirstEvent.Equal(t0.Add(5*time.Hour)) || len(all) != 2 {
+		t.Fatalf("all activity = %+v; want %+v for %s and the other site's event", all, a, site.ID)
+	}
+
+	// Both must seek events_site_ts, never scan events: the site list asks for every site.
+	assertNoEventScan(t, st, siteActivitySQL, site.ID)
+	assertNoEventScan(t, st, allSiteActivitySQL)
+}
+
+func assertNoEventScan(t *testing.T, st *Store, query string, args ...any) {
+	t.Helper()
+	rows, err := st.db.QueryContext(context.Background(), "EXPLAIN QUERY PLAN "+query, args...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = rows.Close() }()
+	var plan []string
+	for rows.Next() {
+		var id, parent, unused int
+		var detail string
+		if err := rows.Scan(&id, &parent, &unused, &detail); err != nil {
+			t.Fatal(err)
+		}
+		plan = append(plan, detail)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	// A MIN or MAX can also walk events_ts until a row matches, which is a scan too.
+	for _, d := range plan {
+		if strings.Contains(d, " events ") && !strings.Contains(d, "events_site_ts (site_id=?)") {
+			t.Fatalf("query plan does not seek events by site: %q", plan)
+		}
+	}
+}
+
 func TestSessions(t *testing.T) {
 	ctx := context.Background()
 	st := openTemp(t)

@@ -47,6 +47,9 @@ export type Site = {
   name: string
   domain: string
   created_at: string
+  /** Oldest and newest stored events; null until the first event arrives. */
+  first_event_at: string | null
+  last_event_at: string | null
 }
 
 export type Summary = {

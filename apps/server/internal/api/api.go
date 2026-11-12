@@ -61,10 +61,24 @@ type siteJSON struct {
 	Name      string    `json:"name"`
 	Domain    string    `json:"domain"`
 	CreatedAt time.Time `json:"created_at"`
+	// The oldest and newest stored events, null until the first one arrives. The
+	// dashboard shows onboarding instead of empty charts while first_event_at is null.
+	FirstEventAt *time.Time `json:"first_event_at"`
+	LastEventAt  *time.Time `json:"last_event_at"`
 }
 
-func toJSON(s store.Site) siteJSON {
-	return siteJSON{ID: s.ID, Name: s.Name, Domain: s.Domain, CreatedAt: s.CreatedAt}
+func toJSON(s store.Site, act store.Activity) siteJSON {
+	out := siteJSON{ID: s.ID, Name: s.Name, Domain: s.Domain, CreatedAt: s.CreatedAt}
+	if !act.FirstEvent.IsZero() {
+		out.FirstEventAt, out.LastEventAt = &act.FirstEvent, &act.LastEvent
+	}
+	return out
+}
+
+// withActivity is toJSON for a response that includes the site's event span.
+func (a *API) withActivity(ctx context.Context, s store.Site) (siteJSON, error) {
+	act, err := a.Store.SiteActivity(ctx, s.ID)
+	return toJSON(s, act), err
 }
 
 type siteRequest struct {
@@ -78,9 +92,14 @@ func (a *API) listSites(w http.ResponseWriter, r *http.Request) {
 		a.internal(w, "list sites", err)
 		return
 	}
+	act, err := a.Store.AllSiteActivity(r.Context())
+	if err != nil {
+		a.internal(w, "list sites", err)
+		return
+	}
 	out := make([]siteJSON, 0, len(sites))
 	for _, s := range sites {
-		out = append(out, toJSON(s))
+		out = append(out, toJSON(s, act[s.ID]))
 	}
 	httpx.WriteJSON(w, http.StatusOK, out)
 }
@@ -96,7 +115,7 @@ func (a *API) createSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.audit(r, "site created", "site", site.ID, "domain", site.Domain)
-	httpx.WriteJSON(w, http.StatusCreated, toJSON(site))
+	httpx.WriteJSON(w, http.StatusCreated, toJSON(site, store.Activity{}))
 }
 
 func (a *API) getSite(w http.ResponseWriter, r *http.Request) {
@@ -104,7 +123,12 @@ func (a *API) getSite(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, toJSON(site))
+	j, err := a.withActivity(r.Context(), site)
+	if err != nil {
+		a.internal(w, "get site", err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, j)
 }
 
 // updateSite changes the fields that are present: an absent or empty domain keeps the
@@ -120,7 +144,13 @@ func (a *API) updateSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.audit(r, "site updated", "site", site.ID, "domain", site.Domain)
-	httpx.WriteJSON(w, http.StatusOK, toJSON(site))
+	// The update is stored; failing to read the event span must not report it as failed.
+	j, err := a.withActivity(r.Context(), site)
+	if err != nil {
+		a.Log.Error("read site activity", "site", site.ID, "err", err)
+		j = toJSON(site, store.Activity{})
+	}
+	httpx.WriteJSON(w, http.StatusOK, j)
 }
 
 // deleteSite has no body, so the Content-Type check that protects the other mutations from

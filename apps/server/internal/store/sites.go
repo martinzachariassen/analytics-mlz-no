@@ -194,6 +194,66 @@ func (s *Store) ListSites(ctx context.Context) ([]Site, error) {
 	return sites, rows.Err()
 }
 
+// Activity is when a site's oldest and newest stored events happened; both are zero when
+// it has none. It is read fresh on every call, unlike GetSite, so a waiting dashboard sees
+// the first event as soon as it is stored.
+type Activity struct {
+	FirstEvent time.Time
+	LastEvent  time.Time
+}
+
+// Each bound is a single seek on events_site_ts; SQLite only optimises a MIN or MAX that
+// stands alone, hence the two subqueries.
+const siteActivitySQL = `SELECT (SELECT MIN(ts) FROM events WHERE site_id = ?1),
+	(SELECT MAX(ts) FROM events WHERE site_id = ?1)`
+
+// The same two seeks per site, correlated, so the site list costs one query.
+const allSiteActivitySQL = `SELECT id,
+	(SELECT MIN(ts) FROM events WHERE site_id = sites.id),
+	(SELECT MAX(ts) FROM events WHERE site_id = sites.id)
+	FROM sites`
+
+// SiteActivity returns the site's Activity.
+func (s *Store) SiteActivity(ctx context.Context, siteID string) (Activity, error) {
+	var first, last sql.NullInt64
+	err := s.db.QueryRowContext(ctx, siteActivitySQL, siteID).Scan(&first, &last)
+	if err != nil {
+		return Activity{}, err
+	}
+	return toActivity(first, last), nil
+}
+
+// AllSiteActivity returns the Activity of every site, keyed by site id.
+func (s *Store) AllSiteActivity(ctx context.Context) (map[string]Activity, error) {
+	rows, err := s.db.QueryContext(ctx, allSiteActivitySQL)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := map[string]Activity{}
+	for rows.Next() {
+		var id string
+		var first, last sql.NullInt64
+		if err := rows.Scan(&id, &first, &last); err != nil {
+			return nil, err
+		}
+		out[id] = toActivity(first, last)
+	}
+	return out, rows.Err()
+}
+
+func toActivity(first, last sql.NullInt64) Activity {
+	var a Activity
+	if first.Valid {
+		a.FirstEvent = time.UnixMilli(first.Int64).UTC()
+	}
+	if last.Valid {
+		a.LastEvent = time.UnixMilli(last.Int64).UTC()
+	}
+	return a
+}
+
 // Site ids: 12 characters from an alphabet without look-alikes (no 0/o, 1/l).
 const (
 	idAlphabet = "abcdefghijkmnopqrstuvwxyz23456789"

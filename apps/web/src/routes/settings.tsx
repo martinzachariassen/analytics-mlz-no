@@ -1,7 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { PartyPopper } from "lucide-react"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { formatDistanceToNow } from "date-fns"
+import { CircleCheck, LoaderCircle } from "lucide-react"
 import { type FormEvent, useState } from "react"
-import { useNavigate, useParams, useSearchParams } from "react-router"
+import { Link, useNavigate, useParams, useSearchParams } from "react-router"
 import { toast } from "sonner"
 
 import { ErrorNote } from "@/components/error-note"
@@ -30,28 +31,34 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
-import { api } from "@/lib/api"
+import { api, type Site } from "@/lib/api"
+import { useSite } from "@/lib/queries"
 
 export function SettingsPage() {
   const { id = "" } = useParams()
   const [params] = useSearchParams()
-  const site = useQuery({ queryKey: ["site", id], queryFn: () => api.site(id) })
+  // Live, so "Last event … ago" stays current while the page is open.
+  const site = useSite(id, { live: true })
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-4 sm:p-6 lg:py-10">
-      {params.get("new") && (
-        <Alert>
-          <PartyPopper />
-          <AlertTitle>Site added</AlertTitle>
-          <AlertDescription>
-            Add the snippet below to your website to start collecting data.
-          </AlertDescription>
-        </Alert>
+      {site.data && (
+        <SetupStatus site={site.data} isNew={params.get("new") !== null} />
       )}
 
       <Card>
         <CardHeader>
           <CardTitle>Tracking code</CardTitle>
+          {site.data?.last_event_at && (
+            <CardDescription>
+              Last event{" "}
+              <time dateTime={site.data.last_event_at}>
+                {formatDistanceToNow(site.data.last_event_at, {
+                  addSuffix: true,
+                })}
+              </time>
+            </CardDescription>
+          )}
         </CardHeader>
         <CardContent>
           <TrackingSnippet siteId={site.data?.id ?? id} />
@@ -67,6 +74,38 @@ export function SettingsPage() {
       )}
       {site.data && <DangerZone id={id} name={site.data.name} />}
     </div>
+  )
+}
+
+/**
+ * Onboarding status: waiting until the first event arrives (useSite polls meanwhile),
+ * then, for a site that was just added, a way on to the dashboard.
+ */
+function SetupStatus({ site, isNew }: { site: Site; isNew: boolean }) {
+  if (site.first_event_at === null)
+    return (
+      <Alert role="status">
+        <LoaderCircle className="text-violet motion-safe:animate-spin" />
+        <AlertTitle>
+          {isNew ? "Site added. " : ""}Waiting for the first event…
+        </AlertTitle>
+        <AlertDescription>
+          Add the snippet below to every page on {site.domain} and open the site
+          in a browser. This updates by itself.
+        </AlertDescription>
+      </Alert>
+    )
+  if (!isNew) return null
+  return (
+    <Alert role="status">
+      <CircleCheck className="text-positive" />
+      <AlertTitle>Receiving data</AlertTitle>
+      <AlertDescription>
+        <Link to={`/sites/${site.id}`} className="text-accent-deep underline">
+          Open the dashboard
+        </Link>
+      </AlertDescription>
+    </Alert>
   )
 }
 

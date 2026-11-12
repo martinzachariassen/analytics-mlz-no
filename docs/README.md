@@ -45,7 +45,7 @@
 
 ### Background
 - [Privacy](privacy.md): exactly what is stored, and what never is
-- [Decisions](decisions.md): architectural decisions and open items
+- [Decisions](decisions.md): architectural decisions, open items and the roadmap
 - [Changelog](../CHANGELOG.md) · [Contributing](../CONTRIBUTING.md) · [Security policy](../SECURITY.md)
 
 ## How these docs are written

@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query"
 import { ChevronRight } from "lucide-react"
+import { useEffect, useRef } from "react"
 import { Link, Outlet, useLocation } from "react-router"
+import { toast } from "sonner"
 
 import { VIEWS } from "@/components/app-sidebar"
 import {
@@ -11,7 +12,9 @@ import {
 import { DetailSheet } from "@/components/detail-sheet"
 import { FilterBar } from "@/components/filter-bar"
 import { PageHeader } from "@/components/page-header"
-import { ApiError, api } from "@/lib/api"
+import { WaitingForData } from "@/components/waiting-for-data"
+import { ApiError } from "@/lib/api"
+import { useSite } from "@/lib/queries"
 import { useScope } from "@/lib/use-scope"
 
 /**
@@ -22,10 +25,8 @@ import { useScope } from "@/lib/use-scope"
 export function SiteLayout() {
   const sc = useScope()
   const { pathname } = useLocation()
-  const site = useQuery({
-    queryKey: ["site", sc.siteId],
-    queryFn: () => api.site(sc.siteId),
-  })
+  const site = useSite(sc.siteId)
+  useFirstEventToast(sc.siteId, site.data?.first_event_at)
   const sub = pathname.slice(`/sites/${sc.siteId}`.length).replace(/^\//, "")
   const settings = sub === "settings"
   const view = VIEWS.find((v) => v.path === sub)
@@ -61,6 +62,16 @@ export function SiteLayout() {
       </>
     )
 
+  if (site.data?.first_event_at === null)
+    return (
+      <>
+        <PageHeader title={title} />
+        <div className="p-3 sm:p-4 lg:p-6">
+          <WaitingForData site={site.data} />
+        </div>
+      </>
+    )
+
   return (
     <>
       <Shortcuts />
@@ -85,6 +96,24 @@ export function SiteLayout() {
       <DetailSheet />
     </>
   )
+}
+
+/**
+ * Says so when the site on screen goes from waiting to having data. Keyed on the site,
+ * because the layout stays mounted when the sidebar switches from a waiting site to one
+ * whose data is already cached.
+ */
+function useFirstEventToast(
+  siteId: string,
+  firstEventAt: string | null | undefined
+) {
+  const previous = useRef({ siteId, firstEventAt })
+  useEffect(() => {
+    const p = previous.current
+    if (p.siteId === siteId && p.firstEventAt === null && firstEventAt)
+      toast.success("First event received")
+    previous.current = { siteId, firstEventAt }
+  }, [siteId, firstEventAt])
 }
 
 function Shortcuts() {

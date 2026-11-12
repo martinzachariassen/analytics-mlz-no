@@ -7,12 +7,14 @@ import { ErrorNote } from "@/components/error-note"
 import { PageHeader } from "@/components/page-header"
 import { Sparkline } from "@/components/sparkline"
 import { Skeleton } from "@/components/ui/skeleton"
+import { LiveDot } from "@/components/waiting-for-data"
 import { api, type Site } from "@/lib/api"
 import { formatNumber } from "@/lib/format"
 import { periodRange } from "@/lib/period"
+import { useSites } from "@/lib/queries"
 
 export function SitesPage() {
-  const sites = useQuery({ queryKey: ["sites"], queryFn: api.sites })
+  const sites = useSites()
   const count = sites.data?.length
 
   return (
@@ -70,9 +72,11 @@ export function SitesPage() {
 
 function SiteRow({ site, index }: { site: Site; index: number }) {
   const range = periodRange("7d")
+  const waiting = site.first_event_at === null
   const stats = useQuery({
     queryKey: ["stats", site.id, range],
     queryFn: () => api.stats(site.id, range),
+    enabled: !waiting,
   })
 
   return (
@@ -88,7 +92,12 @@ function SiteRow({ site, index }: { site: Site; index: number }) {
           <span className="truncate text-xs text-fg-muted">{site.domain}</span>
         </span>
         <span className="max-sm:order-last max-sm:col-span-2">
-          {stats.data ? (
+          {waiting ? (
+            <span className="flex items-center gap-2 text-xs text-fg-muted">
+              <LiveDot />
+              Waiting for first event
+            </span>
+          ) : stats.data ? (
             <Sparkline values={stats.data.timeseries.map((b) => b.visitors)} />
           ) : stats.isError ? (
             <span
@@ -104,7 +113,7 @@ function SiteRow({ site, index }: { site: Site; index: number }) {
         <span className="figure text-right text-[22px]">
           {stats.data ? (
             formatNumber(stats.data.summary.visitors)
-          ) : stats.isError ? (
+          ) : waiting || stats.isError ? (
             <span className="text-fg-muted">–</span>
           ) : (
             <Skeleton className="ml-auto h-7 w-14" />

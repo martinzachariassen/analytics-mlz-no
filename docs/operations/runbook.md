@@ -205,7 +205,7 @@ Do this when someone leaves, a laptop is lost, or a session cookie may have leak
    they would have made a request (their sessions are deleted then), or sign out in the browser
    to end your own session.
 
-Sessions also expire by themselves after 7 days without use.
+Sessions also expire by themselves after 7 days without use, and 30 days after sign-in at the latest.
 
 ### A backup job failed
 

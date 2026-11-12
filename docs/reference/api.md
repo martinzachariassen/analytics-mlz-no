@@ -40,8 +40,8 @@ curl -s -b jar -H 'Content-Type: application/json' \
 
 In production, sign in with the browser, copy the `__session` cookie from the developer tools,
 and pass it with `-b "__session=…"`. Treat it like a password: it stays valid while it is used
-and expires after 7 days without use, when you sign out, or when your username is removed from
-`ALLOWED_GITHUB_USERS`.
+and expires after 7 days without use, 30 days after you signed in, when you sign out, or when
+your username is removed from `ALLOWED_GITHUB_USERS`.
 
 ## Conventions
 
@@ -120,7 +120,8 @@ A failed sign-in redirects to `PUBLIC_URL/?auth_error=<code>` where code is one 
 within 10 minutes (`state` otherwise).
 
 Sessions last 7 days without use. A request made more than a day into a session extends it by
-another 7 days and sends a refreshed cookie. The allowlist is checked on every request: a user
+another 7 days and sends a refreshed cookie, but never past 30 days after the sign-in: then the
+user signs in again, so a leaked cookie cannot be kept alive forever. The allowlist is checked on every request: a user
 removed from `ALLOWED_GITHUB_USERS` gets `401` and their sessions are deleted.
 `analytics sessions revoke [-user LOGIN]` deletes sessions from the command line.
 

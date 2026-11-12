@@ -87,30 +87,36 @@ func scanUser(row *sql.Row) (User, error) {
 	return u, err
 }
 
+// Session is when a sign-in started and when it expires.
+type Session struct {
+	Created time.Time
+	Expires time.Time
+}
+
 // CreateSession stores a session token hash for the user.
-func (s *Store) CreateSession(ctx context.Context, tokenHash []byte, userID int64, expires time.Time) error {
+func (s *Store) CreateSession(ctx context.Context, tokenHash []byte, userID int64, created, expires time.Time) error {
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)`,
-		tokenHash, userID, expires.UnixMilli())
+		`INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)`,
+		tokenHash, userID, created.UnixMilli(), expires.UnixMilli())
 	return err
 }
 
-// UserBySession returns the user owning an unexpired session and when the session expires.
-func (s *Store) UserBySession(ctx context.Context, tokenHash []byte, now time.Time) (User, time.Time, error) {
+// UserBySession returns the user owning an unexpired session, and the session.
+func (s *Store) UserBySession(ctx context.Context, tokenHash []byte, now time.Time) (User, Session, error) {
 	var u User
-	var expires int64
+	var created, expires int64
 	err := s.rdb.QueryRowContext(ctx,
-		`SELECT u.id, u.provider, u.provider_id, u.login, s.expires_at FROM sessions s
+		`SELECT u.id, u.provider, u.provider_id, u.login, s.created_at, s.expires_at FROM sessions s
 		 JOIN users u ON u.id = s.user_id
 		 WHERE s.token_hash = ? AND s.expires_at > ?`, tokenHash, now.UnixMilli()).
-		Scan(&u.ID, &u.Provider, &u.ProviderID, &u.Login, &expires)
+		Scan(&u.ID, &u.Provider, &u.ProviderID, &u.Login, &created, &expires)
 	if errors.Is(err, sql.ErrNoRows) {
-		return User{}, time.Time{}, ErrNotFound
+		return User{}, Session{}, ErrNotFound
 	}
 	if err != nil {
-		return User{}, time.Time{}, err
+		return User{}, Session{}, err
 	}
-	return u, time.UnixMilli(expires).UTC(), nil
+	return u, Session{Created: time.UnixMilli(created).UTC(), Expires: time.UnixMilli(expires).UTC()}, nil
 }
 
 // DeleteSession removes a session (logout).

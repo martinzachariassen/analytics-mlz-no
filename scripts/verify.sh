@@ -52,8 +52,8 @@ if want tracker; then
 fi
 
 if want web; then
-  step "Dashboard: types, tests, production build"
-  (cd apps/web && bun run --silent typecheck && bun run --silent test && bun run --silent build)
+  step "Dashboard: types, tests, production build, size budget"
+  (cd apps/web && bun run --silent typecheck && bun run --silent test && bun run --silent build && bun run --silent check-size)
 fi
 
 if want e2e; then

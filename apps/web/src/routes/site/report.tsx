@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router"
 import { BarList } from "@/components/bar-list"
 import { DataTable } from "@/components/data-table"
 import { IntervalSelect } from "@/components/date-range-picker"
-import { ErrorNote } from "@/components/error-note"
+import { ErrorNote, Unavailable } from "@/components/error-note"
 import { KpiStrip } from "@/components/kpi-strip"
 import { Panel, TextTabs } from "@/components/panel"
 import { ProportionStrip } from "@/components/proportion-strip"
@@ -108,15 +108,16 @@ export function ReportPage({ report }: { report: keyof typeof REPORTS }) {
   return (
     <div className="flex flex-col gap-3 lg:gap-4">
       <KpiStrip stats={stats.data} now={stats.dataUpdatedAt} />
-      {stats.isError && <ErrorNote error={stats.error} />}
-      {rows.isError && !stats.isError && <ErrorNote error={rows.error} />}
+      <ErrorNote queries={[stats, rows]} />
       {cfg.extra === "map" && (
         <Panel
           title="Visitor map"
           description="Country from IP; the IP is never stored"
         >
           <Suspense fallback={<Skeleton className="aspect-2/1" />}>
-            {rows.data ? (
+            {rows.isError ? (
+              <Unavailable className="aspect-2/1 h-auto" />
+            ) : rows.data ? (
               <WorldMap
                 rows={rows.data}
                 total={total}
@@ -139,18 +140,26 @@ export function ReportPage({ report }: { report: keyof typeof REPORTS }) {
         {cfg.extra === "strip" && (
           <ProportionStrip dim={dim} rows={rows.data} max={5} />
         )}
-        <TopSeriesChart sc={sc} dim={dim} rows={rows.data} />
+        {rows.isError ? (
+          <Unavailable />
+        ) : (
+          <TopSeriesChart sc={sc} dim={dim} rows={rows.data} />
+        )}
       </Panel>
       <Panel title={DIMS[dim].plural} bodyClassName="p-0">
-        <DataTable
-          dim={dim}
-          rows={rows.data}
-          loading={rows.isPending}
-          total={total}
-          onOpen={(r) => sc.openDetail({ dim, value: r.value })}
-          canLoadMore={rows.data?.length === limit && limit < 1000}
-          onLoadMore={() => setLimit(1000)}
-        />
+        {rows.isError ? (
+          <Unavailable className="h-40" />
+        ) : (
+          <DataTable
+            dim={dim}
+            rows={rows.data}
+            loading={rows.isPending}
+            total={total}
+            onOpen={(r) => sc.openDetail({ dim, value: r.value })}
+            canLoadMore={rows.data?.length === limit && limit < 1000}
+            onLoadMore={() => setLimit(1000)}
+          />
+        )}
       </Panel>
     </div>
   )
@@ -171,14 +180,17 @@ export function EventsPage() {
   return (
     <div className="flex flex-col gap-3 lg:gap-4">
       <KpiStrip stats={stats.data} now={stats.dataUpdatedAt} />
-      {stats.isError && <ErrorNote error={stats.error} />}
-      {events.isError && !stats.isError && <ErrorNote error={events.error} />}
+      <ErrorNote queries={[stats, events]} />
       <Panel
         title="Top events over time"
         description="Visitors who triggered each event"
         action={<IntervalSelect sc={sc} />}
       >
-        <TopSeriesChart sc={sc} dim="event" rows={events.data} />
+        {events.isError ? (
+          <Unavailable />
+        ) : (
+          <TopSeriesChart sc={sc} dim="event" rows={events.data} />
+        )}
       </Panel>
       <div className="grid gap-3 lg:grid-cols-12 lg:gap-4">
         <Panel
@@ -187,13 +199,17 @@ export function EventsPage() {
           className="lg:col-span-7"
           bodyClassName="p-0"
         >
-          <DataTable
-            dim="event"
-            rows={events.data}
-            loading={events.isPending}
-            total={total}
-            onOpen={(r) => setPicked(r.value)}
-          />
+          {events.isError ? (
+            <Unavailable className="h-40" />
+          ) : (
+            <DataTable
+              dim="event"
+              rows={events.data}
+              loading={events.isPending}
+              total={total}
+              onOpen={(r) => setPicked(r.value)}
+            />
+          )}
         </Panel>
         {event !== undefined && (
           <Properties event={event} className="lg:col-span-5" total={total} />
@@ -251,7 +267,7 @@ function Properties({
       }
     >
       {keys.isError || values.isError ? (
-        <ErrorNote error={keys.error ?? values.error} />
+        <ErrorNote queries={[keys, values]} />
       ) : keys.data && keys.data.length === 0 ? (
         <p className="py-10 text-center text-xs text-fg-muted">
           This event has no properties.

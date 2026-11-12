@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react"
 import { useSearchParams } from "react-router"
 import { IntervalSelect } from "@/components/date-range-picker"
+import { ErrorNote } from "@/components/error-note"
 import { ActiveHours } from "@/components/heatmap"
 import { Insights } from "@/components/insights"
 import { KpiStrip } from "@/components/kpi-strip"
@@ -40,9 +41,7 @@ export function OverviewPage() {
   return (
     <div className="flex flex-col gap-3 lg:gap-4">
       <Insights stats={stats.data} />
-      {stats.isError && (
-        <p className="text-sm text-destructive">{stats.error.message}</p>
-      )}
+      <ErrorNote queries={[stats]} className="py-2" />
       <KpiStrip
         stats={stats.data}
         metric={metric}
@@ -141,7 +140,9 @@ function MapCard({ className, total }: { className?: string; total?: number }) {
       className={className}
     >
       <Suspense fallback={<Skeleton className="aspect-2/1" />}>
-        {q.data ? (
+        {q.isError ? (
+          <ErrorNote queries={[q]} className="aspect-2/1 py-0" />
+        ) : q.data ? (
           <WorldMap
             rows={q.data}
             total={total}

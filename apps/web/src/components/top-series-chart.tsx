@@ -1,7 +1,7 @@
 import { keepPreviousData, useQueries } from "@tanstack/react-query"
 import { format } from "date-fns"
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts"
-
+import { ErrorNote } from "@/components/error-note"
 import {
   AXIS_FORMAT,
   AXIS_TICK,
@@ -51,6 +51,8 @@ export function TopSeriesChart({
     }),
   })
 
+  if (results.some((r) => r.isError))
+    return <ErrorNote queries={results} className="h-64 py-0" />
   if (!rows || results.some((r) => !r.data))
     return <Skeleton className="h-64" />
   if (top.length === 0)

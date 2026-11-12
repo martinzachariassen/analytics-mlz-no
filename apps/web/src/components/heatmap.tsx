@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { useState } from "react"
-
+import { ErrorNote } from "@/components/error-note"
 import { Panel, TextTabs } from "@/components/panel"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -51,7 +51,9 @@ export function ActiveHours({ className }: { className?: string }) {
         />
       }
     >
-      {!grid ? (
+      {q.isError ? (
+        <ErrorNote queries={[q]} className="h-52 py-0" />
+      ) : !grid ? (
         <Skeleton className="h-52" />
       ) : (
         <div className="flex flex-col gap-3">

@@ -15,6 +15,9 @@ All notable changes are documented here. The format follows
 - `analytics sessions revoke [-user LOGIN]` signs dashboard users out everywhere.
 - Terraform: `require_replica` (see Fixed), labels on every resource, lock files for Linux and macOS, `terraform_version < 2.0`, and an outputs table plus a restore playbook (`docs/guides/deploy-gcp.md`, `docs/operations/runbook.md`). The Docker image records which DB-IP month it carries in `/usr/share/geoip/VERSION`.
 - Dashboard tests: component tests (Testing Library, happy-dom) for the filter bar, date range picker, detail sheet and error note, and Playwright end-to-end tests against a seeded server on desktop, mobile and the light theme, with an axe accessibility scan on every page. They run as the new `e2e` group of `scripts/verify.sh` and a CI job that uploads traces on failure.
+- Dashboard: a failed view shows a "Try again" button that refetches every request the view needs that failed, and nothing else. The overview and the "Could not reach the server" page now use the same error message as the other views, and a retry that fails again is announced to screen readers again. Background polling no longer flips the message to "Retrying…", and focus stays on the button during a retry.
+- Dashboard: the heatmap, the visitor map and the "Top … over time" chart show an error with a retry instead of a skeleton that never ends when their request fails; report panels that depend on a failed request say "Not available" under the page's error message.
+- Dashboard: gzipped size budgets for the production build (JavaScript loaded before the first render, all CSS, the largest lazy chunk, all JavaScript), checked by `bun run check-size` in the `web` verify group. TypeScript also checks `noUncheckedIndexedAccess`.
 
 ### Security
 - Built with Go 1.27.4, which fixes a vulnerability in `net/http` ([GO-2026-6859](https://pkg.go.dev/vuln/GO-2026-6859)).

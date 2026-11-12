@@ -27,7 +27,7 @@ export function RealtimePage() {
 
   return (
     <div className="flex flex-col gap-3 lg:gap-4">
-      {rt.isError && <ErrorNote error={rt.error} />}
+      {rt.isError && <ErrorNote queries={[rt]} />}
       <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-3">
         <Stat
           label="Visitors now"
@@ -198,6 +198,7 @@ function LiveList({
   if (error && !rows) {
     return (
       <Panel title={title} description="Last 30 minutes">
+        {/* No retry here: the page-level note above retries the same query. */}
         <ErrorNote error={error} className="py-2" />
       </Panel>
     )

@@ -73,6 +73,12 @@ The reasons are in [ARCHITECTURE.md](ARCHITECTURE.md#invariants).
 Docs are part of the change, in the same pull request. Every page starts with a TL;DR. The
 style is described in [docs/README.md](docs/README.md#how-these-docs-are-written).
 
+> [!IMPORTANT]
+> **Golden rule:** before opening a PR, search the docs for every name you touched (env var,
+> flag, endpoint, command, file path) and update every hit. When you remove or replace
+> something, rewrite the affected pages so they stay as complete as before. Never leave a
+> page thinner or out of date. A PR that changes behaviour without matching docs is not done.
+
 | If you change… | Update |
 |---|---|
 | An environment variable or Terraform variable | [docs/reference/configuration.md](docs/reference/configuration.md) |

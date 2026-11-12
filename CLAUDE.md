@@ -2,6 +2,16 @@
 
 Self-hostable, cookie-free web analytics. Read `ARCHITECTURE.md` (code map, invariants) and `docs/decisions.md` (architectural decisions) before larger changes. Docs index: `docs/README.md`.
 
+## Golden rule: docs move with the code
+
+Every change that adds, changes or removes behaviour, configuration, an endpoint, a CLI command, a stored field, a tool or a workflow must update the docs **in the same PR**. Before opening a PR:
+
+1. **Scan**: grep `README.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `CLAUDE.md` and `docs/` for every name you touched (env var, flag, endpoint, file path, command, package) and read the pages the "If you change…, update…" table in `CONTRIBUTING.md` points to.
+2. **Update**: fix every hit so it describes the code as it is after the PR. Add new things where a reader will look for them (reference page, guide, runbook, `CHANGELOG.md`).
+3. **Never downgrade**: when removing or replacing something, rewrite the affected docs so they stay just as complete, keeping the TL;DR, examples, `<details>` and "Next steps". Removing a feature removes its docs, never the surrounding explanation. Rebasing or resolving conflicts must not drop doc content from either side.
+
+A PR that changes behaviour without matching docs is not done.
+
 ## Layout
 
 Monorepo: `apps/` holds everything that runs (`server`, `web`, `tracker`, `demo`), `infra/` holds Docker and Terraform. The Go module lives in `apps/server`; a root `go.work` lets `go run ./apps/server/cmd/analytics` work from the repo root.

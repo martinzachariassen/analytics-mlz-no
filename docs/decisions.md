@@ -1,6 +1,13 @@
-# Plan
+# Decisions
+
+> **TL;DR** — Go, SQLite and one instance. Litestream for durability, Cloud Run plus Firebase
+> Hosting in production, Docker Compose for everyone else. GitHub OAuth only, and no cookies on
+> tracked sites. The table below is the record. Change it when a decision changes.
+
+**Read this if:** you are about to make a larger change, or wonder why something is the way it is.
 
 Lightweight, privacy-friendly, self-hostable web analytics (inspired by Umami/Plausible, but smaller).
+This page records the architectural decisions and open items. Read it before larger changes.
 
 ## Decisions
 
@@ -27,10 +34,14 @@ Lightweight, privacy-friendly, self-hostable web analytics (inspired by Umami/Pl
 4. ✅ **Dashboard** — React + Vite + shadcn/ui.
 5. ✅ **Terraform** — Artifact Registry, Cloud Run, GCS, Secret Manager, Firebase Hosting.
 6. ✅ **Contributor-friendliness** — README, CONTRIBUTING, SECURITY, issue/PR templates (good-first-issues: label some once the repo is public).
-7. **Release** — CI hardening, versioned builds, GHCR image + binaries on tag (`.github/workflows/release.yml`), privacy/upgrade docs. Code is ready; the first tag waits for the production checks in [RELEASING.md](RELEASING.md).
+7. **Release** — CI hardening, versioned builds, GHCR image + binaries on tag (`.github/workflows/release.yml`), privacy/upgrade docs. Code is ready; the first tag waits for the production checks in [releasing.md](development/releasing.md).
 
 ## Open items
 
 - ✅ Production domain: `analytics.mlz.no` (dashboard and API), `t.mlz.no` (tracking script).
 - ✅ `PROXY_HOPS=2` on Cloud Run behind Firebase Hosting: production events carry the right country and one visitor per person.
-- Decide how self-hosters get the dashboard (embed `apps/web/dist` or a reverse-proxy recipe; see RELEASING.md) before 1.0.
+- **Dashboard for self-hosters.** The Docker image contains the API only. The dashboard (`apps/web/`) is
+  deployed to Firebase Hosting and reaches the API through a same-origin rewrite, so someone running
+  `docker compose` has a working collector but no dashboard unless they serve `apps/web/dist`
+  themselves behind the same origin. Decide before 1.0 whether to embed `apps/web/dist` in the Go
+  binary (simplest for self-hosting) or document a reverse-proxy recipe.

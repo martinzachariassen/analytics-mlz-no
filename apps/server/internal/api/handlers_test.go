@@ -123,7 +123,10 @@ func TestRealtime(t *testing.T) {
 		{Time: ago(3), VisitorID: 2, Path: "/a", Country: "SE"},
 		// Outside the 5-minute "now" window, inside the 30-minute detail window.
 		{Time: ago(10), VisitorID: 3, Path: "/b", Country: "NO"},
-		// Outside both.
+		{Time: ago(5).Add(-time.Millisecond), VisitorID: 3, Path: "/b", Country: "NO"},
+		// The first instant of the detail window (11:31:00) is in, the one before it is out.
+		{Time: time.Date(2026, 11, 2, 11, 31, 0, 0, time.UTC), VisitorID: 3, Path: "/b", Country: "NO"},
+		{Time: time.Date(2026, 11, 2, 11, 30, 59, 999e6, time.UTC), VisitorID: 4, Path: "/old", Country: "DK"},
 		{Time: ago(40), VisitorID: 4, Path: "/old", Country: "DK"},
 	})
 
@@ -147,26 +150,35 @@ func TestRealtime(t *testing.T) {
 	for _, m := range rt.Minutes {
 		views += m.Pageviews
 	}
-	if views != 4 {
-		t.Fatalf("pageviews in the last 30 minutes = %d, want 4", views)
+	if views != 6 {
+		t.Fatalf("pageviews in the last 30 minutes = %d, want 6", views)
+	}
+	if m := rt.Minutes[0]; m.Pageviews != 1 {
+		t.Fatalf("minute 11:31 = %+v, want the view at the window start", m)
 	}
 	if m := rt.Minutes[28]; m.Pageviews != 1 || m.Visitors != 1 {
 		t.Fatalf("minute 11:59 = %+v, want visitor 1's view (the custom event is not a view)", m)
 	}
 
 	pages := byValue(rt.Pages)
-	if len(pages) != 3 || pages["/a"].Count != 2 || pages["/a"].Visitors != 1 || pages["/b"].Visitors != 1 {
+	if len(pages) != 3 || pages["/a"].Count != 2 || pages["/a"].Visitors != 1 || pages["/b"].Count != 3 || pages["/b"].Visitors != 1 {
 		t.Fatalf("pages = %+v", rt.Pages)
 	}
-	if _, ok := pages["/old"]; ok {
-		t.Fatal("a view from 40 minutes ago is in realtime pages")
-	}
-	if c := byValue(rt.Countries); c["NO"].Visitors != 2 || c["SE"].Visitors != 1 || c["DK"].Visitors != 0 {
+	if c := byValue(rt.Countries); len(c) != 2 || c["NO"].Visitors != 2 || c["SE"].Visitors != 1 {
 		t.Fatalf("countries = %+v", rt.Countries)
 	}
 	if r := byValue(rt.Referrers); r["google.com"].Visitors != 1 {
 		t.Fatalf("referrers = %+v", rt.Referrers)
 	}
+}
+
+// full returns a row's visit metrics and fails the test if metrics=full left any out.
+func full(t *testing.T, r store.BreakdownRow) (visits int64, bounce, duration float64) {
+	t.Helper()
+	if r.Visits == nil || r.BounceRate == nil || r.AvgDuration == nil {
+		t.Fatalf("row %q has no visit metrics: %+v", r.Value, r)
+	}
+	return *r.Visits, *r.BounceRate, *r.AvgDuration
 }
 
 func TestBreakdownFullMetricsWithFilters(t *testing.T) {
@@ -184,24 +196,27 @@ func TestBreakdownFullMetricsWithFilters(t *testing.T) {
 	q := base + "/breakdown?dim=entry&metrics=full&from=2026-11-02&to=2026-11-02"
 
 	all := byValue(get[[]store.BreakdownRow](t, h, q))
-	if r := all["/"]; r.Visits == nil || *r.Visits != 2 || *r.BounceRate != 0.5 || *r.AvgDuration != 120 {
-		t.Fatalf("unfiltered entry / = %+v", r)
+	if v, b, d := full(t, all["/"]); v != 2 || b != 0.5 || d != 120 {
+		t.Fatalf("unfiltered entry / = %d visits, %v bounce, %vs; want 2, 0.5, 120", v, b, d)
 	}
 
 	safari := byValue(get[[]store.BreakdownRow](t, h, q+"&f=browser:is:Safari"))
 	if len(safari) != 2 {
 		t.Fatalf("Safari entry rows = %+v, want / and /blog", safari)
 	}
-	if r := safari["/"]; r.Visitors != 1 || r.Visits == nil || *r.Visits != 1 || *r.BounceRate != 1 || *r.AvgDuration != 0 {
-		t.Fatalf("Safari entry / = %+v; the Chrome visit must not count", r)
+	if v, b, d := full(t, safari["/"]); safari["/"].Visitors != 1 || v != 1 || b != 1 || d != 0 {
+		t.Fatalf("Safari entry / = %+v; the Chrome visit must not count", safari["/"])
 	}
-	if r := safari["/blog"]; r.Visits == nil || *r.Visits != 1 || *r.BounceRate != 1 {
-		t.Fatalf("Safari entry /blog = %+v", r)
+	if v, b, _ := full(t, safari["/blog"]); v != 1 || b != 1 {
+		t.Fatalf("Safari entry /blog = %+v", safari["/blog"])
 	}
 
 	// A page filter keeps whole visits that included the page.
 	pricing := byValue(get[[]store.BreakdownRow](t, h, q+"&f=path:is:/pricing"))
-	if r := pricing["/"]; len(pricing) != 1 || r.Visits == nil || *r.Visits != 1 || *r.BounceRate != 0 || *r.AvgDuration != 240 {
-		t.Fatalf("entry rows for visits that saw /pricing = %+v", pricing)
+	if len(pricing) != 1 {
+		t.Fatalf("entry rows for visits that saw /pricing = %+v, want only /", pricing)
+	}
+	if v, b, d := full(t, pricing["/"]); v != 1 || b != 0 || d != 240 {
+		t.Fatalf("entry / for visits that saw /pricing = %d, %v, %vs; want 1, 0, 240", v, b, d)
 	}
 }

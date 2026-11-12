@@ -64,6 +64,7 @@ func New(cfg config.Config, st *store.Store, authn *auth.Service, loc *geo.Locat
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()
 		if err := st.Ping(ctx); err != nil {
+			log.Error("health check failed", "err", err)
 			httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unavailable", "error": "database unavailable"})
 			return
 		}

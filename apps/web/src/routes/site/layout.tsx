@@ -26,7 +26,7 @@ export function SiteLayout() {
   const sc = useScope()
   const { pathname } = useLocation()
   const site = useSite(sc.siteId)
-  useFirstEventToast(site.data?.first_event_at)
+  useFirstEventToast(sc.siteId, site.data?.first_event_at)
   const sub = pathname.slice(`/sites/${sc.siteId}`.length).replace(/^\//, "")
   const settings = sub === "settings"
   const view = VIEWS.find((v) => v.path === sub)
@@ -98,14 +98,22 @@ export function SiteLayout() {
   )
 }
 
-/** Says so when a site that was waiting receives its first event. */
-function useFirstEventToast(firstEventAt: string | null | undefined) {
-  const previous = useRef(firstEventAt)
+/**
+ * Says so when the site on screen goes from waiting to having data. Keyed on the site,
+ * because the layout stays mounted when the sidebar switches from a waiting site to one
+ * whose data is already cached.
+ */
+function useFirstEventToast(
+  siteId: string,
+  firstEventAt: string | null | undefined
+) {
+  const previous = useRef({ siteId, firstEventAt })
   useEffect(() => {
-    if (previous.current === null && firstEventAt)
+    const p = previous.current
+    if (p.siteId === siteId && p.firstEventAt === null && firstEventAt)
       toast.success("First event received")
-    previous.current = firstEventAt
-  }, [firstEventAt])
+    previous.current = { siteId, firstEventAt }
+  }, [siteId, firstEventAt])
 }
 
 function Shortcuts() {

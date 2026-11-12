@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { formatDistanceToNow } from "date-fns"
-import { CircleCheck } from "lucide-react"
+import { CircleCheck, LoaderCircle } from "lucide-react"
 import { type FormEvent, useState } from "react"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router"
 import { toast } from "sonner"
@@ -31,14 +31,14 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
-import { LiveDot } from "@/components/waiting-for-data"
 import { api, type Site } from "@/lib/api"
 import { useSite } from "@/lib/queries"
 
 export function SettingsPage() {
   const { id = "" } = useParams()
   const [params] = useSearchParams()
-  const site = useSite(id)
+  // Live, so "Last event … ago" stays current while the page is open.
+  const site = useSite(id, { live: true })
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-4 sm:p-6 lg:py-10">
@@ -85,7 +85,7 @@ function SetupStatus({ site, isNew }: { site: Site; isNew: boolean }) {
   if (site.first_event_at === null)
     return (
       <Alert role="status">
-        <LiveDot className="mt-1" />
+        <LoaderCircle className="text-violet motion-safe:animate-spin" />
         <AlertTitle>
           {isNew ? "Site added. " : ""}Waiting for the first event…
         </AlertTitle>

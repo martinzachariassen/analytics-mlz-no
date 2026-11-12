@@ -130,9 +130,12 @@ Filters beyond `MAX_FILTERS` (10, the API's limit) are dropped instead of turnin
   `lib/api.ts`). A `401` from any query re-checks `/api/auth/me`, which sends the user to
   sign-in.
 - Realtime refetches every 10 s, the sidebar's live counts every 15 s (`refetchInterval`).
-- `useSite(siteId)` polls every 5 s (`WAITING_POLL_MS`) while the site's `first_event_at` is
-  `null`, and stops once data has arrived; the site list does the same while any site is
-  waiting.
+- `useSite(siteId)` polls while the site's `first_event_at` is `null` and stops once data has
+  arrived. `waitingPoll` in `lib/queries.ts` sets the pace: every 5 s (`WAITING_POLL_MS`) in
+  the first hour after the site was added, then every 60 s (`IDLE_POLL_MS`), so a site that
+  was never installed does not keep open tabs busy. `useSites()` polls the list at the pace of
+  its fastest waiting site. Settings uses `useSite(id, { live: true })`, which keeps polling
+  every 60 s once there is data, so "Last event … ago" stays current.
 - Changes use `useMutation` around an `api.*` call and invalidate the affected queries on
   success (see `components/add-site-dialog.tsx`).
 
@@ -171,8 +174,9 @@ arrives. When polling sees `first_event_at`, the layout swaps in the dashboard a
 event received". Settings shows the same status (with "Site added." after `?new=1`, then
 "Receiving data" with a link to the dashboard) and "Last event … ago" once there is data. The
 site list shows "Waiting for first event" and skips the stats request for such sites. Use
-`first_event_at === null` for "never had data" and the usual "Nothing in this period" for an
-empty period.
+`first_event_at === null` for "no stored events" and the usual "Nothing in this period" for an
+empty period. Onboarding follows the stored events, not history: a site whose events have all
+been purged or aged out by `RETENTION_DAYS` shows it again until the next event.
 
 ## App primitives
 

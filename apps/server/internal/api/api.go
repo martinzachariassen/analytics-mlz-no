@@ -92,14 +92,14 @@ func (a *API) listSites(w http.ResponseWriter, r *http.Request) {
 		a.internal(w, "list sites", err)
 		return
 	}
+	act, err := a.Store.AllSiteActivity(r.Context())
+	if err != nil {
+		a.internal(w, "list sites", err)
+		return
+	}
 	out := make([]siteJSON, 0, len(sites))
 	for _, s := range sites {
-		j, err := a.withActivity(r.Context(), s)
-		if err != nil {
-			a.internal(w, "list sites", err)
-			return
-		}
-		out = append(out, j)
+		out = append(out, toJSON(s, act[s.ID]))
 	}
 	httpx.WriteJSON(w, http.StatusOK, out)
 }
@@ -144,10 +144,11 @@ func (a *API) updateSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.audit(r, "site updated", "site", site.ID, "domain", site.Domain)
+	// The update is stored; failing to read the event span must not report it as failed.
 	j, err := a.withActivity(r.Context(), site)
 	if err != nil {
-		a.internal(w, "update site", err)
-		return
+		a.Log.Error("read site activity", "site", site.ID, "err", err)
+		j = toJSON(site, store.Activity{})
 	}
 	httpx.WriteJSON(w, http.StatusOK, j)
 }

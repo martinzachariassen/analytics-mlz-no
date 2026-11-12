@@ -152,8 +152,22 @@ func TestSiteActivity(t *testing.T) {
 		t.Fatalf("activity = %+v, %v; want %s..%s", a, err, t0, t0.Add(time.Hour))
 	}
 
-	// It must use the index, never scan events: the site list asks for every site.
-	rows, err := st.db.QueryContext(ctx, "EXPLAIN QUERY PLAN "+siteActivitySQL, site.ID)
+	all, err := st.AllSiteActivity(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if all[site.ID] != a || !all[other.ID].FirstEvent.Equal(t0.Add(5*time.Hour)) || len(all) != 2 {
+		t.Fatalf("all activity = %+v; want %+v for %s and the other site's event", all, a, site.ID)
+	}
+
+	// Both must seek events_site_ts, never scan events: the site list asks for every site.
+	assertNoEventScan(t, st, siteActivitySQL, site.ID)
+	assertNoEventScan(t, st, allSiteActivitySQL)
+}
+
+func assertNoEventScan(t *testing.T, st *Store, query string, args ...any) {
+	t.Helper()
+	rows, err := st.db.QueryContext(context.Background(), "EXPLAIN QUERY PLAN "+query, args...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,9 +184,10 @@ func TestSiteActivity(t *testing.T) {
 	if err := rows.Err(); err != nil {
 		t.Fatal(err)
 	}
+	// A MIN or MAX can also walk events_ts until a row matches, which is a scan too.
 	for _, d := range plan {
-		if strings.HasPrefix(d, "SCAN events") {
-			t.Fatalf("query plan scans: %q", plan)
+		if strings.Contains(d, " events ") && !strings.Contains(d, "events_site_ts (site_id=?)") {
+			t.Fatalf("query plan does not seek events by site: %q", plan)
 		}
 	}
 }

@@ -7,8 +7,8 @@ import type { Site } from "@/lib/api"
 export function LiveDot({ className }: { className?: string }) {
   return (
     <span className={`relative flex size-2 shrink-0 ${className ?? ""}`}>
-      <span className="absolute inline-flex size-full rounded-full bg-accent opacity-60 motion-safe:animate-ping" />
-      <span className="relative inline-flex size-2 rounded-full bg-accent" />
+      <span className="absolute inline-flex size-full rounded-full bg-violet opacity-60 motion-safe:animate-ping" />
+      <span className="relative inline-flex size-2 rounded-full bg-violet" />
     </span>
   )
 }

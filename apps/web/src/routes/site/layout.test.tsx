@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { act, cleanup, screen, waitFor } from "@testing-library/react"
+import { toast } from "sonner"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { SidebarProvider } from "@/components/ui/sidebar"
@@ -7,6 +8,8 @@ import type { Site } from "@/lib/api"
 import { WAITING_POLL_MS } from "@/lib/queries"
 import { SiteLayout } from "@/routes/site/layout"
 import { mockFetch, renderInSite } from "@/test/render"
+
+vi.mock("sonner", () => ({ toast: { success: vi.fn() } }))
 
 const waiting: Site = {
   id: "abc",
@@ -20,11 +23,20 @@ const waiting: Site = {
 afterEach(() => {
   cleanup()
   vi.useRealTimers()
+  vi.mocked(toast.success).mockClear()
 })
+
+const layout = () => (
+  <SidebarProvider>
+    <SiteLayout />
+  </SidebarProvider>
+)
 
 describe("SiteLayout onboarding", () => {
   it("shows the snippet instead of the dashboard until the first event, then switches by itself", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
+    // Within the first hour after the site was added, so it polls fast.
+    vi.setSystemTime(new Date("2026-11-12T10:01:00Z"))
     const routes: Record<string, unknown> = { "/api/sites/abc": waiting }
     const calls = mockFetch(routes)
     renderInSite(() => (
@@ -51,6 +63,30 @@ describe("SiteLayout onboarding", () => {
     await waitFor(() =>
       expect(screen.queryByText(/Waiting for the first event/)).toBeNull()
     )
+    expect(toast.success).toHaveBeenCalledOnce()
+  })
+
+  it("does not announce a first event when switching to a site that already has data", async () => {
+    const calls = mockFetch({
+      "/api/sites/abc": waiting,
+      "/api/sites/xyz": {
+        ...waiting,
+        id: "xyz",
+        name: "Docs",
+        first_event_at: "2026-11-01T00:00:00Z",
+        last_event_at: "2026-11-12T09:00:00Z",
+      },
+    })
+    // The layout stays mounted across sites; xyz is cached when the sidebar returns to it.
+    const { router } = renderInSite(layout, "/sites/xyz")
+    await waitFor(() => expect(calls).toContain("/api/sites/xyz"))
+    await act(() => router.navigate("/sites/abc"))
+    await screen.findByText(/Waiting for the first event/)
+    await act(() => router.navigate("/sites/xyz"))
+    await waitFor(() =>
+      expect(screen.queryByText(/Waiting for the first event/)).toBeNull()
+    )
+    expect(toast.success).not.toHaveBeenCalled()
   })
 
   it("does not poll a site that has data", async () => {

@@ -157,8 +157,10 @@ Every site object (list, get, create, update) has this shape:
 `first_event_at` and `last_event_at` are the oldest and newest **stored** events, and both are
 `null` until the first event arrives. The dashboard shows onboarding instead of charts while
 `first_event_at` is `null`. They are read fresh on every request (two index lookups), so polling
-`GET /api/sites/{id}` is the way to notice the first event. Purges and `RETENTION_DAYS` move
-`first_event_at` forward; deleting every event makes both `null` again.
+`GET /api/sites/{id}` is the way to notice the first event. The site list reads them for all sites in one
+query. Purges and `RETENTION_DAYS` move `first_event_at` forward; once every event is gone (a
+site quiet for longer than the retention period, or a full purge) both are `null` again and the
+dashboard shows onboarding until the next event.
 
 ## Cleaning up spam
 

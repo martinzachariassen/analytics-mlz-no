@@ -207,6 +207,12 @@ type Activity struct {
 const siteActivitySQL = `SELECT (SELECT MIN(ts) FROM events WHERE site_id = ?1),
 	(SELECT MAX(ts) FROM events WHERE site_id = ?1)`
 
+// The same two seeks per site, correlated, so the site list costs one query.
+const allSiteActivitySQL = `SELECT id,
+	(SELECT MIN(ts) FROM events WHERE site_id = sites.id),
+	(SELECT MAX(ts) FROM events WHERE site_id = sites.id)
+	FROM sites`
+
 // SiteActivity returns the site's Activity.
 func (s *Store) SiteActivity(ctx context.Context, siteID string) (Activity, error) {
 	var first, last sql.NullInt64
@@ -214,6 +220,30 @@ func (s *Store) SiteActivity(ctx context.Context, siteID string) (Activity, erro
 	if err != nil {
 		return Activity{}, err
 	}
+	return toActivity(first, last), nil
+}
+
+// AllSiteActivity returns the Activity of every site, keyed by site id.
+func (s *Store) AllSiteActivity(ctx context.Context) (map[string]Activity, error) {
+	rows, err := s.db.QueryContext(ctx, allSiteActivitySQL)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := map[string]Activity{}
+	for rows.Next() {
+		var id string
+		var first, last sql.NullInt64
+		if err := rows.Scan(&id, &first, &last); err != nil {
+			return nil, err
+		}
+		out[id] = toActivity(first, last)
+	}
+	return out, rows.Err()
+}
+
+func toActivity(first, last sql.NullInt64) Activity {
 	var a Activity
 	if first.Valid {
 		a.FirstEvent = time.UnixMilli(first.Int64).UTC()
@@ -221,7 +251,7 @@ func (s *Store) SiteActivity(ctx context.Context, siteID string) (Activity, erro
 	if last.Valid {
 		a.LastEvent = time.UnixMilli(last.Int64).UTC()
 	}
-	return a, nil
+	return a
 }
 
 // Site ids: 12 characters from an alphabet without look-alikes (no 0/o, 1/l).

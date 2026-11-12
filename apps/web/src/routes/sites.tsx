@@ -11,17 +11,10 @@ import { LiveDot } from "@/components/waiting-for-data"
 import { api, type Site } from "@/lib/api"
 import { formatNumber } from "@/lib/format"
 import { periodRange } from "@/lib/period"
-import { WAITING_POLL_MS } from "@/lib/queries"
+import { useSites } from "@/lib/queries"
 
 export function SitesPage() {
-  const sites = useQuery({
-    queryKey: ["sites"],
-    queryFn: api.sites,
-    refetchInterval: (q) =>
-      q.state.data?.some((s) => s.first_event_at === null)
-        ? WAITING_POLL_MS
-        : false,
-  })
+  const sites = useSites()
   const count = sites.data?.length
 
   return (

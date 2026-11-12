@@ -25,7 +25,7 @@ uses one session cookie, `__session`, for signed-in users only.
 | Field | Content |
 |---|---|
 | time | When the event arrived |
-| hostname, path | Of the page. The **query string and fragment are not stored** |
+| hostname, path | Of the page. The **query string is not stored**. The fragment is dropped too, unless it names a route in a hash-based router (`#/docs`, `#!/docs`), which is kept as part of the path |
 | referrer | The referrer's **hostname only**, and only when it is another site |
 | `utm_source`, `utm_medium`, `utm_campaign` | Read from the page URL |
 | country | Two-letter code from a local DB-IP Lite database. No city or region |
@@ -33,6 +33,7 @@ uses one session cookie, `__session`, for signed-in users only.
 | visitor id | A one-way hash, see below |
 | session id | A random number, reused while the visitor stays active (30 minutes) |
 | custom event name and properties | Whatever **you** send with `mlz.track()` or `data-mlz-event` |
+| outbound links | The automatic `outbound-link` event stores the link's **origin and path only**: query string, fragment and any credentials in the link are removed by the tracker and again by the server |
 
 ## What is never stored
 
@@ -83,7 +84,9 @@ server checks hourly.
 
 Signing in uses GitHub OAuth. The database stores the GitHub username and numeric account id for
 each user who has signed in, and a SHA-256 hash of each session token. No passwords, emails or
-access tokens are stored.
+access tokens are stored. A session lasts 7 days without use and is extended while it is used;
+removing a user from `ALLOWED_GITHUB_USERS` ends their sessions at their next request, and
+`analytics sessions revoke` ends them at once.
 
 ## Third-party data
 

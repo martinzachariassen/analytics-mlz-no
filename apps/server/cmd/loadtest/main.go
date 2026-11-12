@@ -16,6 +16,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -57,11 +58,12 @@ func main() {
 		wg.Add(1)
 		go func(w int) {
 			defer wg.Done()
+			ctx := context.Background()
 			var local []time.Duration
 			var fail, lim, busy int
 			for i := 0; time.Now().Before(deadline); i++ {
 				body := fmt.Sprintf(`{"site":%q,"url":"https://%s/page-%d"}`, *site, *domain, (w*7919+i)%200)
-				req, _ := http.NewRequest(http.MethodPost, *base+"/api/event", bytes.NewBufferString(body))
+				req, _ := http.NewRequestWithContext(ctx, http.MethodPost, *base+"/api/event", bytes.NewBufferString(body))
 				req.Header.Set("Content-Type", "application/json")
 				req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) Gecko/20100101 Firefox/130.0")
 				req.Header.Set("Origin", "https://"+*domain)

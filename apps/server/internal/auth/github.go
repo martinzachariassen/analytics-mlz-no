@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -26,28 +27,34 @@ type GitHub struct {
 	Client   *http.Client
 }
 
+// maxResponseBytes bounds what is read from the provider.
+const maxResponseBytes = 1 << 20
+
 // Name implements Provider.
 func (g *GitHub) Name() string { return "github" }
 
-// AuthCodeURL implements Provider. Only read:user is requested.
-func (g *GitHub) AuthCodeURL(state, redirectURI string) string {
+// AuthCodeURL implements Provider. No scope is requested: the public profile (id and
+// login) is all that is read.
+func (g *GitHub) AuthCodeURL(state, redirectURI, codeChallenge string) string {
 	q := url.Values{
-		"client_id":    {g.ClientID},
-		"redirect_uri": {redirectURI},
-		"scope":        {"read:user"},
-		"state":        {state},
-		"allow_signup": {"false"},
+		"client_id":             {g.ClientID},
+		"redirect_uri":          {redirectURI},
+		"state":                 {state},
+		"allow_signup":          {"false"},
+		"code_challenge":        {codeChallenge},
+		"code_challenge_method": {"S256"},
 	}
 	return or(g.AuthURL, "https://github.com/login/oauth/authorize") + "?" + q.Encode()
 }
 
 // Identify implements Provider. The access token is used once and discarded.
-func (g *GitHub) Identify(ctx context.Context, code, redirectURI string) (Identity, error) {
+func (g *GitHub) Identify(ctx context.Context, code, redirectURI, codeVerifier string) (Identity, error) {
 	form := url.Values{
 		"client_id":     {g.ClientID},
 		"client_secret": {g.ClientSecret},
 		"code":          {code},
 		"redirect_uri":  {redirectURI},
+		"code_verifier": {codeVerifier},
 	}
 	// Endpoints are fixed GitHub URLs; they are only overridden in tests.
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, //nolint:gosec // G704: not user-controlled
@@ -104,7 +111,7 @@ func (g *GitHub) do(req *http.Request, v any) error {
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status %s", resp.Status)
 	}
-	return json.NewDecoder(resp.Body).Decode(v)
+	return json.NewDecoder(io.LimitReader(resp.Body, maxResponseBytes)).Decode(v)
 }
 
 func or(v, def string) string {

@@ -95,18 +95,56 @@ func (s *Store) CreateSession(ctx context.Context, tokenHash []byte, userID int6
 	return err
 }
 
-// UserBySession returns the user owning an unexpired session.
-func (s *Store) UserBySession(ctx context.Context, tokenHash []byte, now time.Time) (User, error) {
-	return scanUser(s.db.QueryRowContext(ctx,
-		`SELECT u.id, u.provider, u.provider_id, u.login FROM sessions s
+// UserBySession returns the user owning an unexpired session and when the session expires.
+func (s *Store) UserBySession(ctx context.Context, tokenHash []byte, now time.Time) (User, time.Time, error) {
+	var u User
+	var expires int64
+	err := s.db.QueryRowContext(ctx,
+		`SELECT u.id, u.provider, u.provider_id, u.login, s.expires_at FROM sessions s
 		 JOIN users u ON u.id = s.user_id
-		 WHERE s.token_hash = ? AND s.expires_at > ?`, tokenHash, now.UnixMilli()))
+		 WHERE s.token_hash = ? AND s.expires_at > ?`, tokenHash, now.UnixMilli()).
+		Scan(&u.ID, &u.Provider, &u.ProviderID, &u.Login, &expires)
+	if errors.Is(err, sql.ErrNoRows) {
+		return User{}, time.Time{}, ErrNotFound
+	}
+	if err != nil {
+		return User{}, time.Time{}, err
+	}
+	return u, time.UnixMilli(expires).UTC(), nil
 }
 
 // DeleteSession removes a session (logout).
 func (s *Store) DeleteSession(ctx context.Context, tokenHash []byte) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE token_hash = ?`, tokenHash)
 	return err
+}
+
+// ExtendSession moves a session's expiry forward (sliding renewal).
+func (s *Store) ExtendSession(ctx context.Context, tokenHash []byte, expires time.Time) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE sessions SET expires_at = ? WHERE token_hash = ?`, expires.UnixMilli(), tokenHash)
+	return err
+}
+
+// DeleteUserSessions signs a user out everywhere.
+func (s *Store) DeleteUserSessions(ctx context.Context, userID int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ?`, userID)
+	return err
+}
+
+// RevokeSessions deletes sessions: all of them when login is empty, otherwise those of the
+// user with that login (case-insensitive). It returns the number deleted.
+func (s *Store) RevokeSessions(ctx context.Context, login string) (int64, error) {
+	var res sql.Result
+	var err error
+	if login == "" {
+		res, err = s.db.ExecContext(ctx, `DELETE FROM sessions`)
+	} else {
+		res, err = s.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE login = ?)`, login)
+	}
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
 
 // DeleteExpiredSessions removes sessions that expired before now.

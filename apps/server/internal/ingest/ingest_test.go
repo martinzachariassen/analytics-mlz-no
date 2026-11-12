@@ -144,6 +144,12 @@ func TestRejected(t *testing.T) {
 		want             int
 	}{
 		"unknown site":              {`{"site":"nope","url":"https://example.com/"}`, chromeUA, "", 400},
+		"junk site id":              {`{"site":"` + strings.Repeat("Z", 5000) + `","url":"https://example.com/"}`, chromeUA, "", 400},
+		"ftp scheme":                {`{"site":"` + site.ID + `","url":"ftp://example.com/"}`, chromeUA, "", 400},
+		"javascript scheme":         {`{"site":"` + site.ID + `","url":"javascript:alert(1)"}`, chromeUA, "", 400},
+		"trailing data":             {`{"site":"` + site.ID + `","url":"https://example.com/"} {}`, chromeUA, "", 400},
+		"too many props":            {`{"site":"` + site.ID + `","type":"event","name":"x","url":"https://example.com/","props":{` + manyProps(21) + `}}`, chromeUA, "", 400},
+		"body too large":            {`{"site":"` + site.ID + `","url":"https://example.com/","props":{"a":"` + strings.Repeat("x", maxBodyBytes) + `"}}`, chromeUA, "", 413},
 		"foreign host":              {`{"site":"` + site.ID + `","url":"https://evil.com/"}`, chromeUA, "", 400},
 		"lookalike host":            {`{"site":"` + site.ID + `","url":"https://notexample.com/"}`, chromeUA, "", 400},
 		"foreign origin":            {`{"site":"` + site.ID + `","url":"https://example.com/"}`, chromeUA, "https://evil.com", 400},
@@ -175,6 +181,122 @@ func TestRejected(t *testing.T) {
 	}
 	if len(rec.events) != 0 {
 		t.Fatalf("stored %d events, want 0", len(rec.events))
+	}
+}
+
+func manyProps(n int) string {
+	parts := make([]string, n)
+	for i := range parts {
+		parts[i] = `"k` + strconv.Itoa(i) + `":1`
+	}
+	return strings.Join(parts, ",")
+}
+
+func TestHostMatching(t *testing.T) {
+	h, rec, _ := setup(t)
+	ctx := context.Background()
+	idn, err := h.Store.(*recordingStore).CreateSite(ctx, "", "ærø.no")
+	if err != nil {
+		t.Fatal(err)
+	}
+	local, _ := h.Store.(*recordingStore).CreateSite(ctx, "", "localhost")
+	cases := map[string]struct {
+		site, url, origin string
+		want              int
+	}{
+		"port is ignored":         {local.ID, "http://localhost:5173/x", "http://localhost:5173", 202},
+		"trailing dot in host":    {local.ID, "http://localhost./x", "http://localhost", 202},
+		"subdomain of localhost":  {local.ID, "http://docs.localhost/", "http://docs.localhost", 202},
+		"idn site, punycode host": {idn.ID, "https://xn--r-3fa9c.no/", "https://xn--r-3fa9c.no", 202},
+		"idn site, unicode url":   {idn.ID, "https://ærø.no/", "https://ærø.no", 400},
+		"host of another site":    {idn.ID, "http://localhost/", "http://localhost", 400},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			w := post(h, `{"site":"`+c.site+`","url":"`+c.url+`"}`, chromeUA, c.origin)
+			if w.Code != c.want {
+				t.Fatalf("status = %d, want %d (%s)", w.Code, c.want, w.Body)
+			}
+		})
+	}
+	for _, e := range rec.events {
+		if strings.ContainsAny(e.Hostname, ":.æ") && e.Hostname != "docs.localhost" && e.Hostname != "xn--r-3fa9c.no" {
+			t.Errorf("stored hostname %q", e.Hostname)
+		}
+	}
+}
+
+func TestReferrerFromSubdomainIsSelf(t *testing.T) {
+	h, rec, site := setup(t)
+	post(h, `{"site":"`+site.ID+`","url":"https://example.com/","referrer":"https://docs.example.com/x"}`, chromeUA, "")
+	post(h, `{"site":"`+site.ID+`","url":"https://example.com/","referrer":"https://notexample.com/x"}`, chromeUA, "")
+	post(h, `{"site":"`+site.ID+`","url":"https://example.com/","referrer":"android-app://com.slack/"}`, chromeUA, "")
+	if got := rec.events[0].ReferrerHost; got != "" {
+		t.Errorf("subdomain referrer = %q, want empty", got)
+	}
+	if got := rec.events[1].ReferrerHost; got != "notexample.com" {
+		t.Errorf("lookalike referrer = %q, want notexample.com", got)
+	}
+	if got := rec.events[2].ReferrerHost; got != "com.slack" {
+		t.Errorf("app referrer = %q, want com.slack", got)
+	}
+}
+
+func TestOutboundLinkIsStrippedToOriginAndPath(t *testing.T) {
+	h, rec, site := setup(t)
+	body := `{"site":"` + site.ID + `","type":"event","name":"outbound-link","url":"https://example.com/",` +
+		`"props":{"url":"https://user:pw@other.example/path/x?token=secret#frag"}}`
+	if w := post(h, body, chromeUA, ""); w.Code != http.StatusAccepted {
+		t.Fatalf("status = %d %s", w.Code, w.Body)
+	}
+	if got := rec.events[0].Props["url"]; got != "https://other.example/path/x" {
+		t.Fatalf("url = %q", got)
+	}
+	// Not a URL at all: nothing is kept.
+	post(h, `{"site":"`+site.ID+`","type":"event","name":"outbound-link","url":"https://example.com/","props":{"url":"nonsense"}}`, chromeUA, "")
+	if got := rec.events[1].Props["url"]; got != "" {
+		t.Fatalf("url = %q, want empty", got)
+	}
+}
+
+func TestHashRoutesAreKeptInPath(t *testing.T) {
+	h, rec, site := setup(t)
+	for _, u := range []string{"https://example.com/app#/docs/intro", "https://example.com/app#!/old", "https://example.com/page#section-2"} {
+		post(h, `{"site":"`+site.ID+`","url":"`+u+`"}`, chromeUA, "")
+	}
+	want := []string{"/app#/docs/intro", "/app#!/old", "/page"}
+	for i, w := range want {
+		if rec.events[i].Path != w {
+			t.Errorf("path %d = %q, want %q", i, rec.events[i].Path, w)
+		}
+	}
+}
+
+func TestPausedReturns503(t *testing.T) {
+	h, rec, site := setup(t)
+	h.Paused = func() bool { return true }
+	w := post(h, `{"site":"`+site.ID+`","url":"https://example.com/"}`, chromeUA, "")
+	if w.Code != http.StatusServiceUnavailable || w.Header().Get("Retry-After") == "" || len(rec.events) != 0 {
+		t.Fatalf("status = %d, events = %d", w.Code, len(rec.events))
+	}
+}
+
+func TestForgedClientAddressesDoNotGrowTheLimiter(t *testing.T) {
+	h, _, site := setup(t)
+	h.ProxyHops = 2
+	h.Limiter = httpx.NewRateLimiter(100, 100)
+	h.PeerLimiter = httpx.NewRateLimiter(100, 100)
+	body := `{"site":"` + site.ID + `","url":"https://example.com/"}`
+	for i := 0; i < 50; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/api/event", strings.NewReader(body))
+		req.Header.Set("User-Agent", chromeUA)
+		req.Header.Set("Origin", "https://example.com")
+		req.Header.Set("X-Forwarded-For", strings.Repeat("A", 8000)+strconv.Itoa(i)+", 198.51.100.7")
+		h.ServeHTTP(httptest.NewRecorder(), req)
+	}
+	// Every junk entry fell back to the (single) remote address.
+	if n := h.Limiter.Len(); n != 1 {
+		t.Fatalf("client limiter has %d keys, want 1", n)
 	}
 }
 

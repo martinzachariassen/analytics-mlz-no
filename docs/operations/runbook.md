@@ -151,6 +151,23 @@ Do this if the secret leaks, or if you just want a new one.
 
 Sessions are not affected.
 
+### Remove someone's access, or sign everyone out
+
+Do this when someone leaves, a laptop is lost, or a session cookie may have leaked.
+
+1. Remove the username from `allowed_github_users` in `terraform.tfvars` and run
+   `terraform apply` (Docker: edit `ALLOWED_GITHUB_USERS` and restart).
+2. That is enough: the allowlist is checked on every request, so their next request gets `401`
+   and their sessions are deleted.
+3. To end sessions without changing the allowlist (for example your own, after a leak), run
+   `analytics sessions revoke [-user LOGIN]` where the database file is (Docker:
+   `docker compose -f infra/docker/docker-compose.yml exec analytics analytics sessions revoke`).
+   On Cloud Run there is no shell next to the database: keep the user off the allowlist until
+   they would have made a request (their sessions are deleted then), or sign out in the browser
+   to end your own session.
+
+Sessions also expire by themselves after 7 days without use.
+
 ### A backup job failed
 
 1. Find the run with the "Backup job" filter above.

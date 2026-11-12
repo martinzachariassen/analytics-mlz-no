@@ -116,8 +116,11 @@ These must stay true. Each one is enforced in one place, so changing it is a con
   deleted (`Store.SaltForDay`).
 - **No user input is interpolated into SQL.** Dimensions come from the whitelist
   `store.Dimensions`, filter dimensions from `store.FilterDims`, and values are bound parameters.
-- **Mutating dashboard endpoints require `Content-Type: application/json`** (`httpx.ReadJSON`).
-  That is the CSRF protection. There are no CSRF tokens.
+- **Mutating dashboard endpoints require `Content-Type: application/json`** (`httpx.ReadJSON`),
+  and those without a body (`DELETE`, logout) require the dashboard's own `Origin`
+  (`auth.SameOrigin`). That is the CSRF protection. There are no CSRF tokens.
+- **Rate limiters key on parsed IP addresses** (`httpx.ClientIP`, `httpx.PeerIP`), never on raw
+  header text, and the peer limiter runs before the client limiter.
 - **The session cookie is called `__session`.** Firebase Hosting forwards no other cookie.
 - **Migrations only move forward.** Add `NNNN_name.sql` and never edit a released one. They run
   automatically at startup, in a transaction each.
@@ -129,19 +132,23 @@ These must stay true. Each one is enforced in one place, so changing it is a con
 
 ## Cross-cutting concerns
 
-**Request order for `POST /api/event`** (`ingest.Handler.ServeHTTP`): CORS → per-IP limit (429) →
-per-peer limit (429) → global limit (503) → size guard (503) → bot check (202, dropped) → body
-≤ 8 KB (413) → JSON → `buildEvent`: site exists, URL host and `Origin` match the domain (400) →
-per-visitor limit (202, dropped) → write slot (503 after 2 s) → `InsertEvent`.
+**Request order for `POST /api/event`** (`ingest.Handler.ServeHTTP`): CORS → per-peer limit (429,
+first because its key cannot be forged) → per-client-IP limit (429) → global limit (503) → size
+guard (503) → bot check (202, dropped) → body ≤ 8 KB (413) → JSON → `buildEvent`: site id shape
+and existence, `http(s)` URL, URL host and `Origin` match the domain (400), text cleanup and
+`outbound-link` URL stripped to origin and path → per-visitor limit (202, dropped) → write slot
+(503 after 2 s) → `InsertEvent`. Limiter keys are parsed IP addresses, never raw header text.
 
 **Sessions (visits)** are assigned on insert (`store.InsertEvent`). The visitor's latest
 `session_id` is reused if its last event was within 30 minutes (`SessionTimeout`). Otherwise a new
 random id is used.
 
-**Authentication.** `/api/auth/{provider}/login` → GitHub → `/callback` checks
-`ALLOWED_GITHUB_USERS`, binds the login to the GitHub account id on first sign-in, and sets
-`__session` (30 days). Only a hash of the token is stored. `auth.Service.Require` wraps every
-`/api/sites` route.
+**Authentication.** `/api/auth/{provider}/login` → GitHub (OAuth with PKCE S256, state valid for
+10 minutes) → `/callback` checks `ALLOWED_GITHUB_USERS`, binds the login to the GitHub account id
+on first sign-in, and sets `__session`. Sessions last 7 days without use (`auth.SessionTTL`) and
+are extended after a day of use (`SessionRenewAfter`). Only a hash of the token is stored.
+`auth.Service.Require` wraps every `/api/sites` route and checks the allowlist on every request,
+so removing a user signs them out. `analytics sessions revoke` deletes sessions directly.
 
 **Client IP.** `httpx.ClientIP` takes the address `PROXY_HOPS` entries from the right of
 `X-Forwarded-For`. `httpx.PeerIP` is the address the nearest proxy saw, which a client cannot

@@ -90,18 +90,20 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The peer limit runs first: its key cannot be forged, so a flood of forged client
+	// addresses is cut off before each one gets its own limiter entry.
 	ip := httpx.ClientIP(r, h.ProxyHops)
-	if h.Limiter != nil && !h.Limiter.Allow(ip) {
-		h.reject(r, slog.LevelDebug, "rate limit (client)", http.StatusTooManyRequests, "")
-		http.Error(w, "too many requests", http.StatusTooManyRequests)
-		return
-	}
 	if h.PeerLimiter != nil {
 		if peer := httpx.PeerIP(r, h.ProxyHops); peer != ip && !h.PeerLimiter.Allow(peer) {
 			h.reject(r, slog.LevelDebug, "rate limit (upstream address)", http.StatusTooManyRequests, "")
 			http.Error(w, "too many requests", http.StatusTooManyRequests)
 			return
 		}
+	}
+	if h.Limiter != nil && !h.Limiter.Allow(ip) {
+		h.reject(r, slog.LevelDebug, "rate limit (client)", http.StatusTooManyRequests, "")
+		http.Error(w, "too many requests", http.StatusTooManyRequests)
+		return
 	}
 	if h.Global != nil && !h.Global.Allow() {
 		h.reject(r, slog.LevelDebug, "global rate limit", http.StatusServiceUnavailable, "")
@@ -222,6 +224,10 @@ func invalid(reason string) badRequest { return badRequest{"invalid event", reas
 func bad(msg string) badRequest { return badRequest{msg, msg} }
 
 func (h *Handler) buildEvent(ctx context.Context, r *http.Request, p Payload, ip, ua string, parsed useragent.UserAgent) (store.Event, error) {
+	// Junk ids never reach the database or its negative cache.
+	if !store.ValidSiteID(p.Site) {
+		return store.Event{}, invalid("unknown site")
+	}
 	site, err := h.Store.GetSite(ctx, p.Site)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
@@ -231,7 +237,7 @@ func (h *Handler) buildEvent(ctx context.Context, r *http.Request, p Payload, ip
 	}
 
 	pageURL, err := url.Parse(p.URL)
-	if err != nil || pageURL.Host == "" {
+	if err != nil || pageURL.Host == "" || (pageURL.Scheme != "http" && pageURL.Scheme != "https") {
 		return store.Event{}, invalid("invalid page url")
 	}
 	host := normalizeHost(pageURL.Hostname())
@@ -257,7 +263,7 @@ func (h *Handler) buildEvent(ctx context.Context, r *http.Request, p Payload, ip
 		Time:     h.now(),
 		Type:     "pageview",
 		Hostname: host,
-		Path:     truncate(cleanPath(cleanText(pageURL.Path)), maxPathLen),
+		Path:     truncate(cleanPath(cleanText(pagePath(pageURL))), maxPathLen),
 		Browser:  parsed.Name,
 		OS:       parsed.OS,
 		Device:   deviceType(parsed),
@@ -291,6 +297,9 @@ func (h *Handler) buildEvent(ctx context.Context, r *http.Request, p Payload, ip
 
 	if ev.Props, err = parseProps(p.Props); err != nil {
 		return store.Event{}, err
+	}
+	if ev.Type == "event" && ev.Name == outboundEvent {
+		ev.Props[outboundURLProp] = stripURL(ev.Props[outboundURLProp])
 	}
 
 	ev.Country = h.Geo.Country(ip)
@@ -343,6 +352,30 @@ func setCORS(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 	w.Header().Set("Access-Control-Max-Age", "86400")
+}
+
+// The tracker's automatic outbound-link event carries the link target. Only its origin and
+// path are kept: query strings, fragments and credentials in a link are not ours to store.
+const (
+	outboundEvent   = "outbound-link"
+	outboundURLProp = "url"
+)
+
+func stripURL(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return ""
+	}
+	return (&url.URL{Scheme: u.Scheme, Host: u.Host, Path: u.Path}).String()
+}
+
+// pagePath is the stored path: the URL path, plus the fragment when it names a route in a
+// hash-based router ("#/docs" or "#!/docs"). Other fragments (in-page anchors) are dropped.
+func pagePath(u *url.URL) string {
+	if f := u.Fragment; strings.HasPrefix(f, "/") || strings.HasPrefix(f, "!") {
+		return u.Path + "#" + f
+	}
+	return u.Path
 }
 
 func normalizeHost(h string) string {

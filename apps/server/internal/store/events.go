@@ -3,7 +3,9 @@ package store
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/binary"
+	"errors"
 	"time"
 )
 
@@ -47,8 +49,11 @@ func (s *Store) InsertEvent(ctx context.Context, e Event) error {
 		 WHERE site_id = ? AND visitor_id = ? AND ts >= ?
 		 ORDER BY ts DESC LIMIT 1`,
 		e.SiteID, e.VisitorID, ts-SessionTimeout.Milliseconds()).Scan(&sessionID)
-	if err != nil {
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
 		sessionID = randomInt63()
+	case err != nil:
+		return err
 	}
 
 	res, err := tx.ExecContext(ctx,

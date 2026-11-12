@@ -4,7 +4,8 @@
 > `GET /healthz`. Everything under `/api/sites` needs the `__session` cookie from signing in. It
 > returns sites and statistics as JSON for a date range, a time zone and optional filters.
 > Errors are `{"error": "message"}`. Requests with a body must send
-> `Content-Type: application/json`, which is also the CSRF protection.
+> `Content-Type: application/json`, and requests without one must come from the dashboard's own
+> origin; that is the CSRF protection.
 
 **Read this if:** you are building on the API, debugging the dashboard, or want to know what a
 status code means. The dashboard's typed client is `apps/web/src/lib/api.ts`.
@@ -39,16 +40,35 @@ curl -s -b jar -H 'Content-Type: application/json' \
 ```
 
 In production, sign in with the browser, copy the `__session` cookie from the developer tools,
-and pass it with `-b "__session=…"`. Treat it like a password: it is valid for 30 days or until
-you sign out.
+and pass it with `-b "__session=…"`. Treat it like a password: it stays valid while it is used
+and expires after 7 days without use, when you sign out, or when your username is removed from
+`ALLOWED_GITHUB_USERS`.
+
+## Conventions
+
+These apply to every endpoint under `/api/sites` and `/api/auth`:
+
+| Rule | Otherwise |
+|---|---|
+| Responses are JSON, including `404` and `405`: `{"error": "message"}` | — |
+| A request with a body sends `Content-Type: application/json` and exactly one JSON object with no unknown fields | `400` |
+| A request without a body that changes something (`DELETE`, logout) carries an `Origin` (or, failing that, `Referer`) that is the dashboard's own origin | `403` |
+| A session cookie is present and its user is still on the allowlist | `401` |
+
+The JSON content type and the origin check together are the CSRF protection: a foreign page can
+send neither. Every response also carries `X-Content-Type-Options: nosniff`,
+`Referrer-Policy: no-referrer`, a deny-all `Content-Security-Policy`, `X-Frame-Options: DENY` and,
+when `PUBLIC_URL` is https, `Strict-Transport-Security`. The server sets these itself, so the
+direct Cloud Run URL and self-hosted instances get them without a proxy.
 
 ## Public
 
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/api/event` | Collect an event (used by `script.js`) |
-| `GET` | `/api/script.js` | Tracking script |
-| `GET` | `/healthz` | Health check |
+| `OPTIONS` | `/api/event` | CORS preflight: allows any origin, `POST`, `Content-Type` |
+| `GET` | `/api/script.js` | Tracking script (gzip, `ETag`, cached for an hour) |
+| `GET` | `/healthz` | Health check: `ok`, or `503` when the database does not answer |
 
 `POST /api/event` body:
 
@@ -58,8 +78,8 @@ you sign out.
 ```
 
 Requests must carry an `Origin` header (browsers always send it on `POST`, including
-`sendBeacon`) whose host is the site's domain or a subdomain; `null` is accepted. The `url` host
-must match too. Responses:
+`sendBeacon`) whose host is the site's domain or a subdomain; `null` is accepted. The `url` must
+be `http(s)` and its host must match too. Unknown fields are ignored. Responses:
 
 | Status | Meaning |
 |---|---|
@@ -76,24 +96,37 @@ plain DNS hostnames are dropped. `/api/auth/*` is rate limited per IP (5/s, burs
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/api/auth/config` | `{"providers": ["github"]}` — enabled sign-in options |
-| `GET` | `/api/auth/github/login` | Redirects to GitHub; returns to `PUBLIC_URL/` when done |
+| `GET` | `/api/auth/config` | `{"providers": ["github"]}` — enabled sign-in options (`["dev"]` with `DEV_LOGIN=1`, `[]` with none) |
+| `GET` | `/api/auth/github/login` | Redirects to GitHub (OAuth with PKCE); returns to `PUBLIC_URL/` when done. Starting a sign-in ends any existing session |
 | `GET` | `/api/auth/github/callback` | OAuth callback (configure this URL in the GitHub OAuth App) |
+| `GET` | `/api/auth/dev/login`, `/api/auth/dev/callback` | Only with `DEV_LOGIN=1`: signs in as `dev` without a provider. Refused (`403`) unless the connection comes from the loopback interface |
 | `GET` | `/api/auth/me` | `{"login": "...", "provider": "github"}` or 401 |
-| `POST` | `/api/auth/logout` | Ends the session (204) |
+| `POST` | `/api/auth/logout` | Ends the session (204). Same-origin only (`403`) |
 
 A failed sign-in redirects to `PUBLIC_URL/?auth_error=<code>` where code is one of
-`state`, `denied`, `not_allowed`, `conflict`, `failed`.
+`state`, `denied`, `not_allowed`, `conflict`, `failed`. The sign-in page must be completed
+within 10 minutes (`state` otherwise).
+
+Sessions last 7 days without use. A request made more than a day into a session extends it by
+another 7 days and sends a refreshed cookie. The allowlist is checked on every request: a user
+removed from `ALLOWED_GITHUB_USERS` gets `401` and their sessions are deleted.
+`analytics sessions revoke [-user LOGIN]` deletes sessions from the command line.
 
 ## Sites
 
 | Method | Path | Body | Description |
 |---|---|---|---|
 | `GET` | `/api/sites` | | List sites |
-| `POST` | `/api/sites` | `{"name", "domain"}` | Create (201; 409 if the domain exists) |
+| `POST` | `/api/sites` | `{"name", "domain"}` | Create (201; 409 if the domain exists; 400 if the domain is not a hostname). `name` defaults to the domain |
 | `GET` | `/api/sites/{id}` | | Get one |
-| `PATCH` | `/api/sites/{id}` | `{"name", "domain"}` | Update |
-| `DELETE` | `/api/sites/{id}` | | Delete the site **and all its events** (204) |
+| `PATCH` | `/api/sites/{id}` | `{"name", "domain"}` | Update the fields given. An absent or empty `domain` keeps the current one; an absent or empty `name` resets it to the domain |
+| `DELETE` | `/api/sites/{id}` | | Delete the site **and all its events** (204). Same-origin only (`403`) |
+
+`domain` is normalised: scheme, path, port and a leading `www.` are removed, and
+internationalised names are stored in punycode (`ærø.no` → `xn--r-3fa9c.no`). It must contain a
+dot (`localhost` and `*.localhost` excepted), so a bare TLD cannot match every site under it.
+Names are trimmed to 100 characters. Site creation, changes, deletion and purges are logged with
+the signed-in user.
 
 ## Cleaning up spam
 
@@ -108,7 +141,7 @@ Common query parameters:
 | Param | Default | Description |
 |---|---|---|
 | `from` | today | `YYYY-MM-DD`, inclusive |
-| `to` | `from` | `YYYY-MM-DD`, inclusive |
+| `to` | `from` | `YYYY-MM-DD`, inclusive. At most 5 years after `from` |
 | `tz` | `UTC` | IANA time zone, e.g. `Europe/Oslo`; days and months follow local midnight |
 | `f` | | Filter, repeatable (AND): `dim:op:value`, e.g. `f=country:is:NO&f=path:contains:/blog` |
 | `compare` | | `previous` or `year`; see below |
@@ -201,6 +234,8 @@ With `detail=1`, the response also has:
 - `minutes`: 30 entries `{t, visitors, pageviews}`, oldest first, ending with the current
   minute.
 - `pages`, `referrers` and `countries`: the top 10 for the last 30 minutes, as breakdown rows.
+
+Statistics queries are cancelled after 10 seconds (`500`).
 
 ## Privacy note on "visitors"
 

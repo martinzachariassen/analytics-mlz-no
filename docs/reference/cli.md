@@ -3,7 +3,8 @@
 > **TL;DR** — One binary, `analytics`. With no arguments it runs the server. The other
 > subcommands work on the database file in `DATABASE_PATH`: `sites add -domain example.com`
 > creates a site and prints its id, `sites list` shows all sites, `events purge` deletes spam,
-> `seed` fills demo data, and `version` prints the build.
+> `sessions revoke` signs dashboard users out, `seed` fills demo data, and `version` prints the
+> build.
 
 **Read this if:** you run the server yourself, or need to add a site or clean up data from a shell.
 
@@ -13,6 +14,7 @@
 | `analytics sites add -domain D [-name N]` | Creates a site and prints its id |
 | `analytics sites list` | Lists all sites |
 | `analytics events purge -site ID -from T -to T [-path P]` | Deletes events in a time window |
+| `analytics sessions revoke [-user LOGIN]` | Signs one dashboard user, or everyone, out everywhere |
 | `analytics seed [-days N] [-scale X] [-reset]` | Creates the two demo sites with synthetic traffic |
 | `analytics version` | Prints the version, without reading any configuration |
 
@@ -71,8 +73,8 @@ Site ID: k3f9c1a2bq7x
 
 | Flag | Required | Meaning |
 |---|---|---|
-| `-domain` | yes | The domain you track. Scheme, path, port and a leading `www.` are stripped, and subdomains are accepted automatically. Each domain can only be added once |
-| `-name` | no | Display name. Defaults to the domain |
+| `-domain` | yes | The domain you track. Scheme, path, port and a leading `www.` are stripped, internationalised names are stored in punycode, and subdomains are accepted automatically. It must contain a dot (`localhost` and `*.localhost` excepted), so `no` cannot match every `.no` site. Each domain can only be added once |
+| `-name` | no | Display name. Defaults to the domain. Trimmed to 100 characters |
 
 The id is 12 random characters. Put it in the script tag (see [tracking.md](../guides/tracking.md)).
 
@@ -115,11 +117,32 @@ Deleted 1234 events.
 > the path and set the same dates). The full procedure is in the
 > [runbook](../operations/runbook.md).
 
+## `sessions revoke`
+
+Signs dashboard users out everywhere by deleting their sessions.
+
+```sh
+analytics sessions revoke -user octocat   # one user
+analytics sessions revoke                 # everyone
+```
+```
+Revoked 3 sessions.
+```
+
+| Flag | Required | Meaning |
+|---|---|---|
+| `-user` | no | GitHub login whose sessions to delete. Without it, every session is deleted |
+
+You rarely need it: removing a username from `ALLOWED_GITHUB_USERS` already signs that user out
+at their next request. Use it when a laptop is lost or a session cookie may have leaked. Like the
+other admin commands it needs the database file, so on Cloud Run remove the user from the
+allowlist instead.
+
 ## `seed`
 
 ```sh
 analytics seed            # used by make dev
-analytics seed -reset     # regenerate the demo data
+DEV_LOGIN=1 analytics seed -reset     # regenerate the demo data
 analytics seed -days 90 -scale 0.2
 ```
 
@@ -131,7 +154,7 @@ you pass `-reset`, which deletes it and its events first.
 |---|---|---|
 | `-days` | `730` | Days of history |
 | `-scale` | `1` | Multiplies the amount of traffic |
-| `-reset` | off | Delete and recreate the demo sites |
+| `-reset` | off | Delete and recreate the demo sites. Refused unless `DEV_LOGIN=1`, so it cannot wipe a production database by accident |
 
 Only use it on a development database. `make dev` runs it with `DATABASE_PATH=data/dev.db`.
 

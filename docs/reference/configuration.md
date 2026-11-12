@@ -22,11 +22,11 @@ Read by `apps/server/internal/config/config.go`, except `LITESTREAM_REPLICA_URL`
 | `INGEST_RATE_LIMIT` | `200` | Max accepted events per second across all clients. Extra events get `503` (0 = no global limit) |
 | `MAX_DATABASE_MB` | `0` | Pause ingestion (`503`) while the database is larger than this. The dashboard keeps working (0 = no limit) |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. `debug` also logs every event dropped by rate limits or bot filtering |
-| `PUBLIC_URL` | `http://localhost:8080` | Dashboard URL. Used for the OAuth callback. An `https://` URL turns on Secure cookies |
+| `PUBLIC_URL` | `http://localhost:8080` | Dashboard URL. Used for the OAuth callback and as the only origin allowed to log out or delete sites. Must be an origin with no path. Must be `https://` when GitHub sign-in is on (localhost excepted); https also turns on Secure cookies and HSTS |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | – | GitHub OAuth App credentials. Setting the id turns on sign-in |
-| `ALLOWED_GITHUB_USERS` | – | Comma-separated GitHub usernames allowed to sign in |
+| `ALLOWED_GITHUB_USERS` | – | Comma-separated GitHub usernames allowed to sign in. Checked on every request: removing a name signs that user out |
 | `LITESTREAM_REPLICA_URL` | – | Docker image only: continuous backup, e.g. `gs://bucket/analytics` or `s3://bucket/analytics` |
-| `DEV_LOGIN` | – | `1` signs everyone in as `dev`. Local development only: refused unless `PUBLIC_URL` is on `localhost` and GitHub sign-in is off |
+| `DEV_LOGIN` | – | `1` signs everyone in as `dev`. Local development only: refused unless `PUBLIC_URL` is on `localhost` and GitHub sign-in is off, and the dev sign-in only answers connections from the loopback interface. Also required for `analytics seed -reset` |
 
 > [!WARNING]
 > A wrong `PROXY_HOPS` breaks visitor counting, countries and rate limiting without any error.

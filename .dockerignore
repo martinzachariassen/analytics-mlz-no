@@ -21,3 +21,4 @@ infra/terraform
 apps/web
 apps/tracker
 apps/demo
+gha-creds-*.json

@@ -22,7 +22,7 @@ resource "google_cloud_run_v2_service" "this" {
     }
 
     containers {
-      # Replaced by `make deploy`; Terraform ignores later image changes.
+      # Replaced on every deploy (Deploy workflow or `make deploy`); Terraform ignores later image changes.
       image = "us-docker.pkg.dev/cloudrun/container/hello"
 
       ports {

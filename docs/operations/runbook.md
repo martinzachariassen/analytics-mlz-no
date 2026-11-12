@@ -157,7 +157,7 @@ To restore production on Cloud Run:
    with Ctrl+C.
 5. **Point the service and the backup job at it.** Set `replica_path = "analytics-<date>"` in
    `infra/terraform/main/terraform.tfvars` and run `terraform apply`. That rolls out a new
-   revision that restores from the new path; no image build or `make deploy` is needed.
+   revision that restores from the new path; no image build or deploy is needed.
 6. **Confirm.** Run a backup by hand (below) and check that it writes a file, and that the
    dashboard shows data. Delete the old replica path after a day.
 
@@ -166,6 +166,36 @@ Events between the backup file and the restore are lost.
 With Docker, stop the container, put the file in the data volume as `analytics.db`, and point
 `LITESTREAM_REPLICA_URL` at a new path (or remove the old replica), or the old replica is
 restored over your file.
+
+### A deploy failed
+
+Every merge to `main` deploys through the **Deploy** workflow once CI has passed
+([deploy guide](../guides/deploy-gcp.md#deploy-on-merge-to-main-github-actions)).
+
+1. Open the failed run under Actions → Deploy. The step name says how far it got: a failure at
+   "Server to Cloud Run" leaves the previous revision serving (Cloud Run only switches traffic
+   to a revision that starts); a failure at "Dashboard to Firebase Hosting" means the new server
+   is live with the previous dashboard, which is safe because the server ships first.
+2. If the new revision itself is broken, send traffic back to the previous one while you fix it.
+   Only when the change did not migrate the database; otherwise see
+   [upgrading.md](../guides/upgrading.md#cloud-run):
+   ```sh
+   gcloud run revisions list --service analytics --region <region> --project <project_id>
+   gcloud run services update-traffic analytics --to-revisions <previous-revision>=100 --region <region> --project <project_id>
+   ```
+   Traffic now stays pinned, and later deploys create revisions that get none. Once the fix is
+   deployed, unpin with
+   `gcloud run services update-traffic analytics --to-latest --region <region> --project <project_id>`.
+   Old images are kept for 7 days (and the newest 3), so roll back within that window. Roll the
+   dashboard back from the release history under Hosting in the Firebase console.
+3. Merge the fix; it deploys like any other change. For a transient failure (a registry or API
+   hiccup), re-run the failed jobs instead. `make deploy` remains the fallback when Actions is
+   down, but not while a Deploy run is in progress.
+
+A run that says "Not deploying …: main is now …" is not a failure: a newer merge overtook it and
+deploys in its own run. Rarely, `main` moves in the seconds between that check and the checkout;
+the run then fails at "Deploy only the commit CI tested" before touching anything, and the newer
+commit still deploys in its own run.
 
 ### Roll back a release
 
@@ -184,7 +214,8 @@ Do this if the secret leaks, or if you just want a new one.
      | tr -d '\r\n' \
      | gcloud secrets versions add github-client-secret --data-file=- --project <project_id>
    ```
-3. Run `make deploy`. The new revision reads `latest` at startup.
+3. Roll out a new revision: re-run the latest **Deploy** workflow run (Actions → Deploy →
+   *Re-run all jobs*) or run `make deploy`. The new revision reads `latest` at startup.
 4. Check that sign-in works. Then delete the old secret in GitHub and disable the old version:
    `gcloud secrets versions disable <n> --secret github-client-secret --project <project_id>`.
 
@@ -211,7 +242,8 @@ Sessions also expire by themselves after 7 days without use, and 30 days after s
 
 1. Find the run with the "Backup job" filter above.
 2. After the first `terraform apply`, the job uses a placeholder image and fails until the first
-   `make deploy`. `make deploy` updates the job's image together with the service.
+   deploy. Every deploy (the Deploy workflow or `make deploy`) updates the job's image together
+   with the service.
 3. If it failed with "the replica is empty but BACKUP_EXPECT_DATA=1", the replica has lost its
    data: follow [Restore the database from a backup](#restore-the-database-from-a-backup).
 4. Re-run it, or take a backup by hand at any time (the job is named `<service_name>-backup`,
@@ -242,7 +274,7 @@ Sessions also expire by themselves after 7 days without use, and 30 days after s
   seconds of events can be lost.
 - **Deploys:** Cloud Run briefly runs the old and new revision side by side. The new one restores
   from the replica while the old one still serves, so events from those few seconds can be lost.
-  Deploy when traffic is quiet.
+  Deploy when traffic is quiet (with the Deploy workflow: merge to `main` when traffic is quiet).
 - **What the backups cover:** together, the replica and the backup files lose at most the events
   from the two cases above. Older events are never lost, because every daily file contains all of
   them (with `retention_days = 0`).

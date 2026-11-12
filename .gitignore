@@ -41,3 +41,6 @@ tfplan
 apps/web/e2e/.auth/
 apps/web/test-results/
 apps/web/playwright-report/
+
+# Credentials file written by google-github-actions/auth in the Deploy workflow
+gha-creds-*.json

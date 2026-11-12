@@ -26,7 +26,7 @@ output "logs_url" {
 }
 
 output "image_repo" {
-  description = "Push server images here (make deploy)."
+  description = "Push server images here (make deploy or the Deploy workflow)."
   value       = local.image_repo
 }
 
@@ -44,4 +44,14 @@ output "dns_records" {
       ]
     ]
   ])
+}
+
+output "github_deploy_variables" {
+  description = "Repository variables for .github/workflows/deploy.yml (gh variable set NAME --body VALUE). Null while github_repository is empty."
+  value = local.deploy_enabled ? {
+    GCP_PROJECT_ID                 = var.project_id
+    GCP_REGION                     = var.region
+    GCP_WORKLOAD_IDENTITY_PROVIDER = google_iam_workload_identity_pool_provider.github[0].name
+    GCP_DEPLOY_SERVICE_ACCOUNT     = google_service_account.deploy[0].email
+  } : null
 }

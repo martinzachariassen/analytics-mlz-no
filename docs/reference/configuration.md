@@ -60,7 +60,24 @@ Change `replica_path` only when restoring from a backup file; see
 [the runbook](../operations/runbook.md#restore-the-database-from-a-backup).
 
 Other variables only affect infrastructure: `region`, `scheduler_region`, `service_name`,
-`extra_domains`, `alert_email`, `backup_hourly_retention_days` and `backup_daily_retention_days`.
+`extra_domains`, `alert_email`, `backup_hourly_retention_days`, `backup_daily_retention_days` and
+`github_repository` (`owner/name`; lets that repository's `production` environment deploy from
+GitHub Actions, empty by default).
+
+## GitHub repository variables (Deploy workflow)
+
+`.github/workflows/deploy.yml` reads these repository variables (not secrets; none of them grant
+access on their own). Without `GCP_PROJECT_ID` the workflow skips itself. The first four come
+from `terraform output github_deploy_variables`; see the
+[deploy guide](../guides/deploy-gcp.md#deploy-on-merge-to-main-github-actions).
+
+| Variable | Description |
+|---|---|
+| `GCP_PROJECT_ID` | GCP project to deploy to |
+| `GCP_REGION` | Region of Cloud Run and Artifact Registry |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | Full name of the Workload Identity provider (`projects/<number>/locations/global/workloadIdentityPools/github/providers/github`) |
+| `GCP_DEPLOY_SERVICE_ACCOUNT` | The `analytics-deploy` service account the workflow acts as |
+| `TRACKER_ORIGIN` | Optional. Host the dashboard's "Tracking code" snippet points at, as with `make web TRACKER_ORIGIN=…` |
 
 ## Build arguments (Docker image)
 

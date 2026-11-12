@@ -1,7 +1,8 @@
 # Deploying to Google Cloud
 
 > **TL;DR** — Two Terraform stacks (`bootstrap`, then `main`), one secret, DNS records, then
-> `make deploy`. You end up with the dashboard on Firebase Hosting, the API on one Cloud Run
+> `make deploy` once. After that, every merge to `main` deploys itself through GitHub Actions
+> (optional; `make deploy` keeps working). You end up with the dashboard on Firebase Hosting, the API on one Cloud Run
 > instance, and SQLite replicated to GCS. It costs about $1 a month for personal traffic.
 > Time: about an hour, mostly waiting for DNS and certificates.
 
@@ -80,7 +81,7 @@ terraform init -backend-config=bucket=<project_id>-tfstate
 terraform apply
 ```
 
-The first apply deploys a placeholder image. `make deploy` replaces it, and Terraform ignores image changes from then on.
+The first apply deploys a placeholder image. The first deploy replaces it, and Terraform ignores image changes from then on.
 
 Outputs:
 
@@ -88,7 +89,8 @@ Outputs:
 |---|---|
 | `public_url` | Dashboard URL. The OAuth callback is `<public_url>/api/auth/github/callback`. |
 | `dns_records` | Records to create for `domain` and `extra_domains` (usually one CNAME each to `<site>.web.app`). |
-| `image_repo` | Where `make deploy` pushes images. |
+| `image_repo` | Where deploys push images. |
+| `github_deploy_variables` | Repository variables for the Deploy workflow (with `github_repository` set, [step 5](#deploy-on-merge-to-main-github-actions)). |
 | `cloud_run_url` | The service's own `run.app` URL (Firebase Hosting proxies to it), for debugging. |
 | `firebase_site`, `firebase_default_url` | The Hosting site and its `web.app` URL. |
 | `dashboard_url`, `logs_url` | The operations dashboard and the warnings/errors log query. |
@@ -132,7 +134,8 @@ has one callback URL. Add one CNAME per host from `terraform output dns_records`
 
 To make the dashboard's "Tracking code" page hand out the short host, build it with
 `TRACKER_ORIGIN`: `make deploy-web TRACKER_ORIGIN=https://t.example.com` (it becomes
-`VITE_TRACKER_ORIGIN` for Vite). Without it the snippet uses the dashboard's own origin.
+`VITE_TRACKER_ORIGIN` for Vite), or the `TRACKER_ORIGIN` repository variable for the Deploy
+workflow. Without it the snippet uses the dashboard's own origin.
 
 **Moving an existing domain.** If the host you used as `domain` before becomes an extra domain, move
 it in state first so Terraform does not destroy and re-issue its certificate:
@@ -143,6 +146,8 @@ terraform plan   # should only add the new primary domain and update the service
 ```
 
 ## 5. Deploy
+
+Deploy once by hand, then (optionally) let GitHub Actions deploy every merge to `main`.
 
 ```sh
 gcloud auth configure-docker <region>-docker.pkg.dev   # once
@@ -161,6 +166,46 @@ make deploy                                            # or: make deploy-server 
 
 Override `PROJECT`, `REGION` or `SERVICE` on the command line if yours differ. `SERVICE` and
 `REGION` are also written into `apps/web/firebase.json` (the `/api/**` rewrite); change both.
+
+### Deploy on merge to main (GitHub Actions)
+
+`.github/workflows/deploy.yml` runs when CI has passed on a push to `main` and calls the same
+`make deploy-server` and `make deploy-web` (without repeating the quality gate CI just ran). It
+signs in to GCP through Workload Identity Federation, so no service account key exists anywhere.
+
+1. Add your repository to `terraform.tfvars` and apply. This creates a `github` identity pool, an
+   `analytics-deploy` service account with only the roles a deploy needs, and the APIs behind them:
+
+   ```hcl
+   github_repository = "you/analytics"
+   ```
+
+2. Create the `production` environment (deploys from `main` only):
+   `scripts/github-settings.sh` does it for this repository. Elsewhere, create it under
+   **Settings → Environments** with a deployment branch rule for `main`.
+3. Set the repository variables from `terraform output github_deploy_variables`, plus
+   `TRACKER_ORIGIN` if you use one ([step 4](#4-dns)):
+
+   ```sh
+   terraform output -json github_deploy_variables |
+     jq -r 'to_entries[] | "\(.key) \(.value)"' |
+     while read -r name value; do gh variable set "$name" --body "$value"; done
+   gh variable set TRACKER_ORIGIN --body https://t.example.com   # optional
+   ```
+
+The next merge to `main` deploys. Without `GCP_PROJECT_ID` the workflow skips itself, so forks
+and clones are unaffected.
+
+- **Only `main`, only after CI.** GCP accepts tokens only from this repository's `production`
+  environment on `refs/heads/main`, and the environment only admits `main`. Pull requests never
+  reach the workflow.
+- **One at a time, newest wins.** Deploys share one concurrency group and never run in parallel.
+  If two merges land close together, the older commit is skipped once `main` has moved on, so
+  production never goes backwards.
+- **Watching and rolling back.** The run shows under **Actions → Deploy** and in the environment's
+  deployment history. A failed deploy leaves the previous revision serving; roll back as in the
+  [runbook](../operations/runbook.md).
+- **Do not run `make deploy` while a Deploy run is in progress**; the two do not share a lock.
 
 After the first deploy has data, set `require_replica = true` in `terraform.tfvars` and apply.
 From then on an instance refuses to start from an empty replica, and the backup job treats an
@@ -199,7 +244,7 @@ the instance's 512 MiB of memory. Set `alert_email` to be told about memory pres
 shedding, failed backups, server errors and (with `domain` set) downtime.
 
 The backup job (`analytics-backup`) uses a placeholder image after the first `terraform apply`, so
-it fails, and sends an alert, until the first `make deploy`.
+it fails, and sends an alert, until the first deploy.
 
 ## After the deploy
 
@@ -215,6 +260,8 @@ open the operations dashboard and the log query; all outputs are listed under
 | `billingbudgets.googleapis.com API requires a quota project` | User credentials need a quota project. The bootstrap routes the budget through a provider with `billing_project` set. Re-run `apply` once the project exists. |
 | `PERMISSION_DENIED … CONSUMER_INVALID` right after creating the project | Permissions on the new project are still propagating. Wait a minute and retry. |
 | `go mod download` segfaults during `make deploy` on Apple Silicon | The Go toolchain crashes under amd64 emulation. The Dockerfile cross-compiles on the build platform (`--platform=$BUILDPLATFORM`). Make sure you're on the current Dockerfile. |
+| The Deploy workflow fails at "Authenticate to Google Cloud" with `unauthorized_client` or `Permission 'iam.serviceAccounts.getAccessToken' denied` | The token did not match: the run is not in the `production` environment, not on `main`, or `github_repository` is spelled differently from the repository (owner and name, case included). Check `terraform output github_deploy_variables` against `gh variable list`. |
+| The Deploy workflow fails at "Dashboard to Firebase Hosting" with a 403 | A missing role on `analytics-deploy`; the error names the permission. Grant it in `infra/terraform/main/deploy.tf` and apply. |
 | `Secret Payload cannot be empty` | stdin wasn't a terminal (e.g. a non-interactive shell). Use the hidden-prompt command above. |
 | Sign-in fails with `redirect_uri` mismatch | The OAuth App's callback URL must be exactly `https://<domain>/api/auth/github/callback`. |
 | `Location 'europe-north1' is not a valid location` creating a Cloud Scheduler job | Cloud Scheduler is not available in every region. The backup schedules use `scheduler_region` (default `europe-west1`) and still trigger the job in `region`. |

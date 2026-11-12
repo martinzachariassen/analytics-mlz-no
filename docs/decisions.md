@@ -24,6 +24,7 @@ This page records the architectural decisions, open items, what comes next and w
 | Dimensions (v1) | Views, uniques, bounce rate, top pages, referrer + UTM, browser/OS/device, country (DB-IP Lite, CC BY 4.0). |
 | Retention | Keep forever by default; `RETENTION_DAYS` deletes older events. |
 | Infra | Terraform, new GCP project. `plan`/`apply` by hand, never from CI. |
+| Deploy | GitHub Actions deploys every push to `main` once CI has passed on it (`deploy.yml`, through the same `make deploy-server`/`deploy-web` targets). Workload Identity Federation, no service account keys; GCP only trusts the `production` environment on `main`. One deploy at a time, and an overtaken commit is skipped. `make deploy` stays as the manual fallback. |
 | CI | GitHub Actions running `scripts/verify.sh` (the same file as `make verify`), one group per job, plus a docs link check, `govulncheck`, `bun audit` and a Docker build. |
 | Tooling | Tool versions pinned in `mise.toml`; one Bun workspace (`apps/web`, `apps/tracker`) with a root `bun.lock`; Biome for TypeScript formatting and linting, gofmt and golangci-lint for Go. |
 | Supply chain | Digest-pinned images, commit-pinned Actions, Trivy and CodeQL in CI, SBOM and signed provenance on releases, Dependabot. |

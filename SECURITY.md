@@ -59,7 +59,9 @@ the server guarantees instead:
   current. `main` only changes through a pull request with signed commits and every check
   green (repository admins can bypass it in an emergency), and only admins create or move
   release tags
-  (`scripts/github-settings.sh`); [OpenSSF Scorecard](https://scorecard.dev) grades these
+  (`scripts/github-settings.sh`). Production deploys run from `main` only, after CI, with
+  short-lived credentials through Workload Identity Federation: there is no service account
+  key to leak. [OpenSSF Scorecard](https://scorecard.dev) grades these
   practices weekly.
 
 What is not prevented: a distributed attack from many real IP addresses with browser-like

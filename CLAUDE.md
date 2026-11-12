@@ -41,8 +41,8 @@ Tools are pinned in `mise.toml` (`mise install`); JavaScript packages are a Bun 
 - `make dev-web` — dashboard on :5173; set `PUBLIC_URL=http://localhost:5173` for the server
 - `docker compose -f infra/docker/docker-compose.yml up --build`
 - `infra/docker/test-restore.sh` — verifies Litestream backup/restore with the local Docker image; `infra/docker/test-backup.sh` — verifies `backup.sh`; `go run ./apps/server/cmd/loadtest` — ingest load test
-- `scripts/github-settings.sh` — GitHub settings and rulesets as code (`--check` for drift); CI job `name:`s are its required checks, so a new or renamed job that runs on pull requests must be changed there too
-- `make deploy` — build/push the server image to Cloud Run and publish the dashboard to Firebase Hosting
+- `scripts/github-settings.sh` — GitHub settings, rulesets and the `production` environment as code (`--check` for drift); CI job `name:`s are its required checks, so a new or renamed job that runs on pull requests must be changed there too
+- Deploy: every merge to `main` deploys itself once CI passes (`.github/workflows/deploy.yml`, Workload Identity Federation from `infra/terraform/main/deploy.tf`, `production` environment). `make deploy` (build/push the server image to Cloud Run, publish the dashboard to Firebase Hosting) is the manual fallback; never run it while a Deploy run is in progress
 
 ## Conventions
 
@@ -54,4 +54,4 @@ Tools are pinned in `mise.toml` (`mise install`); JavaScript packages are a Bun 
 - Rate limiters are keyed on parsed IP addresses (`httpx.ClientIP`/`PeerIP`), never on raw header text; check the peer limiter before the client limiter.
 - Breakdown dimensions are a whitelist in `store.Dimensions`; never interpolate user input into SQL.
 - Code, comments and docs in English. No comments unless they explain a non-obvious why.
-- Conventional Commits; PRs use the template; every user-visible change gets a line in `CHANGELOG.md`. Merging to `main`, tagging and releasing happen only when Martin asks. Terraform `plan`/`apply` are run by hand, never by CI.
+- Conventional Commits; PRs use the template; every user-visible change gets a line in `CHANGELOG.md`. Merging to `main` (which deploys to production), tagging and releasing happen only when Martin asks. Terraform `plan`/`apply` are run by hand, never by CI.

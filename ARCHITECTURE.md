@@ -173,9 +173,12 @@ These must stay true. Each one is enforced in one place, so changing it is a con
   deleted (`Store.SaltForDay`).
 - **No user input is interpolated into SQL.** Dimensions come from the whitelist
   `store.Dimensions`, filter dimensions from `store.FilterDims`, and values are bound parameters.
-- **Mutating dashboard endpoints require `Content-Type: application/json`** (`httpx.ReadJSON`),
-  and those without a body (`DELETE`, logout) require the dashboard's own `Origin`
-  (`auth.SameOrigin`). That is the CSRF protection. There are no CSRF tokens.
+- **CSRF protection is in the router, not in handlers.** `server.New` wraps every dashboard
+  and sign-in route in `http.CrossOriginProtection` (`crossOrigin` in `internal/server`), which
+  rejects non-safe requests a browser marks as cross-origin (`Sec-Fetch-Site`, or an `Origin`
+  that is neither `Host` nor `PUBLIC_URL`). Endpoints with a body also require
+  `Content-Type: application/json` (`httpx.ReadJSON`) as a second layer. There are no CSRF
+  tokens. `POST /api/event` and the script are cross-origin by design and are not wrapped.
 - **Rate limiters key on parsed IP addresses** (`httpx.ClientIP`, `httpx.PeerIP`), never on raw
   header text, and the peer limiter runs before the client limiter.
 - **The session cookie is called `__session`.** Firebase Hosting forwards no other cookie.

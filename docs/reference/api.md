@@ -3,9 +3,8 @@
 > **TL;DR** — Three public endpoints: `POST /api/event` (the tracker), `GET /api/script.js` and
 > `GET /healthz`. Everything under `/api/sites` needs the `__session` cookie from signing in. It
 > returns sites and statistics as JSON for a date range, a time zone and optional filters.
-> Errors are `{"error": "message"}`. Requests with a body must send
-> `Content-Type: application/json`, and requests without one must come from the dashboard's own
-> origin; that is the CSRF protection.
+> Errors are `{"error": "message"}`. Changes from another origin are rejected with `403`
+> (CSRF protection), and requests with a body must send `Content-Type: application/json`.
 
 **Read this if:** you are building on the API, debugging the dashboard, or want to know what a
 status code means. The dashboard's typed client is `apps/web/src/lib/api.ts`.
@@ -52,11 +51,11 @@ These apply to every endpoint under `/api/sites` and `/api/auth`:
 |---|---|
 | Responses are JSON, including `404` and `405`: `{"error": "message"}` | — |
 | A request with a body sends `Content-Type: application/json` and exactly one JSON object with no unknown fields | `400` |
-| A request without a body that changes something (`DELETE`, logout) carries an `Origin` (or, failing that, `Referer`) that is the dashboard's own origin | `403` |
+| A request that changes something (`POST`, `PATCH`, `DELETE`) is not cross-origin: `Sec-Fetch-Site` is `same-origin` or `none`, or, without it, `Origin` is absent, matches `Host` or is `PUBLIC_URL`. Clients that send neither header (curl) pass | `403` |
 | A session cookie is present and its user is still on the allowlist | `401` |
 
-The JSON content type and the origin check together are the CSRF protection: a foreign page can
-send neither. Every response also carries `X-Content-Type-Options: nosniff`,
+The cross-origin check is the CSRF protection (Go's `http.CrossOriginProtection`). The JSON
+content type is a second layer: a foreign HTML form cannot send it. Every response also carries `X-Content-Type-Options: nosniff`,
 `Referrer-Policy: no-referrer`, a deny-all `Content-Security-Policy`, `X-Frame-Options: DENY` and,
 when `PUBLIC_URL` is https, `Strict-Transport-Security`. The server sets these itself, so the
 direct Cloud Run URL and self-hosted instances get them without a proxy.

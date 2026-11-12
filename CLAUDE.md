@@ -50,7 +50,7 @@ Tools are pinned in `mise.toml` (`mise install`); JavaScript packages are a Bun 
 - Never store IP addresses or raw user agents. Only derived, coarse fields.
 - Migrations: add a new numbered file in `apps/server/internal/store/migrations/`; never edit an applied one.
 - Session cookie must be named `__session` (Firebase Hosting only forwards that cookie).
-- Auth is OAuth-only (no passwords). Mutating dashboard endpoints must use `httpx.ReadJSON` (requires `application/json`, which is the CSRF protection); endpoints without a body (`DELETE`, logout) must check `auth.SameOrigin`.
+- Auth is OAuth-only (no passwords). CSRF protection is `http.CrossOriginProtection` in the router (`crossOrigin` in `internal/server`): register dashboard routes through `API.Register` or the auth mux so they get it, never directly on the root mux. Mutating endpoints with a body also use `httpx.ReadJSON` (requires `application/json`).
 - Rate limiters are keyed on parsed IP addresses (`httpx.ClientIP`/`PeerIP`), never on raw header text; check the peer limiter before the client limiter.
 - Breakdown dimensions are a whitelist in `store.Dimensions`; never interpolate user input into SQL.
 - Code, comments and docs in English. No comments unless they explain a non-obvious why.

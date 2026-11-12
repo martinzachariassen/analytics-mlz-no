@@ -51,8 +51,8 @@ before it costs anything.
    seconds for a slot gets `503`.
 
 Sign-in endpoints have their own limits (5 requests/s per client, burst 30, and 20/s per upstream
-address). Mutating dashboard endpoints require `Content-Type: application/json`, or for requests
-without a body the dashboard's own `Origin`; that is the CSRF protection.
+address). Dashboard and sign-in endpoints reject changes that a browser marks as cross-origin
+(`Sec-Fetch-Site` or `Origin`) with `403`; that is the CSRF protection.
 
 Nothing in these checks stores an IP address or a raw user agent. See [privacy.md](../privacy.md).
 

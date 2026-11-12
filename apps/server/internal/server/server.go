@@ -54,11 +54,14 @@ func New(cfg config.Config, st *store.Store, authn *auth.Service, loc *geo.Locat
 
 	// Sign-in endpoints are public; limit them per client so they can't be used to hammer
 	// the OAuth provider or the session table.
+	csrf := crossOrigin(cfg.PublicURL, log)
 	authMux := http.NewServeMux()
 	authn.Register(authMux)
-	mux.Handle("/api/auth/", limit(httpx.NewRateLimiter(5, 30), httpx.NewRateLimiter(20, 100), cfg.ProxyHops, authMux))
+	mux.Handle("/api/auth/", limit(httpx.NewRateLimiter(5, 30), httpx.NewRateLimiter(20, 100), cfg.ProxyHops, csrf.Handler(authMux)))
 
-	(&api.API{Store: st, Log: log, PublicURL: cfg.PublicURL}).Register(mux, authn.Require)
+	(&api.API{Store: st, Log: log}).Register(mux, func(h http.Handler) http.Handler {
+		return csrf.Handler(authn.Require(h))
+	})
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
@@ -72,6 +75,23 @@ func New(cfg config.Config, st *store.Store, authn *auth.Service, loc *geo.Locat
 	})
 
 	return secure(cfg, jsonErrors(mux))
+}
+
+// crossOrigin is the CSRF protection for the dashboard and sign-in routes. It rejects
+// non-safe requests that a browser marks as cross-origin (Sec-Fetch-Site, or an Origin that
+// differs from Host), whatever their content type or body. The dashboard origin is trusted
+// explicitly because behind Firebase Hosting the Host header can be the Cloud Run address.
+// POST /api/event and the tracking script are cross-origin by design and are not wrapped.
+func crossOrigin(publicURL string, log *slog.Logger) *http.CrossOriginProtection {
+	c := http.NewCrossOriginProtection()
+	if err := c.AddTrustedOrigin(publicURL); err != nil {
+		// config.Load has already validated PUBLIC_URL as an origin.
+		log.Error("PUBLIC_URL is not a valid origin for the CSRF check", "err", err)
+	}
+	c.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		httpx.Error(w, http.StatusForbidden, "cross-origin request")
+	}))
+	return c
 }
 
 // secure adds the response headers every response gets, whether or not a CDN in front

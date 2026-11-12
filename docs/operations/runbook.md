@@ -255,6 +255,56 @@ Sessions also expire by themselves after 7 days without use, and 30 days after s
 > replica stops the service from starting empty and fails the backup job, instead of both
 > quietly carrying on with nothing.
 
+### Litestream compaction fails
+
+**Symptoms:** the "Litestream reported a problem" alert, and a log line like this every few
+minutes, with the same transaction ids every time:
+
+```text
+level=ERROR msg="compaction failed" system=store db=analytics.db level=2 error="write ltx file: extract timestamp from LTX header: non-contiguous transaction ids in input files: (…0190,…0191) -> (…0191,…0191)"
+```
+
+**Cause:** two instances replicated at the same time, usually a deploy or a burst of requests on
+a cold start that briefly ran a second instance (see [Known trade-offs](#known-trade-offs)).
+Both wrote the same transaction ids, so one compaction level now has overlapping files, and
+every compaction into the next level stops at them. Replication, restores and the backup job
+keep working, because a restore steps over the overlap. Nothing is lost by the error itself, but
+the higher levels stop advancing and the lower one keeps growing until it is fixed.
+
+1. **Find the overlap.** It is read-only:
+   ```sh
+   scripts/check-replica.sh gs://<project_id>-db/analytics
+   ```
+   It lists every overlap and gap per level, and which files to drop to leave one chain.
+2. **Check that the restore is sound.** Take a backup now and check it:
+   ```sh
+   gcloud run jobs execute analytics-backup --args daily --region <region> --project <project_id> --wait
+   gcloud storage cp "$(gcloud storage ls gs://<project_id>-backups/daily/ | sort | tail -1)" backup.db.gz
+   gunzip -f backup.db.gz && sqlite3 backup.db 'PRAGMA integrity_check;'   # must print "ok"
+   ```
+3. **Keep a copy of the replica.** The bucket has no object versioning, so a deleted file is gone:
+   `gcloud storage cp -r gs://<project_id>-db/analytics ./replica-copy`.
+4. **Compare the files that overlap.** `gcloud storage ls -l` on that level shows their sizes. A
+   file of 191 bytes is only a header, a transaction with no page changes, so dropping it loses
+   nothing. If both copies carry pages, the two instances wrote different data; the live
+   database comes from the restore, so keep the chain a restore would pick and drop the rest.
+5. **Drop the files the script lists** (only when it reports no gap):
+   ```sh
+   gcloud storage rm gs://<project_id>-db/analytics/ltx/1/<file>.ltx …
+   scripts/check-replica.sh gs://<project_id>-db/analytics   # must print "ok"
+   ```
+6. **Confirm.** Within five minutes the log shows `compaction complete … level=2`, and the error
+   stops.
+
+<details>
+<summary>Doing nothing also fixes it, eventually</summary>
+
+Litestream deletes lower-level files older than the oldest daily snapshot it keeps (24 hours).
+About two days after the overlap, the overlapping files age out and compaction resumes on its
+own. Until then, the alert emails at most once an hour.
+
+</details>
+
 ## Routine checks
 
 | When | Check |
@@ -279,7 +329,11 @@ Sessions also expire by themselves after 7 days without use, and 30 days after s
   from the two cases above. Older events are never lost, because every daily file contains all of
   them (with `retention_days = 0`).
 - **One instance:** `max_instance_count = 1`, because SQLite has a single writer. This handles
-  far more than personal traffic needs.
+  far more than personal traffic needs. The cap is not absolute: a burst of requests on a cold
+  start can briefly start a second instance (it happened twice in November 2026). Each restores
+  and writes on its own, so events sent to the instance that stops first can be lost, and the
+  replica can end up with overlapping files. That stops Litestream's compaction until it is
+  fixed; see [Litestream compaction fails](#litestream-compaction-fails).
 
 ## Next steps
 

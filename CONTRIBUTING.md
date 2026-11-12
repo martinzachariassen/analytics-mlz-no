@@ -39,6 +39,7 @@ in [docs/reference/configuration.md](docs/reference/configuration.md) and run `m
 | `make tracker` | Rebuild `apps/server/internal/script/script.js` from `apps/tracker/src` |
 | `docker compose -f infra/docker/docker-compose.yml up --build` | Production image locally |
 | `infra/docker/test-restore.sh` | Check Litestream backup and restore |
+| `scripts/check-replica.sh <gs://bucket/path>` | Check a Litestream replica for overlapping or missing LTX files (read-only) |
 | `infra/docker/test-backup.sh` | Check the standalone backup script (`backup.sh`) |
 | `go run ./apps/server/cmd/loadtest` | Ingest load test |
 

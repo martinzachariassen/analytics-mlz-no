@@ -185,6 +185,8 @@ These must stay true. Each one is enforced in one place, so changing it is a con
 - **Migrations only move forward.** Add `NNNN_name.sql` and never edit a released one. They run
   automatically at startup, in a transaction each.
 - **Exactly one writer.** SQLite and Litestream assume a single instance (`max_instance_count = 1`).
+  Cloud Run can still run two for a moment (deploys, cold-start bursts); the runbook covers the
+  overlapping replica files that leaves (`scripts/check-replica.sh`).
   Inside it, writes go through the store's one-connection write pool (`s.db`) and reads through
   the read-only pool (`s.rdb`), so dashboard queries never block event ingestion.
 - **Pure Go, no CGO** (`modernc.org/sqlite`), standard library routing (`http.ServeMux` patterns).

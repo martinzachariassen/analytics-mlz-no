@@ -58,7 +58,7 @@ far back as its retention (hours); for anything older, use a standalone backup f
 
 Cloud Run runs the old and new revision side by side for a moment. The new one restores from the
 replica while the old one still serves, so events from those seconds can be lost. Deploy when
-traffic is quiet; with the Deploy workflow, that means merging to `main` when traffic is quiet. See [deploy-gcp.md](deploy-gcp.md) and the [runbook](../operations/runbook.md#known-trade-offs).
+traffic is quiet; with the Deploy workflow, that means merging to `main` when traffic is quiet. See [deploy-gcp.md](deploy-gcp.md) and the [runbook](../operations/runbook.md#known-trade-offs). If both revisions write in that moment, Litestream can start logging `compaction failed … non-contiguous transaction ids`; the runbook's [Litestream compaction fails](../operations/runbook.md#litestream-compaction-fails) fixes it.
 
 Rolling back a Cloud Run revision (`gcloud run services update-traffic`) runs the old binary
 against a database the new one may already have migrated. That only works when the release notes

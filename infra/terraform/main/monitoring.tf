@@ -218,7 +218,7 @@ resource "google_monitoring_alert_policy" "replication" {
 
   notification_channels = [google_monitoring_notification_channel.email[0].id]
   documentation {
-    content = "Litestream logged an error, or an instance started without finding a backup in the replica (gs://${google_storage_bucket.db.name}/${var.replica_path}). If the service has data, an empty replica means it was lost: stop deploying, and follow 'Restore the database from a backup' in docs/operations/runbook.md before the standalone backups age out."
+    content = "Litestream logged an error, or an instance started without finding a backup in the replica (gs://${google_storage_bucket.db.name}/${var.replica_path}). If the service has data, an empty replica means it was lost: stop deploying, and follow 'Restore the database from a backup' in docs/operations/runbook.md before the standalone backups age out. 'compaction failed ... non-contiguous transaction ids' means two instances replicated at once: run scripts/check-replica.sh gs://${google_storage_bucket.db.name}/${var.replica_path} and follow 'Litestream compaction fails' in the runbook."
   }
 }
 

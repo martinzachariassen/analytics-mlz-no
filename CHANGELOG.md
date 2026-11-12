@@ -46,7 +46,7 @@ All notable changes are documented here. The format follows
 - Statistics queries are cancelled after 10 seconds.
 - Site creation, changes, deletion and purges are logged with the signed-in user.
 - `ReadJSON` rejects trailing data after the JSON body.
-- Dashboard: `make web TRACKER_ORIGIN=https://t.example.com` builds the "Tracking code" page with that host in the snippet (`docs/DEPLOY.md`). Vite refuses to start on another port than 5173, since the OAuth callback names it. `shadcn`, `tailwindcss` and `@tailwindcss/vite` are dev dependencies, so `npm audit --omit=dev` covers only what ships.
+- Dashboard: `make web TRACKER_ORIGIN=https://t.example.com` builds the "Tracking code" page with that host in the snippet (`docs/guides/deploy-gcp.md`). Vite refuses to start on another port than 5173, since the OAuth callback names it. `shadcn`, `tailwindcss` and `@tailwindcss/vite` are dev dependencies, so `npm audit --omit=dev` covers only what ships.
 - Tracker: CI fails if the gzipped script grows past 1024 bytes (`npm run check-size`). It is now 1.9 KB minified and 1.0 KB gzipped.
 - More `golangci-lint` linters (`gocritic`, `noctx`, `sqlclosecheck`, `rowserrcheck`, `nilerr`, `usestdlibvars`, `unparam`, `perfsprint`, `exhaustive`, `contextcheck`).
 - Server logs use `severity` and `message` instead of `level` and `msg`, so Cloud Logging shows the level and `severity>=ERROR` finds app errors. Update log queries that matched on `msg` or `level`.

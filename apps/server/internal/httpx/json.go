@@ -30,8 +30,8 @@ const MaxJSONBody = 64 << 10
 // ReadJSON decodes a JSON request body into v: at most MaxJSONBody bytes, unknown fields
 // rejected, and exactly one JSON value.
 //
-// Requiring application/json also protects cookie-authenticated endpoints from CSRF:
-// cross-site HTML forms cannot send that content type, and cross-origin fetch
+// Requiring application/json is a second CSRF layer behind the router's cross-origin
+// check: cross-site HTML forms cannot send that content type, and cross-origin fetch
 // triggers a CORS preflight that the API never approves.
 func ReadJSON(w http.ResponseWriter, r *http.Request, v any) error {
 	if mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mt != "application/json" {

@@ -150,7 +150,7 @@ func TestSitesCRUD(t *testing.T) {
 	}
 }
 
-func TestDeleteRequiresSameOrigin(t *testing.T) {
+func TestDeleteRejectsCrossOrigin(t *testing.T) {
 	h, c := setup(t)
 	w := call(h, "POST", "/api/sites", `{"domain":"mlz.no"}`, c, "application/json")
 	var site struct{ ID string }
@@ -358,6 +358,7 @@ func TestIngestIsWired(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/event", strings.NewReader(`{"site":"`+site.ID+`","url":"https://mlz.no/"}`))
 	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36")
 	req.Header.Set("Origin", "https://mlz.no")
+	req.Header.Set("Sec-Fetch-Site", "cross-site") // the CSRF check must not apply here
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, req)
 	if w.Code != http.StatusAccepted {

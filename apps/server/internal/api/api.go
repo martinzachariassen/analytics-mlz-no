@@ -25,11 +25,10 @@ type API struct {
 	Store *store.Store
 	Log   *slog.Logger
 	Now   func() time.Time
-	// PublicURL is the dashboard origin. DELETE requests must come from it (CSRF).
-	PublicURL string
 }
 
-// Register adds the routes to mux, wrapping each with protect.
+// Register adds the routes to mux, wrapping each with protect, which must authenticate the
+// user and reject cross-origin requests (CSRF).
 func (a *API) Register(mux *http.ServeMux, protect func(http.Handler) http.Handler) {
 	routes := map[string]http.HandlerFunc{
 		"GET /api/sites":                a.listSites,
@@ -159,13 +158,7 @@ func (a *API) updateSite(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, j)
 }
 
-// deleteSite has no body, so the Content-Type check that protects the other mutations from
-// CSRF does not apply; the Origin check does the same job.
 func (a *API) deleteSite(w http.ResponseWriter, r *http.Request) {
-	if !auth.SameOrigin(r, a.PublicURL) {
-		httpx.Error(w, http.StatusForbidden, "cross-origin request")
-		return
-	}
 	id := r.PathValue("id")
 	if a.siteError(w, a.Store.DeleteSite(r.Context(), id)) {
 		return

@@ -109,7 +109,7 @@ The checks in `ingest.Handler.ServeHTTP` run cheapest first, and the order is de
 | Package | What the tests cover | Helper |
 |---|---|---|
 | `store` | SQL: sites, sessions, salts, stats, filters, purge | `openTemp(t)` |
-| `server` | The whole router: auth, CRUD, CSRF (`Content-Type`), rate limits, headers | `setup(t)`, `call(...)` |
+| `server` | The whole router: auth, CRUD, CSRF (cross-origin check, `Content-Type`), rate limits, headers | `setup(t)`, `call(...)` |
 | `ingest` | Validation, bot detection, limits, rejection reasons | |
 | `api` | Query parsing, periods, time zones, DST; handler responses on a seeded store with a fixed clock | `newTestAPI(t, now, events)`, `get[T]` |
 | `auth` | OAuth flow, sessions, `DEV_LOGIN` | |

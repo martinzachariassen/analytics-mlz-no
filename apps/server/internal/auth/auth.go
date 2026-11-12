@@ -255,41 +255,13 @@ func (s *Service) fail(w http.ResponseWriter, r *http.Request, code string) {
 	http.Redirect(w, r, s.PublicURL+"/?auth_error="+url.QueryEscape(code), http.StatusFound)
 }
 
-// logout ends the session. It is a POST from the dashboard, so it requires the dashboard's
-// own Origin (or none, for non-browser clients such as curl).
+// logout ends the session. The router's cross-origin check keeps other sites from posting here.
 func (s *Service) logout(w http.ResponseWriter, r *http.Request) {
-	if !SameOrigin(r, s.PublicURL) {
-		httpx.Error(w, http.StatusForbidden, "cross-origin request")
-		return
-	}
 	if c, err := r.Cookie(CookieName); err == nil && isSessionValue(c.Value) {
 		_ = s.Store.DeleteSession(r.Context(), hashToken(c.Value))
 	}
 	http.SetCookie(w, s.cookie("", time.Unix(0, 0)))
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// SameOrigin reports whether the request's Origin header (or, failing that, its Referer)
-// is publicURL. Requests without either header pass: browsers always send Origin on
-// cross-origin POST and DELETE, so a missing header means a non-browser client, which
-// cannot carry the victim's cookie anyway.
-func SameOrigin(r *http.Request, publicURL string) bool {
-	src := r.Header.Get("Origin")
-	if src == "" {
-		src = r.Header.Get("Referer")
-	}
-	if src == "" {
-		return true
-	}
-	u, err := url.Parse(src)
-	if err != nil {
-		return false
-	}
-	want, err := url.Parse(publicURL)
-	if err != nil {
-		return false
-	}
-	return strings.EqualFold(u.Scheme, want.Scheme) && strings.EqualFold(u.Host, want.Host)
 }
 
 type userResponse struct {

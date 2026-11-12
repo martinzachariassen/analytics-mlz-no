@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/auth"
 	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/httpx"
 	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/store"
 )
@@ -70,13 +69,7 @@ func (a *API) createGoal(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusCreated, goalToJSON(g))
 }
 
-// deleteGoal has no body, so it checks the Origin instead of relying on the JSON
-// Content-Type for CSRF protection.
 func (a *API) deleteGoal(w http.ResponseWriter, r *http.Request) {
-	if !auth.SameOrigin(r, a.PublicURL) {
-		httpx.Error(w, http.StatusForbidden, "cross-origin request")
-		return
-	}
 	site, ok := a.site(w, r)
 	if !ok {
 		return

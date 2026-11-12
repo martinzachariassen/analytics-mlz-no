@@ -22,7 +22,7 @@
     "verify": "./scripts/verify.sh"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.6.4",
-    "firebase-tools": "^15.34.2"
+    "@biomejs/biome": "^2.6.6",
+    "firebase-tools": "^15.35.0"
   }
 }

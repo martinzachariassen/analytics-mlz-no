@@ -103,6 +103,8 @@ The checks in `ingest.Handler.ServeHTTP` run cheapest first, and the order is de
   `slog.LevelInfo` for bad payloads and `slog.LevelDebug` for floods and bots.
 - Update the table in [operations/bots.md](../operations/bots.md) and the status list in
   [reference/api.md](../reference/api.md).
+- If you add a stored field or a limit, extend the checks in `FuzzEvent`
+  (`internal/ingest/fuzz_test.go`) and fuzz it for a minute (see [Fuzzing](#fuzzing)).
 
 ## Tests
 
@@ -117,6 +119,27 @@ The checks in `ingest.Handler.ServeHTTP` run cheapest first, and the order is de
 
 Tests open a real SQLite database in `t.TempDir()`. Prefer that over interfaces and fakes. Run
 with `-race`, as CI does.
+
+### Fuzzing
+
+Code that parses what browsers and proxies send has native Go fuzz tests. Their seed inputs,
+and every failing input saved under `testdata/fuzz/`, run as ordinary tests in `make test`.
+To search for new failures, run one fuzzer at a time:
+
+```sh
+cd apps/server
+go test ./internal/ingest -run '^$' -fuzz '^FuzzEvent$' -fuzztime 1m
+```
+
+| Fuzzer | Package | What must hold |
+|---|---|---|
+| `FuzzEvent` | `ingest` | Stored events belong to the site, and every field is clean UTF-8 within its limit |
+| `FuzzClientIP` | `httpx` | `ClientIP` and `PeerIP` return a canonical parsed address or the raw `RemoteAddr` |
+| `FuzzNormalizeDomain` | `store` | A normalised domain is valid and normalising it again changes nothing |
+| `FuzzCell` | `api` | A CSV cell a spreadsheet would read as a formula always gets a leading `'` |
+
+When a fuzzer fails it writes the input to `testdata/fuzz/<Fuzzer>/`. Fix the bug and commit
+that file, so the case stays covered.
 
 <details>
 <summary>Advanced: performance and SQLite</summary>

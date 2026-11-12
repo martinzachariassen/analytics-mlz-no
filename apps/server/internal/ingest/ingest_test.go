@@ -33,7 +33,7 @@ func (r *recordingStore) InsertEvent(ctx context.Context, e store.Event) error {
 	return r.Store.InsertEvent(ctx, e)
 }
 
-func setup(t *testing.T) (*Handler, *recordingStore, store.Site) {
+func setup(t testing.TB) (*Handler, *recordingStore, store.Site) {
 	t.Helper()
 	ctx := context.Background()
 	st, err := store.Open(ctx, ":memory:")

@@ -62,15 +62,21 @@ func NormalizeDomain(in string) string {
 }
 
 // validDomain accepts lowercase ASCII hostnames with at least one dot, plus "localhost" and
-// its subdomains for local development. A bare TLD would match every site under it.
+// its subdomains for local development. A bare TLD would match every site under it. Every
+// label is 1 to 63 letters, digits and hyphens, and does not start or end with a hyphen.
 func validDomain(d string) bool {
 	if d == "" || len(d) > maxDomainLen {
 		return false
 	}
-	for i := 0; i < len(d); i++ {
-		c := d[i]
-		if (c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '.' && c != '-' {
+	for label := range strings.SplitSeq(d, ".") {
+		if label == "" || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
 			return false
+		}
+		for i := 0; i < len(label); i++ {
+			c := label[i]
+			if (c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '-' {
+				return false
+			}
 		}
 	}
 	return d == "localhost" || strings.HasSuffix(d, ".localhost") || strings.Contains(d, ".")

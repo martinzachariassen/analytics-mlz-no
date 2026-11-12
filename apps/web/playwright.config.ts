@@ -8,7 +8,9 @@ import { defineConfig, devices } from "@playwright/test"
 const API_PORT = 18080
 const WEB_PORT = 4173
 const WEB = `http://localhost:${WEB_PORT}`
-const db = join(tmpdir(), "analytics-e2e", "e2e.db")
+const dir = join(tmpdir(), "analytics-e2e")
+const db = join(dir, "e2e.db")
+const bin = join(dir, "analytics")
 
 import { SESSION, SESSION_LIGHT } from "./e2e/paths.ts"
 
@@ -48,15 +50,17 @@ export default defineConfig({
   webServer: [
     {
       // 60 days of history keeps seeding fast; -reset starts every run from the same data.
-      command: `cd ../.. && mkdir -p ${join(tmpdir(), "analytics-e2e")} && ${serverEnv} go run ./apps/server/cmd/analytics seed -reset -days 60 && ${serverEnv} go run ./apps/server/cmd/analytics serve`,
+      command: `cd ../.. && mkdir -p ${dir} && go build -o ${bin} ./apps/server/cmd/analytics && ${serverEnv} ${bin} seed -reset -days 60 && ${serverEnv} ${bin} serve`,
       url: `http://localhost:${API_PORT}/healthz`,
-      reuseExistingServer: !process.env.CI,
+      // Never test against a leftover server or an old build: a busy port fails the run.
+      reuseExistingServer: false,
       timeout: 120_000,
     },
     {
-      command: `bun run build && API_PROXY=http://localhost:${API_PORT} bunx vite preview --port ${WEB_PORT} --strictPort`,
+      // verify.sh sets E2E_PREBUILT when its web group has just built dist/.
+      command: `${process.env.E2E_PREBUILT ? "" : "bun run build && "}API_PROXY=http://localhost:${API_PORT} bunx vite preview --port ${WEB_PORT} --strictPort`,
       url: WEB,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       timeout: 120_000,
     },
   ],

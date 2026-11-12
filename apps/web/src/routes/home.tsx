@@ -300,7 +300,7 @@ function SectionTitle({ eyebrow, title }: { eyebrow: string; title: string }) {
 function Code({ children }: { children: ReactNode }) {
   return (
     // Wraps instead of scrolling sideways: a scroll box would need keyboard focus (WCAG).
-    <pre className="rounded-lg border bg-surface-2 p-4 font-mono text-xs leading-relaxed break-all whitespace-pre-wrap text-fg">
+    <pre className="rounded-lg border bg-surface-2 p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere text-fg">
       <code>{children}</code>
     </pre>
   )

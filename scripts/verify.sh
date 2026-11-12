@@ -59,7 +59,9 @@ fi
 if want e2e; then
   step "Dashboard end to end: Playwright + axe against the Go server with seeded data"
   # A no-op once the browser is cached; CI installs it with system dependencies first.
-  (cd apps/web && bunx playwright install chromium >/dev/null && bun run --silent e2e)
+  prebuilt=""
+  if want web; then prebuilt=1; fi
+  (cd apps/web && bunx playwright install chromium >/dev/null && E2E_PREBUILT=$prebuilt bun run --silent e2e)
 fi
 
 if want infra; then

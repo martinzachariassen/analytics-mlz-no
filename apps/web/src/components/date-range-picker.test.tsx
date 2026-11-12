@@ -73,7 +73,9 @@ describe("useScopeShortcuts", () => {
     const { search } = renderInSite((sc) => <WithShortcuts sc={sc} />)
     await screen.findByRole("button")
 
-    await user.keyboard("{Meta>}m{/Meta}")
+    // A plain shortcut afterwards proves updates have landed before asserting nothing else changed.
+    await user.keyboard("{Meta>}m{/Meta}x")
+    await waitFor(() => expect(search().get("compare")).toBe("off"))
     expect(search().get("period")).toBeNull()
   })
 })

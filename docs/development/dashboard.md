@@ -218,7 +218,10 @@ There are three layers. Each one catches what the one before cannot.
   `mockFetch`, which answers API paths with fixed JSON.
 - **End-to-end tests:** `playwright.config.ts` seeds a throwaway database in the system temp
   directory (`seed -reset -days 60`), runs the server on :18080 with `DEV_LOGIN=1`, and serves
-  `apps/web/dist` with `vite preview` on :4173, so it can run next to `make dev`.
+  `apps/web/dist` with `vite preview` on :4173, so it can run next to `make dev`. Both are
+  started fresh every run, so a leftover process on either port fails the run instead of
+  testing old code. `bun run e2e` builds the dashboard first; `verify.sh` skips that when its
+  `web` group has just built it.
   - A setup project signs in once and shares the session, because the auth endpoints are rate
     limited.
   - Every test runs three times: desktop, mobile (Pixel 7) and the light theme.

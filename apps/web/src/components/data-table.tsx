@@ -238,7 +238,7 @@ export function DataTable({
                   onClick={onOpen ? () => onOpen(r) : undefined}
                   className={cn(
                     "tnum text-xs",
-                    onOpen && "cursor-pointer focus-within:bg-accent"
+                    onOpen && "cursor-pointer has-focus-visible:bg-accent"
                   )}
                 >
                   <TableCell className="pl-4 text-right text-fg-muted">

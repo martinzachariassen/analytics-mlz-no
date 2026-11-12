@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef } from "react"
-import { useParams, useSearchParams } from "react-router"
+import { useCallback, useEffect, useMemo } from "react"
+import { useLocation, useParams, useSearchParams } from "react-router"
 
 import type { Compare, Filter, FilterOp, Interval, Scope } from "@/lib/api"
 import { isFilterDim } from "@/lib/dims"
@@ -32,6 +32,12 @@ export function parseFilter(raw: string): Filter | null {
 export const encodeFilter = (f: Filter) => `${f.dim}:${f.op}:${f.value}`
 
 export type Detail = { dim: Filter["dim"]; value: string }
+
+// React Router hands every update the params of the last render, so two updates before the
+// next render (add a filter and close the sheet, often from different components) would
+// overwrite each other. The latest unrendered params are shared by every useScope, keyed by
+// the location they were built on: once a navigation lands, the rendered params win again.
+let pending: { key: string; params: URLSearchParams } | null = null
 
 /**
  * Dashboard state that lives in the URL, shared by every view of a site:
@@ -92,21 +98,20 @@ export function useScope() {
     }
   }, [params])
 
-  // React Router hands every functional update the params of the last render, so two
-  // actions in one click (add a filter, close the sheet) would overwrite each other.
-  // Each update builds on the previous one instead, until the next render catches up.
-  const pending = useRef(params)
+  const { key } = useLocation()
   useEffect(() => {
-    pending.current = params
-  }, [params])
+    if (pending && pending.key !== key) pending = null
+  }, [key])
   const update = useCallback(
     (fn: (p: URLSearchParams) => void) => {
-      const next = new URLSearchParams(pending.current)
+      const next = new URLSearchParams(
+        pending?.key === key ? pending.params : params
+      )
       fn(next)
-      pending.current = next
+      pending = { key, params: next }
       setParams(next, { preventScrollReset: true })
     },
-    [setParams]
+    [key, params, setParams]
   )
 
   const actions = useMemo(

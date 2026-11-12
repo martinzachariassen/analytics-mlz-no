@@ -51,7 +51,7 @@ The product roadmap after the quality base, in order. Each is one pull request w
 
 1. ✅ **Onboarding and empty states**: "waiting for the first event" with polling,
    `first_event_at`/`last_event_at` on sites.
-2. **Goals and conversions**: `goals` table (event name or path, `*` wildcard), conversions
+2. ✅ **Goals and conversions**: `goals` table (event name or path, `*` wildcard), conversions
    and rate per goal on the overview, management in settings.
 3. **CSV export**: breakdowns and time series with the same period and filter parameters,
    formula-escaped cells.

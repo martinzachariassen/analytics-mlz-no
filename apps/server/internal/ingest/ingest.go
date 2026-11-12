@@ -12,8 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/mileusna/useragent"
 	"golang.org/x/time/rate"
@@ -21,6 +19,7 @@ import (
 	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/geo"
 	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/httpx"
 	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/store"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/text"
 )
 
 // Limits on incoming payloads.
@@ -199,10 +198,10 @@ func (h *Handler) reject(r *http.Request, level slog.Level, reason string, statu
 		if u, err := url.Parse(o); err == nil && u.Host != "" {
 			origin = u.Hostname()
 		}
-		attrs = append(attrs, slog.String("origin", truncate(cleanText(origin), maxLogField)))
+		attrs = append(attrs, slog.String("origin", text.Truncate(text.Clean(origin), maxLogField)))
 	}
 	if site != "" {
-		attrs = append(attrs, slog.String("site", truncate(cleanText(site), maxLogField)))
+		attrs = append(attrs, slog.String("site", text.Truncate(text.Clean(site), maxLogField)))
 	}
 	h.Log.LogAttrs(r.Context(), level, "event rejected", attrs...)
 }
@@ -263,7 +262,7 @@ func (h *Handler) buildEvent(ctx context.Context, r *http.Request, p Payload, ip
 		Time:     h.now(),
 		Type:     "pageview",
 		Hostname: host,
-		Path:     truncate(cleanPath(cleanText(pagePath(pageURL))), maxPathLen),
+		Path:     text.Truncate(cleanPath(text.Clean(pagePath(pageURL))), maxPathLen),
 		Browser:  parsed.Name,
 		OS:       parsed.OS,
 		Device:   deviceType(parsed),
@@ -273,7 +272,7 @@ func (h *Handler) buildEvent(ctx context.Context, r *http.Request, p Payload, ip
 	case "", "pageview":
 	case "event":
 		ev.Type = "event"
-		ev.Name = truncate(strings.TrimSpace(cleanText(p.Name)), maxNameLen)
+		ev.Name = text.Truncate(strings.TrimSpace(text.Clean(p.Name)), maxNameLen)
 		if ev.Name == "" {
 			return store.Event{}, bad("event name is required")
 		}
@@ -291,9 +290,9 @@ func (h *Handler) buildEvent(ctx context.Context, r *http.Request, p Payload, ip
 	}
 
 	q := pageURL.Query()
-	ev.UTMSource = truncate(strings.ToLower(cleanText(q.Get("utm_source"))), maxPropValLen)
-	ev.UTMMedium = truncate(strings.ToLower(cleanText(q.Get("utm_medium"))), maxPropValLen)
-	ev.UTMCampaign = truncate(cleanText(q.Get("utm_campaign")), maxPropValLen)
+	ev.UTMSource = text.Truncate(strings.ToLower(text.Clean(q.Get("utm_source"))), maxPropValLen)
+	ev.UTMMedium = text.Truncate(strings.ToLower(text.Clean(q.Get("utm_medium"))), maxPropValLen)
+	ev.UTMCampaign = text.Truncate(text.Clean(q.Get("utm_campaign")), maxPropValLen)
 
 	if ev.Props, err = parseProps(p.Props); err != nil {
 		return store.Event{}, err
@@ -325,7 +324,7 @@ func parseProps(raw map[string]json.RawMessage) (map[string]string, error) {
 	}
 	out := make(map[string]string, len(raw))
 	for k, v := range raw {
-		k = truncate(strings.TrimSpace(cleanText(k)), maxPropKeyLen)
+		k = text.Truncate(strings.TrimSpace(text.Clean(k)), maxPropKeyLen)
 		if k == "" {
 			continue
 		}
@@ -335,7 +334,7 @@ func parseProps(raw map[string]json.RawMessage) (map[string]string, error) {
 		}
 		switch x := val.(type) {
 		case string:
-			out[k] = truncate(cleanText(x), maxPropValLen)
+			out[k] = text.Truncate(text.Clean(x), maxPropValLen)
 		case float64:
 			out[k] = strconv.FormatFloat(x, 'f', -1, 64)
 		case bool:
@@ -403,35 +402,11 @@ func validHostname(h string) bool {
 	return true
 }
 
-// cleanText drops invalid UTF-8, control characters (newlines, NUL, escapes) and bidi
-// overrides, so stored strings are safe to log and cannot reorder text in the dashboard.
-// Zero-width joiners stay, since emoji sequences use them.
-func cleanText(s string) string {
-	s = strings.ToValidUTF8(s, "")
-	return strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) || (r >= 0x202A && r <= 0x202E) || (r >= 0x2066 && r <= 0x2069) {
-			return -1
-		}
-		return r
-	}, s)
-}
-
 func cleanPath(p string) string {
 	if p == "" {
 		return "/"
 	}
 	return p
-}
-
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	s = s[:n]
-	for !utf8.ValidString(s) {
-		s = s[:len(s)-1]
-	}
-	return s
 }
 
 func deviceType(ua useragent.UserAgent) string {

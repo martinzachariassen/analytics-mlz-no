@@ -136,6 +136,9 @@ Filters beyond `MAX_FILTERS` (10, the API's limit) are dropped instead of turnin
   was never installed does not keep open tabs busy. `useSites()` polls the list at the pace of
   its fastest waiting site. Settings uses `useSite(id, { live: true })`, which keeps polling
   every 60 s once there is data, so "Last event … ago" stays current.
+- `useGoals(siteId)` and `useGoalStats(siteId, scope)` share the `["goals", siteId]` key
+  prefix, so invalidating it after a goal is added or removed refreshes the list, the overview
+  card and every "Make this a goal" button.
 - Changes use `useMutation` around an `api.*` call and invalidate the affected queries on
   success (see `components/add-site-dialog.tsx`).
 
@@ -194,6 +197,7 @@ Use these before writing new layout:
 | `date-range-picker.tsx` | Period, custom range and interval selects |
 | `detail-sheet.tsx` | Side sheet for one value, with "Filter dashboard by this" |
 | `delta.tsx` | Up/down change, coloured with `--positive`/`--negative` |
+| `goals-card.tsx`, `goals-settings.tsx`, `goal-button.tsx` | Conversions per goal on the overview (a row filters by the goal), goal management in settings (`#goals`), and "Make this a goal" in the detail sheet and the event properties panel. `lib/goals.ts` has the labels and the goal-to-filter mapping; `formatRate` in `lib/format.ts` formats conversion rates |
 | `heatmap.tsx`, `world-map.tsx`, `proportion-strip.tsx`, `sparkline.tsx` | Special charts |
 
 ## Look and theming
@@ -254,8 +258,8 @@ There are three layers. Each one catches what the one before cannot.
 | Layer | Where | Runs with | What it covers |
 |---|---|---|---|
 | Unit | `src/lib/*.test.ts` | `bun run test` (vitest, Node) | The API client (error mapping, retry policy, headers, id encoding, query strings), URL state parsing and the `hasOwn` guards, period maths, metrics, dimensions, formatting, and the CSP hash of the theme script |
-| Component | `src/components/*.test.tsx`, `src/routes/**/*.test.tsx` | `bun run test` (vitest, happy-dom, Testing Library) | Filter bar, date range picker and its shortcuts, detail sheet, `ErrorNote` (retry, focus, no flip on background refetches) and onboarding in the site layout (polling until the first event, then the dashboard), against a mocked `fetch`, with the URL as the observable state |
-| End to end | `e2e/*.spec.ts` | `bun run e2e` (Playwright) | The real Go server with seeded data and the production build: sign-in, every view of a site, filters, the detail sheet, settings, a failed request recovering with "Try again", and a new site waiting for its first event and switching to the dashboard when one is sent, with an axe scan on every page |
+| Component | `src/components/*.test.tsx`, `src/routes/**/*.test.tsx` | `bun run test` (vitest, happy-dom, Testing Library) | Filter bar, date range picker and its shortcuts, detail sheet, goals (the overview card, adding and removing in settings), `ErrorNote` (retry, focus, no flip on background refetches) and onboarding in the site layout (polling until the first event, then the dashboard), against a mocked `fetch`, with the URL as the observable state |
+| End to end | `e2e/*.spec.ts` | `bun run e2e` (Playwright) | The real Go server with seeded data and the production build: sign-in, every view of a site, filters, the detail sheet, settings, goals (conversions on the overview, adding and removing in settings), a failed request recovering with "Try again", and a new site waiting for its first event and switching to the dashboard when one is sent, with an axe scan on every page |
 
 - **Unit tests:** put logic in `lib/` as plain functions when you can, so it is easy to test. If
   you edit the theme script in `index.html`, update its hash in `firebase.json`; `csp.test.ts`
@@ -263,7 +267,9 @@ There are three layers. Each one catches what the one before cannot.
 - **Component tests:** opt into a DOM with `// @vitest-environment happy-dom` at the top of the
   file. `src/test/render.tsx` has `renderInSite`, which renders a component inside `/sites/:id`
   with a fresh query client and returns the router so tests can assert on the URL, and
-  `mockFetch`, which answers API paths with fixed JSON.
+  `mockFetch`, which answers API paths with fixed JSON. A route can also be a function of the
+  request's `init` that returns the body or a `Response`, for testing mutations and error
+  statuses (see `components/goals.test.tsx`).
 - **End-to-end tests:** `playwright.config.ts` seeds a throwaway database in the system temp
   directory (`seed -reset -days 60`), runs the server on :18080 with `DEV_LOGIN=1`, and serves
   `apps/web/dist` with `vite preview` on :4173, so it can run next to `make dev`. Both are

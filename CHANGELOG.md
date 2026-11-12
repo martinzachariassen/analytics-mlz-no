@@ -7,6 +7,8 @@ All notable changes are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Goals and conversions: a goal is a custom event or a page (`*` matches anything, so `/blog/*` is every post). The overview has a Goals card with conversions, visitors, conversion rate (share of all visitors) and its change; clicking a goal filters the dashboard to visits that reached it. Goals are managed in settings, and the detail sheet and the event properties panel offer "Make this a goal". Goals count past traffic too. `analytics seed` creates demo goals.
+- API: `GET`/`POST /api/sites/{id}/goals`, `DELETE /api/sites/{id}/goals/{goalId}` and `GET /api/sites/{id}/goals/stats` (same period, filter and `compare` parameters as the other stats endpoints). At most 50 goals per site.
 - Onboarding: a site with no stored events (new, or emptied by a purge or retention) shows "Waiting for the first event…" with its snippet and troubleshooting tips instead of empty charts, and switches to the dashboard by itself (with a "First event received" toast) when the first event arrives. It checks every 5 s in the first hour after the site was added, then every minute. Settings shows the same status and when the last event arrived; the site list shows "Waiting for first event" instead of an empty trend.
 - API: sites have `first_event_at` and `last_event_at` (oldest and newest stored events, `null` before the first one).
 - `docs/decisions.md` has a "Next" section with the product roadmap.

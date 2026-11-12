@@ -13,6 +13,16 @@ export function formatPercent(ratio: number): string {
   return `${Math.round(ratio * 100)}%`
 }
 
+/** A conversion rate: one decimal below 10%, where whole percents hide the difference. */
+export function formatRate(ratio: number): string {
+  const p = ratio * 100
+  if (p === 0) return "0%"
+  // A few conversions out of many visitors must not read as none.
+  if (p < 0.05) return "<0.1%"
+  const tenth = Math.round(p * 10) / 10
+  return tenth >= 10 ? `${Math.round(p)}%` : `${tenth.toFixed(1)}%`
+}
+
 /** Seconds -> "1m 05s" / "42s". */
 export function formatDuration(seconds: number): string {
   const s = Math.round(seconds)

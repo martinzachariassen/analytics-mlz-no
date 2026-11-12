@@ -345,9 +345,10 @@ var demoSites = []struct {
 	name, domain string
 	visits       int
 	profile      *devdata.Profile
+	goals        [][2]string // kind, value
 }{
-	{"Demo blog", "localhost", 80, devdata.Blog},
-	{"Demo docs", "docs.localhost", 35, devdata.Docs},
+	{"Demo blog", "localhost", 80, devdata.Blog, [][2]string{{"event", "newsletter-signup"}, {"event", "contact-submit"}, {"path", "/contact"}}},
+	{"Demo docs", "docs.localhost", 35, devdata.Docs, [][2]string{{"event", "copy-code"}, {"path", "/docs/*"}}},
 }
 
 // seed fills demo sites with synthetic traffic for local development.
@@ -391,6 +392,11 @@ func seed(cfg config.Config, args []string) error {
 		site, err := st.CreateSite(ctx, demo.name, demo.domain)
 		if err != nil {
 			return err
+		}
+		for _, g := range demo.goals {
+			if _, err := st.CreateGoal(ctx, site.ID, g[0], g[1]); err != nil {
+				return err
+			}
 		}
 		start := time.Now()
 		n, err := devdata.Seed(ctx, st, site.ID, devdata.Options{

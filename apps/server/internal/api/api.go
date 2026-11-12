@@ -42,6 +42,11 @@ func (a *API) Register(mux *http.ServeMux, protect func(http.Handler) http.Handl
 		"GET /api/sites/{id}/heatmap":   a.timed(a.heatmap),
 		"GET /api/sites/{id}/realtime":  a.timed(a.realtime),
 		"POST /api/sites/{id}/purge":    a.purge,
+
+		"GET /api/sites/{id}/goals":             a.listGoals,
+		"POST /api/sites/{id}/goals":            a.createGoal,
+		"DELETE /api/sites/{id}/goals/{goalId}": a.deleteGoal,
+		"GET /api/sites/{id}/goals/stats":       a.timed(a.goalStats),
 	}
 	for pattern, h := range routes {
 		mux.Handle(pattern, protect(h))

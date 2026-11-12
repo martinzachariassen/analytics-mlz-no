@@ -367,3 +367,70 @@ func TestIngestIsWired(t *testing.T) {
 		t.Fatalf("realtime = %s", r.Body)
 	}
 }
+
+func TestGoalEndpoints(t *testing.T) {
+	h, c := setup(t)
+	js := "application/json"
+	w := call(h, "POST", "/api/sites", `{"domain":"mlz.no"}`, c, js)
+	var site struct{ ID string }
+	_ = json.Unmarshal(w.Body.Bytes(), &site)
+	base := "/api/sites/" + site.ID + "/goals"
+
+	w = call(h, "POST", base, `{"kind":"event","value":"signup"}`, c, js)
+	var goal struct {
+		ID    int64
+		Kind  string
+		Value string
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &goal); w.Code != http.StatusCreated || err != nil || goal.ID == 0 || goal.Value != "signup" {
+		t.Fatalf("create = %d %s", w.Code, w.Body)
+	}
+	for _, c2 := range []struct {
+		body string
+		want int
+	}{
+		{`{"kind":"event","value":"signup"}`, http.StatusConflict},
+		{`{"kind":"path","value":"no-slash"}`, http.StatusBadRequest},
+		{`{"kind":"referrer","value":"x"}`, http.StatusBadRequest},
+		{`not json`, http.StatusBadRequest},
+	} {
+		if w := call(h, "POST", base, c2.body, c, js); w.Code != c2.want {
+			t.Errorf("POST %s = %d, want %d", c2.body, w.Code, c2.want)
+		}
+	}
+	// The JSON Content-Type is the CSRF protection for POST.
+	if w := call(h, "POST", base, `{"kind":"event","value":"form"}`, c, "text/plain"); w.Code != http.StatusBadRequest {
+		t.Fatalf("text/plain create = %d, want 400", w.Code)
+	}
+	if w := call(h, "POST", "/api/sites/nope/goals", `{"kind":"event","value":"x"}`, c, js); w.Code != http.StatusNotFound {
+		t.Fatalf("create on unknown site = %d, want 404", w.Code)
+	}
+	if w := call(h, "GET", base, "", nil, ""); w.Code != http.StatusUnauthorized {
+		t.Fatalf("anonymous list = %d, want 401", w.Code)
+	}
+	if w := call(h, "GET", base, "", c, ""); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"value":"signup"`) {
+		t.Fatalf("list = %d %s", w.Code, w.Body)
+	}
+	if w := call(h, "GET", base+"/stats?from=2026-11-01&to=2026-11-03", "", c, ""); w.Code != http.StatusOK ||
+		!strings.Contains(w.Body.String(), `"conversion_rate":0`) {
+		t.Fatalf("stats = %d %s", w.Code, w.Body)
+	}
+
+	one := base + "/" + strconv.FormatInt(goal.ID, 10)
+	req := httptest.NewRequest(http.MethodDelete, one, nil)
+	req.AddCookie(c)
+	req.Header.Set("Origin", "https://evil.example")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("cross-origin delete = %d, want 403", rec.Code)
+	}
+	if w := call(h, "DELETE", one, "", c, ""); w.Code != http.StatusNoContent {
+		t.Fatalf("delete = %d %s", w.Code, w.Body)
+	}
+	for _, path := range []string{one, base + "/abc"} {
+		if w := call(h, "DELETE", path, "", c, ""); w.Code != http.StatusNotFound {
+			t.Errorf("delete %s = %d, want 404", path, w.Code)
+		}
+	}
+}

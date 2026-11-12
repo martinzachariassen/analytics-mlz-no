@@ -5,6 +5,7 @@ import { BarList } from "@/components/bar-list"
 import { DataTable } from "@/components/data-table"
 import { IntervalSelect } from "@/components/date-range-picker"
 import { ErrorNote, Unavailable } from "@/components/error-note"
+import { GoalButton } from "@/components/goal-button"
 import { KpiStrip } from "@/components/kpi-strip"
 import { Panel, TextTabs } from "@/components/panel"
 import { ProportionStrip } from "@/components/proportion-strip"
@@ -250,20 +251,23 @@ function Properties({
       description="Properties"
       className={className}
       action={
-        keys.data && keys.data.length > 0 ? (
-          <Select value={key} onValueChange={setPicked}>
-            <SelectTrigger size="sm" className="w-40" aria-label="Property">
-              <SelectValue placeholder="Property" />
-            </SelectTrigger>
-            <SelectContent align="end">
-              {keys.data.map((k) => (
-                <SelectItem key={k.value} value={k.value}>
-                  {k.value}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : undefined
+        <>
+          <GoalButton siteId={sc.siteId} kind="event" value={event} />
+          {keys.data && keys.data.length > 0 && (
+            <Select value={key} onValueChange={setPicked}>
+              <SelectTrigger size="sm" className="w-40" aria-label="Property">
+                <SelectValue placeholder="Property" />
+              </SelectTrigger>
+              <SelectContent align="end">
+                {keys.data.map((k) => (
+                  <SelectItem key={k.value} value={k.value}>
+                    {k.value}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </>
       }
     >
       {keys.isError || values.isError ? (

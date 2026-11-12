@@ -51,6 +51,8 @@ sequenceDiagram
 | **Visit duration** | Time from the first to the last event of a visit, averaged over visits. A one-page visit lasts 0 s |
 | **Views per visit** | Page views divided by visits |
 | **Realtime visitors** | Distinct visitors in the last 5 minutes |
+| **Goal** | A custom event or a page (path, `*` as a wildcard) you want visitors to reach. A goal's visitors are the distinct visitors who reached it; its completions are the matching events or page views |
+| **Conversion rate** | A goal's visitors divided by all visitors in the period |
 
 ### Dimensions (what you can break down and filter by)
 

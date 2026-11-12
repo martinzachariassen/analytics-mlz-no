@@ -53,6 +53,9 @@ export function DataTable({
   onOpen,
   canLoadMore,
   onLoadMore,
+  search: searchProp,
+  onSearch,
+  searching,
 }: {
   dim: Dimension
   rows?: BreakdownRow[]
@@ -61,12 +64,19 @@ export function DataTable({
   onOpen?: (r: BreakdownRow) => void
   canLoadMore?: boolean
   onLoadMore?: () => void
+  /** Controlled search text, for a parent that also searches on the server. */
+  search?: string
+  onSearch?: (s: string) => void
+  /** A search is still running elsewhere, so no matches yet is not the answer. */
+  searching?: boolean
 }) {
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({
     key: "visitors",
     desc: true,
   })
-  const [search, setSearch] = useState("")
+  const [ownSearch, setOwnSearch] = useState("")
+  const search = searchProp ?? ownSearch
+  const setSearch = onSearch ?? setOwnSearch
   const info = DIMS[dim]
   const compare = rows?.some((r) => r.previous_visitors !== undefined)
   const full = rows?.some((r) => r.visits !== undefined)
@@ -187,6 +197,7 @@ export function DataTable({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={`Search ${info.plural.toLowerCase()}…`}
+            aria-label={`Search ${info.plural.toLowerCase()}`}
             className="h-7 pl-8 text-xs"
           />
         </div>
@@ -301,7 +312,11 @@ export function DataTable({
                 colSpan={columns.length + 3}
                 className="py-12 text-center text-xs text-fg-muted"
               >
-                {search ? "No matches" : "Nothing in this period"}
+                {searching
+                  ? "Searching…"
+                  : search
+                    ? "No matches"
+                    : "Nothing in this period"}
               </TableCell>
             </TableRow>
           )}

@@ -47,6 +47,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 import { api, type User } from "@/lib/api"
+import { useSites } from "@/lib/queries"
 import { useScope } from "@/lib/use-scope"
 
 export type View = { path: string; label: string; icon: LucideIcon }
@@ -189,7 +190,7 @@ function SitePicker() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const sc = useScope()
-  const sites = useQuery({ queryKey: ["sites"], queryFn: api.sites })
+  const sites = useSites()
   const site = sites.data?.find((s) => s.id === id)
   // Keep the current view when switching site.
   const sub = id ? pathname.slice(`/sites/${id}`.length) : ""

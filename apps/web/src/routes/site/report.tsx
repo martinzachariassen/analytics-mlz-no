@@ -22,7 +22,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { exportUrl, type FilterDim } from "@/lib/api"
 import { DIMS, formatValue } from "@/lib/dims"
 import { useBreakdown, useStats } from "@/lib/queries"
-import { useScope } from "@/lib/use-scope"
+import { useDebounced } from "@/lib/use-debounced"
+import { MAX_FILTERS, useScope } from "@/lib/use-scope"
 
 const WorldMap = lazy(() =>
   import("@/components/world-map").then((m) => ({ default: m.WorldMap }))
@@ -63,6 +64,7 @@ export const REPORTS: Record<string, ReportConfig> = {
 }
 
 const PAGE = 100
+const SEARCH_DEBOUNCE_MS = 250
 
 /**
  * A full report for one area: the KPIs, the top five values over time, and a
@@ -75,15 +77,41 @@ export function ReportPage({ report }: { report: keyof typeof REPORTS }) {
   const t = params.get("tab")
   const dim = cfg.tabs.find((x) => x.dim === t)?.dim ?? cfg.tabs[0]!.dim
   const [limit, setLimit] = useState(PAGE)
+  const [search, setSearch] = useState("")
+  const needle = useDebounced(search.trim(), SEARCH_DEBOUNCE_MS)
 
   const stats = useStats(sc.siteId, sc.scope, sc.interval)
   const rows = useBreakdown(sc.siteId, sc.scope, dim, {
     limit,
     metrics: "full",
   })
+  // The table searches the rows it has. When the server has more than were loaded, a
+  // search also asks the server with a "contains" filter, so values past the first page are
+  // found too. Not for formatted values (countries), whose labels the server does not know.
+  const truncated = rows.data?.length === limit
+  const serverSearch =
+    truncated && !DIMS[dim].format && sc.filters.length < MAX_FILTERS
+  const found = useBreakdown(
+    sc.siteId,
+    {
+      ...sc.scope,
+      filters: [...sc.filters, { dim, op: "contains", value: needle }],
+    },
+    dim,
+    { limit: PAGE, metrics: "full" },
+    serverSearch && needle !== ""
+  )
+  const searching = serverSearch && needle !== ""
+  const table = searching ? found : rows
+  // While the server search catches up with what was typed, an empty list is not final.
+  const pending =
+    serverSearch &&
+    (search.trim() !== needle || (searching && found.isPlaceholderData))
+
   const total = stats.data?.summary.visitors
   const setTab = (d: FilterDim) => {
     setLimit(PAGE)
+    setSearch("")
     setParams(
       (p) => {
         const q = new URLSearchParams(p)
@@ -110,7 +138,7 @@ export function ReportPage({ report }: { report: keyof typeof REPORTS }) {
   return (
     <div className="flex flex-col gap-3 lg:gap-4">
       <KpiStrip stats={stats.data} now={stats.dataUpdatedAt} />
-      <ErrorNote queries={[stats, rows]} />
+      <ErrorNote queries={[stats, rows, found]} />
       {cfg.extra === "map" && (
         <Panel
           title="Visitor map"
@@ -158,17 +186,20 @@ export function ReportPage({ report }: { report: keyof typeof REPORTS }) {
           />
         }
       >
-        {rows.isError ? (
+        {table.isError ? (
           <Unavailable className="h-40" />
         ) : (
           <DataTable
             dim={dim}
-            rows={rows.data}
-            loading={rows.isPending}
+            rows={table.data}
+            loading={table.isPending}
+            searching={pending}
             total={total}
             onOpen={(r) => sc.openDetail({ dim, value: r.value })}
-            canLoadMore={rows.data?.length === limit && limit < 1000}
+            canLoadMore={!searching && truncated && limit < 1000}
             onLoadMore={() => setLimit(1000)}
+            search={search}
+            onSearch={setSearch}
           />
         )}
       </Panel>
@@ -185,8 +216,23 @@ export function EventsPage() {
     metrics: "full",
   })
   const total = stats.data?.summary.visitors
-  const [picked, setPicked] = useState<string>()
-  const event = picked ?? events.data?.[0]?.value
+  const [params, setParams] = useSearchParams()
+  const picked = params.get("event")
+  // A picked event that is not in this period's list falls back to the top one.
+  const event =
+    picked !== null && events.data?.some((e) => e.value === picked)
+      ? picked
+      : events.data?.[0]?.value
+  const setPicked = (value: string) =>
+    setParams(
+      (p) => {
+        const q = new URLSearchParams(p)
+        q.set("event", value)
+        q.delete("prop")
+        return q
+      },
+      { preventScrollReset: true }
+    )
 
   return (
     <div className="flex flex-col gap-3 lg:gap-4">
@@ -248,9 +294,10 @@ function Properties({
   const sc = useScope()
   const scope = { ...sc.scope, compare: undefined }
   const keys = useBreakdown(sc.siteId, scope, "prop_key", { event, limit: 50 })
-  const [picked, setPicked] = useState<string>()
+  const [params, setParams] = useSearchParams()
+  const picked = params.get("prop")
   const key =
-    picked && keys.data?.some((k) => k.value === picked)
+    picked !== null && keys.data?.some((k) => k.value === picked)
       ? picked
       : keys.data?.[0]?.value
   const values = useBreakdown(
@@ -279,7 +326,19 @@ function Properties({
             />
           )}
           {keys.data && keys.data.length > 0 && (
-            <Select value={key} onValueChange={setPicked}>
+            <Select
+              value={key}
+              onValueChange={(v) =>
+                setParams(
+                  (p) => {
+                    const q = new URLSearchParams(p)
+                    q.set("prop", v)
+                    return q
+                  },
+                  { preventScrollReset: true }
+                )
+              }
+            >
               <SelectTrigger size="sm" className="w-40" aria-label="Property">
                 <SelectValue placeholder="Property" />
               </SelectTrigger>

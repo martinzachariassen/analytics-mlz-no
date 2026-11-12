@@ -5,6 +5,7 @@ import { BarList } from "@/components/bar-list"
 import { DataTable } from "@/components/data-table"
 import { IntervalSelect } from "@/components/date-range-picker"
 import { ErrorNote, Unavailable } from "@/components/error-note"
+import { ExportLink } from "@/components/export-link"
 import { GoalButton } from "@/components/goal-button"
 import { KpiStrip } from "@/components/kpi-strip"
 import { Panel, TextTabs } from "@/components/panel"
@@ -18,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
-import type { FilterDim } from "@/lib/api"
+import { exportUrl, type FilterDim } from "@/lib/api"
 import { DIMS, formatValue } from "@/lib/dims"
 import { useBreakdown, useStats } from "@/lib/queries"
 import { useScope } from "@/lib/use-scope"
@@ -147,7 +148,16 @@ export function ReportPage({ report }: { report: keyof typeof REPORTS }) {
           <TopSeriesChart sc={sc} dim={dim} rows={rows.data} />
         )}
       </Panel>
-      <Panel title={DIMS[dim].plural} bodyClassName="p-0">
+      <Panel
+        title={DIMS[dim].plural}
+        bodyClassName="p-0"
+        action={
+          <ExportLink
+            href={exportUrl.breakdown(sc.siteId, sc.scope, dim)}
+            label={DIMS[dim].plural.toLowerCase()}
+          />
+        }
+      >
         {rows.isError ? (
           <Unavailable className="h-40" />
         ) : (
@@ -199,6 +209,12 @@ export function EventsPage() {
           description="Conversion = share of all visitors"
           className="lg:col-span-7"
           bodyClassName="p-0"
+          action={
+            <ExportLink
+              href={exportUrl.breakdown(sc.siteId, sc.scope, "event")}
+              label="events"
+            />
+          }
         >
           {events.isError ? (
             <Unavailable className="h-40" />
@@ -253,6 +269,15 @@ function Properties({
       action={
         <>
           <GoalButton siteId={sc.siteId} kind="event" value={event} />
+          {key !== undefined && (
+            <ExportLink
+              href={exportUrl.breakdown(sc.siteId, scope, "prop", {
+                event,
+                key,
+              })}
+              label={`${key} values`}
+            />
+          )}
           {keys.data && keys.data.length > 0 && (
             <Select value={key} onValueChange={setPicked}>
               <SelectTrigger size="sm" className="w-40" aria-label="Property">

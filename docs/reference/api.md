@@ -16,7 +16,7 @@ status code means. The dashboard's typed client is `apps/web/src/lib/api.ts`.
 | [Authentication](#authentication) | `/api/auth/*` |
 | [Sites](#sites) | `/api/sites`, `/api/sites/{id}` |
 | [Cleaning up spam](#cleaning-up-spam) | `/api/sites/{id}/purge` |
-| [Statistics](#statistics) | `/stats`, `/breakdown`, `/heatmap`, `/realtime` |
+| [Statistics](#statistics) | `/stats`, `/breakdown`, `/heatmap`, `/realtime`, `/goals/stats`, `/export` |
 
 ## Calling the API from a shell
 
@@ -323,6 +323,47 @@ Conversions for every goal of the site, for the period and filters:
   counted.
 - Filters select whole visits, like visit metrics: with `f=path:is:/pricing`, a goal counts
   visitors who reached it in a visit that included `/pricing`.
+
+### `GET /api/sites/{id}/export`
+
+Downloads a breakdown or a time series as CSV, with the same period, filter and `compare`
+parameters as the endpoints above. The response is `text/csv; charset=utf-8` with
+`Content-Disposition: attachment; filename="{domain}-{dim or timeseries}-{from}-{to}.csv"`, so a
+plain link downloads it. The body starts with a UTF-8 byte order mark, so Excel reads
+non-ASCII paths correctly.
+
+| Param | Description |
+|---|---|
+| `what` | `breakdown` or `timeseries` (required) |
+| `format` | `csv`, the default and the only format |
+| `dim`, `event`, `key`, `limit` | With `what=breakdown`: as for `breakdown`, but `limit` defaults to 1000 (the maximum). When more values exist than `limit`, the response has `X-Truncated: true` |
+| `interval` | With `what=timeseries`: as for `stats` |
+
+Breakdown columns, in order:
+
+- the dimension name (`prop` for property values), then `visitors`;
+- the count, named by what it counts: `pageviews` for `path` and `hostname`, `events` for
+  `event`, `prop_key` and `prop`. Dimensions that count visits have no count column, because
+  `visits` says the same;
+- `visits`, `bounce_rate`, `avg_duration_seconds` (the `metrics=full` columns), except for
+  `prop` and `prop_key`;
+- `previous_visitors` when `compare` is given.
+
+```csv
+path,visitors,pageviews,visits,bounce_rate,avg_duration_seconds,previous_visitors
+/,812,1204,950,0.6120,48.3,790
+/blog/hello,233,251,240,0.7000,95.0,0
+```
+
+Time series columns are `start` (RFC 3339 in `tz`), `pageviews`, `visitors`, `visits`,
+`bounce_rate`, `avg_duration_seconds`, and with `compare` the same six prefixed with `previous_`
+for the aligned bucket of the comparison period. Rates are ratios with four decimals; durations
+are seconds with one.
+
+A cell that starts with `=`, `+`, `-`, `@`, tab or carriage return gets a leading `'`, so a
+spreadsheet shows it as text instead of running it as a formula. Plain numbers such as `-1` are
+left as they are. Errors are JSON, as elsewhere; a browser following a plain link saves no file
+for them (a `401` means the session expired, so sign in again).
 
 Statistics queries are cancelled after 10 seconds (`500`).
 

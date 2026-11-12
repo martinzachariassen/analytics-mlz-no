@@ -221,3 +221,18 @@ export const api = {
   realtime: (id: string, detail = false) =>
     request<Realtime>(`${site(id)}/realtime${detail ? "?detail=1" : ""}`),
 }
+
+/**
+ * Download URLs for CSV exports. They are plain links, not fetches: the browser sends the
+ * session cookie on the same origin and saves the file the server names.
+ */
+export const exportUrl = {
+  breakdown: (
+    id: string,
+    s: Scope,
+    dim: Dimension,
+    opts: { event?: string; key?: string } = {}
+  ) => `${site(id)}/export?${query(s, { what: "breakdown", dim, ...opts })}`,
+  timeseries: (id: string, s: Scope, interval?: Interval) =>
+    `${site(id)}/export?${query(s, { what: "timeseries", interval })}`,
+}

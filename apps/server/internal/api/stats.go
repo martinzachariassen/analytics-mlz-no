@@ -245,31 +245,14 @@ func (a *API) stats(w http.ResponseWriter, r *http.Request) {
 		a.internal(w, "previous summary", err)
 		return
 	}
-	series, err := a.Store.Timeseries(ctx, site.ID, q.bounds(), q.filters)
-	if err != nil {
-		a.internal(w, "timeseries", err)
+	series, prevSeries, ok := a.timeseries(w, r, site.ID, q)
+	if !ok {
 		return
 	}
-	for i := range series {
-		series[i].Start = series[i].Start.In(q.loc)
-	}
 	resp := statsResponse{Period: q.json(), Summary: summary, Previous: previous, Timeseries: series}
-
 	if q.compare != "" {
-		prev, err := a.Store.Timeseries(ctx, site.ID, cmp.bounds(), q.filters)
-		if err != nil {
-			a.internal(w, "previous timeseries", err)
-			return
-		}
-		aligned := make([]store.Bucket, len(series))
-		for i := range aligned {
-			if i < len(prev) {
-				aligned[i] = prev[i]
-				aligned[i].Start = prev[i].Start.In(q.loc)
-			}
-		}
 		pj := cmp.json()
-		resp.PreviousTimeseries, resp.Compare = aligned, &pj
+		resp.PreviousTimeseries, resp.Compare = prevSeries, &pj
 	}
 	httpx.WriteJSON(w, http.StatusOK, resp)
 }
@@ -284,56 +267,85 @@ func (a *API) breakdown(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v := r.URL.Query()
-	dim := v.Get("dim")
-	if !slices.Contains(store.Dimensions, dim) {
-		httpx.Error(w, http.StatusBadRequest, "unknown dim")
+	req, err := parseBreakdown(v, q, 10)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	opt := store.BreakdownOptions{Event: v.Get("event"), PropKey: v.Get("key"), Limit: 10, Filters: q.filters}
-	if dim == "prop" && (opt.Event == "" || opt.PropKey == "") {
-		httpx.Error(w, http.StatusBadRequest, "dim=prop requires event and key")
+	m := v.Get("metrics")
+	if m != "" && m != "full" {
+		httpx.Error(w, http.StatusBadRequest, "metrics must be full")
 		return
 	}
-	if dim == "prop_key" && opt.Event == "" {
-		httpx.Error(w, http.StatusBadRequest, "dim=prop_key requires event")
+	req.full = m == "full"
+	rows, ok := a.breakdownRows(w, r, site.ID, q, req)
+	if !ok {
 		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, rows)
+}
+
+// breakdownRequest is a parsed breakdown: the dimension, its options and whether to add
+// visit metrics.
+type breakdownRequest struct {
+	dim  string
+	opt  store.BreakdownOptions
+	full bool
+}
+
+// parseBreakdown reads dim, event, key and limit (default limit when absent).
+func parseBreakdown(v url.Values, q query, limit int) (breakdownRequest, error) {
+	req := breakdownRequest{
+		opt: store.BreakdownOptions{Event: v.Get("event"), PropKey: v.Get("key"), Limit: limit, Filters: q.filters},
+	}
+	// The dimension is taken from the whitelist rather than the request, so the string that
+	// reaches the SQL builder is never user input.
+	i := slices.Index(store.Dimensions, v.Get("dim"))
+	if i < 0 {
+		return req, errors.New("unknown dim")
+	}
+	req.dim = store.Dimensions[i]
+	switch {
+	case req.dim == "prop" && (req.opt.Event == "" || req.opt.PropKey == ""):
+		return req, errors.New("dim=prop requires event and key")
+	case req.dim == "prop_key" && req.opt.Event == "":
+		return req, errors.New("dim=prop_key requires event")
 	}
 	if l := v.Get("limit"); l != "" {
 		n, err := strconv.Atoi(l)
 		if err != nil || n < 1 || n > maxBreakdownLimit {
-			httpx.Error(w, http.StatusBadRequest, fmt.Sprintf("limit must be 1-%d", maxBreakdownLimit))
-			return
+			return req, fmt.Errorf("limit must be 1-%d", maxBreakdownLimit)
 		}
-		opt.Limit = n
+		req.opt.Limit = n
 	}
-	full := v.Get("metrics") == "full"
-	if m := v.Get("metrics"); m != "" && !full {
-		httpx.Error(w, http.StatusBadRequest, "metrics must be full")
-		return
-	}
+	return req, nil
+}
 
+// breakdownRows runs a breakdown with its visit metrics and comparison. On failure it has
+// written the response and returns false.
+func (a *API) breakdownRows(w http.ResponseWriter, r *http.Request, siteID string, q query, req breakdownRequest) ([]store.BreakdownRow, bool) {
 	ctx := r.Context()
-	rows, err := a.Store.Breakdown(ctx, site.ID, q.rng(), dim, opt)
+	rows, err := a.Store.Breakdown(ctx, siteID, q.rng(), req.dim, req.opt)
 	if err != nil {
 		a.internal(w, "breakdown", err)
-		return
+		return nil, false
 	}
-	if full {
-		if err := a.Store.VisitMetrics(ctx, site.ID, q.rng(), dim, q.filters, rows); err != nil {
+	if req.full {
+		if err := a.Store.VisitMetrics(ctx, siteID, q.rng(), req.dim, q.filters, rows); err != nil {
 			a.internal(w, "visit metrics", err)
-			return
+			return nil, false
 		}
 	}
 	if q.compare != "" && len(rows) > 0 {
-		popt := opt
+		popt := req.opt
 		popt.Limit = len(rows)
 		for _, row := range rows {
 			popt.Values = append(popt.Values, row.Value)
 		}
-		prev, err := a.Store.Breakdown(ctx, site.ID, q.comparison(q.compare).rng(), dim, popt)
+		prev, err := a.Store.Breakdown(ctx, siteID, q.comparison(q.compare).rng(), req.dim, popt)
 		if err != nil {
 			a.internal(w, "previous breakdown", err)
-			return
+			return nil, false
 		}
 		byValue := make(map[string]int64, len(prev))
 		for _, p := range prev {
@@ -344,7 +356,38 @@ func (a *API) breakdown(w http.ResponseWriter, r *http.Request) {
 			rows[i].PreviousVisitors = &n
 		}
 	}
-	httpx.WriteJSON(w, http.StatusOK, rows)
+	return rows, true
+}
+
+// timeseries returns the period's buckets in its time zone and, when comparing, the
+// comparison period's buckets aligned by index (cut or padded to the same length). On
+// failure it has written the response and returns false.
+func (a *API) timeseries(w http.ResponseWriter, r *http.Request, siteID string, q query) (series, prev []store.Bucket, ok bool) {
+	ctx := r.Context()
+	series, err := a.Store.Timeseries(ctx, siteID, q.bounds(), q.filters)
+	if err != nil {
+		a.internal(w, "timeseries", err)
+		return nil, nil, false
+	}
+	for i := range series {
+		series[i].Start = series[i].Start.In(q.loc)
+	}
+	if q.compare == "" {
+		return series, nil, true
+	}
+	raw, err := a.Store.Timeseries(ctx, siteID, q.comparison(q.compare).bounds(), q.filters)
+	if err != nil {
+		a.internal(w, "previous timeseries", err)
+		return nil, nil, false
+	}
+	prev = make([]store.Bucket, len(series))
+	for i := range prev {
+		if i < len(raw) {
+			prev[i] = raw[i]
+			prev[i].Start = raw[i].Start.In(q.loc)
+		}
+	}
+	return series, prev, true
 }
 
 type heatmapResponse struct {

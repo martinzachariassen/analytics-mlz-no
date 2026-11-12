@@ -75,6 +75,12 @@ Requests from known crawlers and automation are dropped before anything is store
 Event properties are stored as sent. Do not put personal data (email addresses, names, user ids)
 in event names or properties.
 
+## Exports
+
+CSV exports contain the same aggregates the dashboard shows (counts, rates and durations per
+value or per time bucket), never single events or visitor ids. They are only available to
+signed-in dashboard users.
+
 ## Goals
 
 A goal stores only the site, an event name or a path pattern, and when it was created. Goals

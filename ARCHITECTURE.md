@@ -113,7 +113,7 @@ What the server defends against, and what it does not, is in the
 | `internal/geo` | `Locator.Country`: local MaxMind/DB-IP lookup. Returns `""` without a database |
 | `internal/httpx` | `ClientIP` and `PeerIP` (`X-Forwarded-For` with `PROXY_HOPS`), `RateLimiter`, `ReadJSON` and `WriteJSON` |
 | `internal/auth` | `Service`: GitHub OAuth (`github.go`), sessions, `Require` middleware, the `DEV_LOGIN` shortcut (`dev.go`). A `Provider` interface leaves room for more identity providers |
-| `internal/api` | `API.Register`: sites CRUD, purge (`api.go`), goals and goal stats (`goals.go`), and stats, breakdown, heatmap and realtime handlers with query parsing (`stats.go`) |
+| `internal/api` | `API.Register`: sites CRUD, purge (`api.go`), goals and goal stats (`goals.go`), CSV export (`export.go`), and stats, breakdown, heatmap and realtime handlers with query parsing (`stats.go`) |
 | `internal/store` | All SQL. `store.go` opens SQLite (WAL) and runs `migrations/*.sql`. `events.go` inserts events and assigns sessions. `stats.go` holds `Summary`, `Timeseries`, `Breakdown` and `Dimensions`. `filter.go` turns `Filters` into SQL. `goals.go` holds goal CRUD and `GoalStats`. `sites.go` (with `sitecache.go`), `users.go` |
 | `internal/text` | `Clean` and `Truncate`: how ingest cleans browser strings before storing them, shared with goals so a goal typed as sent matches |
 | `internal/script` | Embeds `script.js` (built from `apps/tracker`) and serves it gzipped with an `ETag` |
@@ -198,7 +198,7 @@ net/http server (timeouts, 16 KB header cap)
             ├── POST /api/event          ingest.Handler (limits → bot → payload → site → store)
             ├── GET  /api/script.js      script.Handler (gzip, ETag, CDN cache headers)
             ├── /api/auth/*              limit() → auth.Service (config, login, callback, me, logout)
-            ├── /api/sites/*             auth.Require → api.API (sites, goals, stats, breakdown, heatmap, realtime, purge)
+            ├── /api/sites/*             auth.Require → api.API (sites, goals, stats, breakdown, heatmap, realtime, export, purge)
             └── GET  /healthz            store.Ping
 ```
 

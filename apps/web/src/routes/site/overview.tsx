@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react"
 import { useSearchParams } from "react-router"
 import { IntervalSelect } from "@/components/date-range-picker"
 import { ErrorNote } from "@/components/error-note"
+import { ExportLink } from "@/components/export-link"
 import { GoalsCard } from "@/components/goals-card"
 import { ActiveHours } from "@/components/heatmap"
 import { Insights } from "@/components/insights"
@@ -11,6 +12,7 @@ import { ProportionStrip } from "@/components/proportion-strip"
 import { ReportCard } from "@/components/report-card"
 import { LegendItem, TrafficChart } from "@/components/traffic-chart"
 import { Skeleton } from "@/components/ui/skeleton"
+import { exportUrl } from "@/lib/api"
 import { isMetric, METRIC, type MetricKey } from "@/lib/metrics"
 import { formatRange } from "@/lib/period"
 import { useBreakdown, useStats } from "@/lib/queries"
@@ -64,6 +66,10 @@ export function OverviewPage() {
               )}
             </span>
             <IntervalSelect sc={sc} />
+            <ExportLink
+              href={exportUrl.timeseries(sc.siteId, sc.scope, sc.interval)}
+              label="the time series"
+            />
           </>
         }
         bodyClassName="px-2 pt-3 pb-2 sm:px-3"

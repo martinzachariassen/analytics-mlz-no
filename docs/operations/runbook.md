@@ -193,7 +193,9 @@ Every merge to `main` deploys through the **Deploy** workflow once CI has passed
    down, but not while a Deploy run is in progress.
 
 A run that says "Not deploying …: main is now …" is not a failure: a newer merge overtook it and
-deploys in its own run.
+deploys in its own run. Rarely, `main` moves in the seconds between that check and the checkout;
+the run then fails at "Deploy only the commit CI tested" before touching anything, and the newer
+commit still deploys in its own run.
 
 ### Roll back a release
 

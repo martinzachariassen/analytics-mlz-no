@@ -65,12 +65,22 @@ jobs:
       contents: read
       id-token: write # the OIDC token exchanged for GCP credentials
     steps:
-      - name: Check out the code
+      # main, never a ref taken from the triggering run; the next step makes sure it is still the
+      # commit CI tested.
+      - name: Check out main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: main
           fetch-depth: 0 # tags, so the version is `git describe` as with make deploy
           persist-credentials: false
+      - name: Deploy only the commit CI tested
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$SHA" || {
+            echo "::error::main moved past $SHA after the check above; the newer commit deploys in its own run."
+            exit 1
+          }
       - name: Install Bun (mise.toml)
         uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:

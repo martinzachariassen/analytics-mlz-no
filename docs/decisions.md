@@ -55,10 +55,16 @@ The product roadmap after the quality base, in order. Each is one pull request w
    and rate per goal on the overview, management in settings.
 3. ✅ **CSV export**: breakdowns and time series with the same period and filter parameters,
    formula-escaped cells.
-4. **Shareable read-only links**: hashed tokens, a read-only `/api/share/{token}/…`, revocable
-   from settings.
+4. **Dashboard in the binary**: embed `apps/web/dist` in the Go binary and serve it from the
+   same origin as the API, so `docker compose` gives self-hosters a working dashboard (see
+   [Before 1.0](#before-10)). Firebase Hosting keeps serving it in production.
 
-Later, not scheduled: the dashboard embedded in the binary and OIDC (see below), an OpenAPI
+Dropped: **shareable read-only links** (a public `/api/share/{token}/…`). Every reader today is a
+signed-in, allowlisted user, so a token-based read path would add an unauthenticated surface
+without anyone to serve. Revisit together with site ownership if the dashboard gets readers
+outside the allowlist.
+
+Later, not scheduled: OIDC (see below), an OpenAPI
 spec and `/api/v1`, rollup tables if queries get slow, email reports, funnels, property
 filters, and `utm_term`/`utm_content`.
 
@@ -68,7 +74,8 @@ filters, and `utm_term`/`utm_content`.
   deployed to Firebase Hosting and reaches the API through a same-origin rewrite, so someone running
   `docker compose` has a working collector but no dashboard unless they serve `apps/web/dist`
   themselves behind the same origin. Decide whether to embed `apps/web/dist` in the Go
-  binary (simplest for self-hosting) or document a reverse-proxy recipe.
+  binary (simplest for self-hosting) or document a reverse-proxy recipe. Chosen: embed it,
+  item 4 under [Next](#next).
 - **Site ownership.** The dashboard is single-tenant: every allowlisted user can read and change
   every site. Fine for one person or one team; more would need a `site_users` table.
 - **A second identity provider.** The `auth.Provider` interface is there; OIDC (Google, Keycloak)

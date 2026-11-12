@@ -1,4 +1,4 @@
-// Typed client for the Go API (see docs/API.md). All requests are same-origin:
+// Typed client for the Go API (see docs/reference/api.md). All requests are same-origin:
 // Vite proxies /api in development and Firebase Hosting rewrites it in production.
 
 export class ApiError extends Error {

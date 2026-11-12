@@ -8,3 +8,11 @@ vulnerabilities:
     paths:
       - usr/local/bin/litestream
     expired_at: 2026-12-15
+  - id: CVE-2026-78661
+    # In the Litestream binary (golang.org/x/net/html, an indirect dependency), not in our code.
+    # Denial of service through crafted HTML; Litestream never imports the html package, so the
+    # vulnerable code is never reached. Litestream main already has x/net 0.62.0; waiting for
+    # the release after 0.5.18.
+    paths:
+      - usr/local/bin/litestream
+    expired_at: 2026-12-15

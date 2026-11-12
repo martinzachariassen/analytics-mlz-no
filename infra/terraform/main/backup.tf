@@ -88,7 +88,7 @@ resource "google_cloud_run_v2_job" "backup" {
 
         env {
           name  = "LITESTREAM_REPLICA_URL"
-          value = "gs://${google_storage_bucket.db.name}/analytics"
+          value = "gs://${google_storage_bucket.db.name}/${var.replica_path}"
         }
         env {
           name  = "BACKUP_BUCKET"

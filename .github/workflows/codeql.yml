@@ -21,8 +21,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Manual: autobuild would run `make`, whose default target starts the server.
           - language: go
-            build-mode: autobuild
+            build-mode: manual
           - language: javascript-typescript
             build-mode: none
           - language: actions
@@ -38,6 +39,10 @@ jobs:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-and-quality
+      - name: Build Go
+        if: matrix.build-mode == 'manual'
+        working-directory: apps/server
+        run: go build ./...
       - uses: github/codeql-action/analyze@1fc58d04a4d4374f921bdac573c3811c240f9c26 # v4.39.2
         with:
           category: /language:${{ matrix.language }}

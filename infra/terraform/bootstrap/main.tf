@@ -1,6 +1,6 @@
 # Bootstrap: creates the GCP project, links billing, enables APIs and creates the
 # bucket that stores Terraform state for infra/terraform/main. Its own state starts local and
-# moves into that bucket afterwards (backend.tf.example, docs/DEPLOY.md).
+# moves into that bucket afterwards (backend.tf.example, docs/guides/deploy-gcp.md).
 #
 #   cd infra/terraform/bootstrap && terraform init && terraform apply
 

@@ -50,12 +50,14 @@ Read by `apps/server/internal/config/config.go`, except `LITESTREAM_REPLICA_URL`
 | `github_client_id` | `GITHUB_CLIENT_ID` | – |
 | `allowed_github_users` | `ALLOWED_GITHUB_USERS` | `[]` |
 | (Secret Manager `github-client-secret`) | `GITHUB_CLIENT_SECRET` | placeholder; see [deploy guide](../guides/deploy-gcp.md#3-github-client-secret) |
-| (bucket `<project_id>-db`) | `LITESTREAM_REPLICA_URL` | set automatically |
+| `replica_path` (in bucket `<project_id>-db`) | `LITESTREAM_REPLICA_URL` (`gs://<project_id>-db/<replica_path>`, service and backup job) | `analytics` |
 | `require_replica` | `REQUIRE_REPLICA` on the service, `BACKUP_EXPECT_DATA` on the backup job | `false` |
 
 `require_replica` must stay `false` for the very first deploy, because the replica is empty by
 design. Set it to `true` once the service has data: a lost replica then stops the service from
 starting empty, and the backup job fails (and alerts) instead of reporting "nothing to back up".
+Change `replica_path` only when restoring from a backup file; see
+[the runbook](../operations/runbook.md#restore-the-database-from-a-backup).
 
 Other variables only affect infrastructure: `region`, `scheduler_region`, `service_name`,
 `extra_domains`, `alert_email`, `backup_hourly_retention_days` and `backup_daily_retention_days`.
@@ -65,7 +67,7 @@ Other variables only affect infrastructure: `region`, `scheduler_region`, `servi
 | Argument | Default | Description |
 |---|---|---|
 | `VERSION` | `dev` | Printed by `analytics version`; the release workflow sets it to the tag |
-| `DBIP_MONTH` | empty | DB-IP Lite Country release to bundle, as `YYYY-MM`. Empty takes this month, falling back to last month early in the month. Set it for a reproducible build; the release workflow does |
+| `DBIP_MONTH` | empty | DB-IP Lite Country release to bundle, as `YYYY-MM`. Empty takes this month, falling back to last month early in the month. Set it for a reproducible build. The release workflow sets it to the month before the tagged commit, which is always published and the same on every rebuild |
 
 ## `PROXY_HOPS`
 

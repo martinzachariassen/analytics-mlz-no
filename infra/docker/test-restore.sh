@@ -60,6 +60,14 @@ fi
 
 echo "==> first start (empty database)"
 start
+# The "Litestream reported a problem" alert (infra/terraform/main/monitoring.tf) matches these
+# phrases. If a Litestream upgrade rewords them, fail here instead of going silently unalerted.
+alert_pattern='no backup found, starting fresh|no matching backup|restore failed|level=ERROR'
+if ! docker logs "$name" 2>&1 | grep -Eq "$alert_pattern"; then
+  echo "FAIL: an empty start no longer logs a line the Litestream alert matches" >&2
+  docker logs "$name" >&2
+  exit 1
+fi
 site=$(docker exec "$name" analytics sites add -domain example.com | sed -n 's/^Site ID: //p')
 echo "    site id: $site"
 

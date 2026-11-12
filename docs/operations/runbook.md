@@ -152,10 +152,12 @@ To restore production on Cloud Run:
    ```sh
    litestream replicate <file>.db gs://<project_id>-db/analytics-<date>
    ```
-   Stop it (Ctrl+C) once it reports that it is replicating.
-5. **Point the service and the backup job at it.** Change `LITESTREAM_REPLICA_URL` in
-   `infra/terraform/main/run.tf` and `infra/terraform/main/backup.tf` to the new path, run
-   `terraform apply`, then `make deploy-server`.
+   Leave it running until the first snapshot is uploaded. Check from another terminal with
+   `gcloud storage ls -r gs://<project_id>-db/analytics-<date>`; once files are listed, stop it
+   with Ctrl+C.
+5. **Point the service and the backup job at it.** Set `replica_path = "analytics-<date>"` in
+   `infra/terraform/main/terraform.tfvars` and run `terraform apply`. That rolls out a new
+   revision that restores from the new path; no image build or `make deploy` is needed.
 6. **Confirm.** Run a backup by hand (below) and check that it writes a file, and that the
    dashboard shows data. Delete the old replica path after a day.
 

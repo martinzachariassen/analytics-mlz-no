@@ -145,8 +145,11 @@ gcloud auth configure-docker <region>-docker.pkg.dev   # once
 make deploy                                            # or: make deploy-server / make deploy-web
 ```
 
-- `deploy` runs the quality gate (`scripts/verify.sh`) and refuses to continue unless the tree is
-  clean, on `main` and pushed. `FORCE=1 make deploy` skips those three checks for an emergency fix.
+- `deploy` (and `deploy-server` or `deploy-web` on their own) runs the quality gate
+  (`scripts/verify.sh`) once, and refuses to continue unless the working tree is clean (untracked
+  files included), on `main` and identical to `origin/main` (it fetches to compare, so it needs
+  the network). `FORCE=1 make deploy` skips those three checks for an emergency fix; the quality
+  gate still runs.
 - `deploy-server` builds a `linux/amd64` image, pushes it as `server:<git sha>` (with `-dirty` for
   uncommitted or untracked changes) and rolls out a new Cloud Run revision and backup job image.
 - `deploy-web` builds `apps/web/dist` and publishes it to Firebase Hosting. Server first, then

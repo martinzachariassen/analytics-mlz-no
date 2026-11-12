@@ -72,24 +72,29 @@ PROJECT ?= analytics-mlz-no
 REGION  ?= europe-north1
 SERVICE ?= analytics
 BACKUP_JOB ?= $(SERVICE)-backup
-# Untracked files count as dirty too: a build must match a commit, or say that it does not.
-DIRTY   := $(shell test -z "$$(git status --porcelain -- apps infra go.work)" || echo -dirty)
+# Any change in the working tree counts, untracked files included: a build must match a commit,
+# or say that it does not. (Git-ignored files such as terraform.tfvars do not count.)
+DIRTY   := $(shell test -z "$$(git status --porcelain)" || echo -dirty)
 IMAGE   ?= $(REGION)-docker.pkg.dev/$(PROJECT)/analytics/server:$(shell git rev-parse --short HEAD)$(DIRTY)
 
 # Server first, then the dashboard: a new dashboard must never go live before the API it needs.
+# The check runs once here; SKIP_CHECK=1 stops the two sub-makes from repeating it.
 deploy: deploy-check
-	$(MAKE) deploy-server
-	$(MAKE) deploy-web
+	$(MAKE) deploy-server SKIP_CHECK=1
+	$(MAKE) deploy-web SKIP_CHECK=1
 
 # Refuses to deploy anything that is not a pushed commit on main, unless FORCE=1. Runs the
 # quality gate first, so what reaches production is what CI would have passed.
 deploy-check:
-ifndef FORCE
-	@test -z "$(DIRTY)" || { echo "error: uncommitted changes in apps/, infra/ or go.work (FORCE=1 to deploy anyway)"; exit 1; }
+ifneq ($(SKIP_CHECK),1)
+ifneq ($(FORCE),1)
+	@test -z "$(DIRTY)" || { echo "error: uncommitted changes (FORCE=1 to deploy anyway)"; exit 1; }
 	@test "$$(git rev-parse --abbrev-ref HEAD)" = main || { echo "error: not on main (FORCE=1 to deploy anyway)"; exit 1; }
-	@git fetch -q origin main && test "$$(git rev-parse HEAD)" = "$$(git rev-parse origin/main)" || { echo "error: HEAD is not pushed to origin/main (FORCE=1 to deploy anyway)"; exit 1; }
+	@git fetch -q origin main || { echo "error: could not fetch origin/main to compare (offline? FORCE=1 to deploy anyway)"; exit 1; }
+	@test "$$(git rev-parse HEAD)" = "$$(git rev-parse origin/main)" || { echo "error: HEAD is not origin/main; push or pull first (FORCE=1 to deploy anyway)"; exit 1; }
 endif
 	./scripts/verify.sh lint go tracker web
+endif
 
 # Build for Cloud Run (amd64), push to Artifact Registry and roll out a new revision.
 # One-time setup: gcloud auth configure-docker $(REGION)-docker.pkg.dev

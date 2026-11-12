@@ -94,6 +94,16 @@ variable "max_database_mb" {
   }
 }
 
+variable "replica_path" {
+  description = "Path of the Litestream replica inside the <project_id>-db bucket. Change it only to restore from a backup file (see the runbook): a new path starts from the file you seeded there, instead of the old replica."
+  type        = string
+  default     = "analytics"
+  validation {
+    condition     = can(regex("^[a-z0-9][a-z0-9._-]*$", var.replica_path))
+    error_message = "replica_path must be a single path segment: lowercase letters, digits, '.', '_' or '-'."
+  }
+}
+
 variable "require_replica" {
   description = "Refuse to start with an empty Litestream replica, and treat an empty replica as a failed backup. Leave false for the very first deploy (the replica is empty by design); set true once the service has data, so a lost replica is an alert instead of a quiet fresh start."
   type        = bool

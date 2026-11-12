@@ -193,7 +193,9 @@ resource "google_monitoring_alert_policy" "uptime" {
   }
 }
 
-# Litestream writes plain text without a severity, so app_errors never sees it. Replication that
+# Litestream writes plain text (slog: `level=INFO msg="..."`) without a Cloud Logging severity,
+# so app_errors never sees it. The phrases come from Litestream's restore code;
+# infra/docker/test-restore.sh checks that an empty start still logs one of them. Replication that
 # stalls (permissions, quota) or a cold start that found no backup must still reach someone.
 resource "google_monitoring_alert_policy" "replication" {
   count        = local.alerts
@@ -203,7 +205,7 @@ resource "google_monitoring_alert_policy" "replication" {
   conditions {
     display_name = "Litestream error or empty restore"
     condition_matched_log {
-      filter = "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${var.service_name}\" AND textPayload=~\"(?i)litestream.*(error|failed|no backup found|no snapshots)|level=ERROR\""
+      filter = "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${var.service_name}\" AND textPayload=~\"no backup found, starting fresh|no matching backup|restore failed|level=ERROR\""
     }
   }
 
@@ -216,7 +218,7 @@ resource "google_monitoring_alert_policy" "replication" {
 
   notification_channels = [google_monitoring_notification_channel.email[0].id]
   documentation {
-    content = "Litestream logged an error, or an instance started without finding a backup in the replica (gs://${google_storage_bucket.db.name}/analytics). If the service has data, an empty replica means it was lost: stop deploying, and follow the restore runbook in docs/DEPLOY.md before the standalone backups age out."
+    content = "Litestream logged an error, or an instance started without finding a backup in the replica (gs://${google_storage_bucket.db.name}/${var.replica_path}). If the service has data, an empty replica means it was lost: stop deploying, and follow 'Restore the database from a backup' in docs/operations/runbook.md before the standalone backups age out."
   }
 }
 

@@ -45,9 +45,12 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}},enable=${{ !contains(github.ref_name, '-') }}
             type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
-      # The GeoIP month is pinned to the release month, so the image is the same whenever it is rebuilt.
+      # The GeoIP file is the month before the tagged commit: always published (a release on the
+      # 1st cannot outrun DB-IP), and the same whenever this tag is rebuilt.
       - id: month
-        run: echo "value=$(date -u +%Y-%m)" >> "$GITHUB_OUTPUT"
+        run: |
+          first="$(git log -1 --format=%cd --date=format:%Y-%m-01)"
+          echo "value=$(date -u -d "$first -1 month" +%Y-%m)" >> "$GITHUB_OUTPUT"
       - id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:

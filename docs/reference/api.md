@@ -168,6 +168,29 @@ dashboard shows onboarding until the next event.
 deletes the site's events with `from <= time < to` (and the given exact path, if any). Returns
 `{"deleted": n}`. This cannot be undone.
 
+## Goals
+
+A goal is something a visitor should do: send a custom event, or view a page. Goals are
+evaluated when stats are read, so a new goal also counts past traffic.
+
+| Method | Path | Body | Description |
+|---|---|---|---|
+| `GET` | `/api/sites/{id}/goals` | | List the site's goals, oldest first |
+| `POST` | `/api/sites/{id}/goals` | `{"kind", "value"}` | Create (201). 409 if the goal exists; 400 if it is invalid or the site already has 50 goals |
+| `DELETE` | `/api/sites/{id}/goals/{goalId}` | | Delete (204; 404 if it is not one of the site's goals). Same-origin only (`403`) |
+
+```json
+{ "id": 3, "kind": "path", "value": "/blog/*", "created_at": "2026-11-12T10:00:00Z" }
+```
+
+- **`kind: "event"`**: `value` is a custom event name (at most 64 characters), matched exactly.
+- **`kind: "path"`**: `value` starts with `/`, has no `?` or `#`, and is at most 1024
+  characters. `*` matches any characters, including `/`, so `/blog/*` is every page under
+  `/blog/`. No other character is special. Without `*` the path must match exactly.
+
+`value` is trimmed. Creating and deleting goals is logged with the signed-in user. Deleting a
+site deletes its goals.
+
 ## Statistics
 
 Common query parameters:
@@ -268,6 +291,32 @@ With `detail=1`, the response also has:
 - `minutes`: 30 entries `{t, visitors, pageviews}`, oldest first, ending with the current
   minute.
 - `pages`, `referrers` and `countries`: the top 10 for the last 30 minutes, as breakdown rows.
+
+### `GET /api/sites/{id}/goals/stats`
+
+Conversions for every goal of the site, for the period and filters:
+
+```json
+{
+  "period": { "from": "2026-11-01", "to": "2026-11-07", "tz": "Europe/Oslo", "interval": "day" },
+  "visitors": 1000,
+  "previous_visitors": 800,
+  "goals": [
+    { "id": 1, "kind": "event", "value": "newsletter-signup", "created_at": "…",
+      "visitors": 42, "completions": 50, "conversion_rate": 0.042,
+      "previous_visitors": 30, "previous_conversion_rate": 0.0375 }
+  ],
+  "compare": { "from": "2026-10-25", "to": "2026-10-31", "tz": "Europe/Oslo", "interval": "day" }
+}
+```
+
+- `visitors` (top level) is every visitor in the period. A goal's `visitors` reached it, and
+  `conversion_rate` is goal `visitors` / top-level `visitors` (0 when there are none).
+- `completions` counts events or page views that matched the goal.
+- `previous_*` always describe the comparison period: `previous` by default, or `year` with
+  `compare=year`. `compare` (its dates) is only present when the parameter is given.
+- Filters select whole visits, like visit metrics: with `f=path:is:/pricing`, a goal counts
+  visitors who reached it in a visit that included `/pricing`.
 
 Statistics queries are cancelled after 10 seconds (`500`).
 

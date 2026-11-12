@@ -108,6 +108,38 @@ test("settings shows the tracking code", async ({ page }) => {
   await expectAccessible(page)
 })
 
+test("the overview shows conversions for the seeded goals", async ({
+  page,
+}) => {
+  await openSite(page, "Demo blog")
+  const goals = page.getByTitle("Filter by this goal").filter({
+    hasText: "newsletter-signup",
+  })
+  await expect(goals).toBeVisible()
+  await expect(goals).toContainText("%")
+  await expectAccessible(page)
+
+  await goals.click()
+  await expect(page).toHaveURL(/[?&]f=event%3Ais%3Anewsletter-signup/)
+})
+
+test("goals can be added and removed in settings", async ({ page }) => {
+  const base = await openSite(page, "Demo docs")
+  await page.goto(`${base}/settings#goals`)
+  await page.getByRole("combobox", { name: "Goal type" }).click()
+  await page.getByRole("option", { name: "Page" }).click()
+  await page.getByLabel("Add a goal").fill("/docs/e2e-goal")
+  await page.getByRole("button", { name: "Add", exact: true }).click()
+  const remove = page.getByRole("button", {
+    name: "Remove goal /docs/e2e-goal",
+  })
+  await expect(remove).toBeVisible()
+  await expectAccessible(page)
+
+  await remove.click()
+  await expect(remove).toHaveCount(0)
+})
+
 test("a failed panel says so and recovers with Try again", async ({ page }) => {
   let fail = true
   await page.route("**/api/sites/*/heatmap*", (route) =>

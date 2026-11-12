@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react"
 import { useSearchParams } from "react-router"
 import { IntervalSelect } from "@/components/date-range-picker"
 import { ErrorNote } from "@/components/error-note"
+import { GoalsCard } from "@/components/goals-card"
 import { ActiveHours } from "@/components/heatmap"
 import { Insights } from "@/components/insights"
 import { KpiStrip } from "@/components/kpi-strip"
@@ -118,6 +119,7 @@ export function OverviewPage() {
           total={total}
           tabs={[{ dim: "event", label: "Custom events" }]}
         />
+        <GoalsCard className="lg:col-span-12" />
       </div>
     </div>
   )

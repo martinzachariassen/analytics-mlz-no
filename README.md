@@ -8,7 +8,7 @@ Lightweight, privacy-friendly, self-hostable web analytics written in Go.
 - **Cookie-free and anonymous.** No IP addresses or user agents are stored. Visitors are counted with a hash that changes every day.
 - **Tiny script.** About 1 KB gzipped. Tracks page views, single-page-app navigation, outbound links and custom events.
 - **One binary, one SQLite file.** Optional continuous backup with Litestream.
-- **Modern dashboard.** React + Vite + shadcn/ui, with GitHub sign-in.
+- **Modern dashboard.** React + Vite + shadcn/ui, with GitHub sign-in. Filters, comparisons, realtime, and goals with conversion rates.
 
 > [!NOTE]
 > **Status: pre-1.0.** It works and runs on the author's own sites, but configuration and the

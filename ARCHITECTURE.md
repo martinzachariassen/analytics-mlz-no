@@ -113,8 +113,8 @@ What the server defends against, and what it does not, is in the
 | `internal/geo` | `Locator.Country`: local MaxMind/DB-IP lookup. Returns `""` without a database |
 | `internal/httpx` | `ClientIP` and `PeerIP` (`X-Forwarded-For` with `PROXY_HOPS`), `RateLimiter`, `ReadJSON` and `WriteJSON` |
 | `internal/auth` | `Service`: GitHub OAuth (`github.go`), sessions, `Require` middleware, the `DEV_LOGIN` shortcut (`dev.go`). A `Provider` interface leaves room for more identity providers |
-| `internal/api` | `API.Register`: sites CRUD, purge (`api.go`), and stats, breakdown, heatmap and realtime handlers with query parsing (`stats.go`) |
-| `internal/store` | All SQL. `store.go` opens SQLite (WAL) and runs `migrations/*.sql`. `events.go` inserts events and assigns sessions. `stats.go` holds `Summary`, `Timeseries`, `Breakdown` and `Dimensions`. `filter.go` turns `Filters` into SQL. `sites.go` (with `sitecache.go`), `users.go` |
+| `internal/api` | `API.Register`: sites CRUD, purge (`api.go`), goals and goal stats (`goals.go`), and stats, breakdown, heatmap and realtime handlers with query parsing (`stats.go`) |
+| `internal/store` | All SQL. `store.go` opens SQLite (WAL) and runs `migrations/*.sql`. `events.go` inserts events and assigns sessions. `stats.go` holds `Summary`, `Timeseries`, `Breakdown` and `Dimensions`. `filter.go` turns `Filters` into SQL. `goals.go` holds goal CRUD and `GoalStats`. `sites.go` (with `sitecache.go`), `users.go` |
 | `internal/script` | Embeds `script.js` (built from `apps/tracker`) and serves it gzipped with an `ETag` |
 | `internal/devdata` | Synthetic traffic profiles for `analytics seed` |
 
@@ -153,6 +153,7 @@ Defined in `apps/server/internal/store/migrations/`:
 | `sites` | `id` (public, used in the snippet), `name`, `domain` (subdomains match) |
 | `events` | One row per page view or custom event: time, type, name, hostname, path, referrer host, UTM, country, browser, OS, device, `visitor_id`, `session_id` |
 | `event_props` | Custom event properties, as key and value |
+| `goals` | Per site: `kind` (`event` or `path`) and `value` (event name, or path with optional `*`). Evaluated at read time |
 | `salts` | One random salt per UTC day. Older salts are deleted |
 | `users`, `sessions` | Dashboard users (GitHub id and login), and SHA-256 hashes of session tokens |
 | `schema_migrations` | Applied migration numbers |
@@ -196,7 +197,7 @@ net/http server (timeouts, 16 KB header cap)
             ├── POST /api/event          ingest.Handler (limits → bot → payload → site → store)
             ├── GET  /api/script.js      script.Handler (gzip, ETag, CDN cache headers)
             ├── /api/auth/*              limit() → auth.Service (config, login, callback, me, logout)
-            ├── /api/sites/*             auth.Require → api.API (sites, stats, breakdown, heatmap, realtime, purge)
+            ├── /api/sites/*             auth.Require → api.API (sites, goals, stats, breakdown, heatmap, realtime, purge)
             └── GET  /healthz            store.Ping
 ```
 

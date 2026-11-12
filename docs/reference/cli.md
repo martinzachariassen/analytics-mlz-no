@@ -147,7 +147,8 @@ analytics seed -days 90 -scale 0.2
 ```
 
 Creates "Demo blog" (`localhost`) and "Demo docs" (`docs.localhost`) and fills them with
-synthetic traffic from `internal/devdata`. A demo site that already exists is left alone unless
+synthetic traffic from `internal/devdata`, plus a few goals (newsletter sign-ups and `/contact` on
+the blog, `copy-code` and `/docs/*` on the docs). A demo site that already exists is left alone unless
 you pass `-reset`, which deletes it and its events first.
 
 | Flag | Default | Meaning |

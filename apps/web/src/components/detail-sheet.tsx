@@ -4,6 +4,7 @@ import { Link } from "react-router"
 import { BarList } from "@/components/bar-list"
 import { Delta } from "@/components/delta"
 import { ErrorNote } from "@/components/error-note"
+import { GoalButton } from "@/components/goal-button"
 import { TrafficChart } from "@/components/traffic-chart"
 import { Button } from "@/components/ui/button"
 import {
@@ -17,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import type { Dimension, FilterDim, Scope } from "@/lib/api"
 import { DIM_VIEW, DIMS, formatValue } from "@/lib/dims"
 import { formatPercent } from "@/lib/format"
+import { goalKindFor } from "@/lib/goals"
 import { METRIC, type MetricKey } from "@/lib/metrics"
 import { useBreakdown, useStats } from "@/lib/queries"
 import { type Detail, useScope } from "@/lib/use-scope"
@@ -81,6 +83,7 @@ function DetailBody({ d }: { d: Detail }) {
   const stats = useStats(sc.siteId, scope, sc.interval)
   const all = useStats(sc.siteId, sc.scope, sc.interval)
   const view = DIM_VIEW[d.dim]
+  const goalKind = goalKindFor(d.dim)
   const title = formatValue(d.dim, d.value)
   const share =
     stats.data && all.data?.summary.visitors
@@ -107,6 +110,9 @@ function DetailBody({ d }: { d: Detail }) {
             <ListFilter />
             Filter dashboard by this
           </Button>
+          {goalKind && (
+            <GoalButton siteId={sc.siteId} kind={goalKind} value={d.value} />
+          )}
           {view && (
             <Button variant="outline" size="sm" asChild>
               <Link to={`/sites/${sc.siteId}/${view}${sc.search}`}>

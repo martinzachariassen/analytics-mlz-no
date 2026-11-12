@@ -33,13 +33,21 @@ export function renderInSite(ui: ScopedUi, url = "/sites/abc") {
   return { ...view, router, search }
 }
 
-/** Replaces fetch with a handler keyed on path; unknown paths answer 404. */
+/** A route that answers by request, for mutations: return a body, or a Response as is. */
+export type Handler = (init: RequestInit | undefined) => unknown
+
+/**
+ * Replaces fetch with a handler keyed on path; unknown paths answer 404. A value is the
+ * JSON body, or a Handler.
+ */
 export function mockFetch(routes: Record<string, unknown>) {
   const calls: string[] = []
-  globalThis.fetch = (async (input: RequestInfo | URL) => {
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), "http://localhost")
     calls.push(url.pathname + url.search)
-    const body = routes[url.pathname]
+    const route = routes[url.pathname]
+    const body = typeof route === "function" ? (route as Handler)(init) : route
+    if (body instanceof Response) return body
     if (body === undefined)
       return new Response(JSON.stringify({ error: "not found" }), {
         status: 404,

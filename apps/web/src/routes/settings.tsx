@@ -6,6 +6,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router"
 import { toast } from "sonner"
 
 import { ErrorNote } from "@/components/error-note"
+import { GoalsSettings } from "@/components/goals-settings"
 import { TrackingSnippet } from "@/components/tracking-snippet"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
@@ -72,6 +73,7 @@ export function SettingsPage() {
       ) : (
         <Skeleton className="h-56" />
       )}
+      {site.data && <GoalsSettings siteId={site.data.id} />}
       {site.data && <DangerZone id={id} name={site.data.name} />}
     </div>
   )

@@ -6,6 +6,7 @@ import {
   formatDuration,
   formatNumber,
   formatPercent,
+  formatRate,
 } from "@/lib/format"
 
 describe("formatNumber", () => {
@@ -19,6 +20,16 @@ describe("formatNumber", () => {
 describe("formatPercent", () => {
   it("rounds a ratio to a whole percent", () => {
     expect(formatPercent(0.456)).toBe("46%")
+  })
+})
+
+describe("formatRate", () => {
+  it("keeps a decimal for small rates only", () => {
+    expect(formatRate(0)).toBe("0%")
+    expect(formatRate(0.0042)).toBe("0.4%")
+    expect(formatRate(0.0951)).toBe("9.5%")
+    expect(formatRate(0.456)).toBe("46%")
+    expect(formatRate(1)).toBe("100%")
   })
 })
 

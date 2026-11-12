@@ -134,6 +134,29 @@ export type Realtime = {
   countries?: BreakdownRow[]
 }
 
+export type GoalKind = "event" | "path"
+/** A conversion: a custom event by name, or a page view whose path matches (* is a wildcard). */
+export type Goal = {
+  id: number
+  kind: GoalKind
+  value: string
+  created_at: string
+}
+export type GoalStat = Goal & {
+  visitors: number
+  completions: number
+  conversion_rate: number
+  previous_visitors: number
+  previous_conversion_rate: number
+}
+export type GoalStats = {
+  period: PeriodInfo
+  visitors: number
+  previous_visitors: number
+  goals: GoalStat[]
+  compare?: PeriodInfo
+}
+
 type Params = Record<string, string | number | undefined>
 
 function query(s: Partial<Scope>, extra: Params = {}): string {
@@ -185,6 +208,16 @@ export const api = {
     request<Heatmap>(
       `${site(id)}/heatmap?${query({ ...s, compare: undefined })}`
     ),
+  goals: (id: string) => request<Goal[]>(`${site(id)}/goals`),
+  createGoal: (id: string, body: { kind: GoalKind; value: string }) =>
+    request<Goal>(`${site(id)}/goals`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  deleteGoal: (id: string, goalId: number) =>
+    request<void>(`${site(id)}/goals/${goalId}`, { method: "DELETE" }),
+  goalStats: (id: string, s: Scope) =>
+    request<GoalStats>(`${site(id)}/goals/stats?${query(s)}`),
   realtime: (id: string, detail = false) =>
     request<Realtime>(`${site(id)}/realtime${detail ? "?detail=1" : ""}`),
 }

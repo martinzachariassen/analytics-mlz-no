@@ -75,6 +75,12 @@ Requests from known crawlers and automation are dropped before anything is store
 Event properties are stored as sent. Do not put personal data (email addresses, names, user ids)
 in event names or properties.
 
+## Goals
+
+A goal stores only the site, an event name or a path pattern, and when it was created. Goals
+are computed from the stored events when the dashboard asks, so they add no data about
+visitors.
+
 ## Retention
 
 Events are kept forever by default. Set `RETENTION_DAYS` to delete events older than N days; the

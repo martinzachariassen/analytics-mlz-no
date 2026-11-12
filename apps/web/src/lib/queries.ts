@@ -56,6 +56,23 @@ export function useSites() {
   })
 }
 
+export function useGoals(siteId: string) {
+  return useQuery({
+    queryKey: ["goals", siteId],
+    queryFn: () => api.goals(siteId),
+  })
+}
+
+/** Conversions per goal. Shares the "goals" key prefix, so changing goals refetches it. */
+export function useGoalStats(siteId: string, scope: Scope, enabled = true) {
+  return useQuery({
+    queryKey: ["goals", siteId, "stats", scope],
+    queryFn: () => api.goalStats(siteId, scope),
+    placeholderData: keepPreviousData,
+    enabled,
+  })
+}
+
 export function useStats(
   siteId: string,
   scope: Scope,

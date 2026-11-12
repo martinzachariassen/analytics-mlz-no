@@ -3,6 +3,7 @@ import { ArrowUpRight, ListFilter } from "lucide-react"
 
 import { BarList } from "@/components/bar-list"
 import { Delta } from "@/components/delta"
+import { ErrorNote } from "@/components/error-note"
 import { TrafficChart } from "@/components/traffic-chart"
 import { Button } from "@/components/ui/button"
 import {
@@ -117,6 +118,7 @@ function DetailBody({ d }: { d: Detail }) {
         </div>
       </SheetHeader>
 
+      {stats.isError && <ErrorNote error={stats.error} className="px-5" />}
       <div className="grid grid-cols-3 gap-px border-b bg-border">
         {SHEET_METRICS.map((k) => {
           const m = METRIC[k]
@@ -125,7 +127,9 @@ function DetailBody({ d }: { d: Detail }) {
               <span className="text-[11px] font-medium text-fg-muted">
                 {m.label}
               </span>
-              {stats.data ? (
+              {stats.isError ? (
+                <span className="figure text-lg text-fg-muted">–</span>
+              ) : stats.data ? (
                 <>
                   <span className="figure text-lg">
                     {m.format(m.value(stats.data.summary))}
@@ -197,13 +201,17 @@ function Related({
       <h3 className="text-xs font-medium text-fg-secondary">
         {DIMS[dim].plural}
       </h3>
-      <BarList
-        dim={dim}
-        rows={q.data}
-        loading={q.isPending}
-        total={total}
-        rowsShown={6}
-      />
+      {q.isError ? (
+        <ErrorNote error={q.error} className="py-2" />
+      ) : (
+        <BarList
+          dim={dim}
+          rows={q.data}
+          loading={q.isPending}
+          total={total}
+          rowsShown={6}
+        />
+      )}
     </section>
   )
 }

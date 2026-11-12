@@ -81,8 +81,9 @@ How a filter applies depends on the kind of dimension (visitor, page or visit). 
 
 - **SQLite and one instance.** There is no database server to run, and backup is a file copy.
   It handles far more than personal traffic needs.
-- **Cookie-free counting.** In most jurisdictions no consent banner is needed. The trade-off is
-  that visitors cannot be followed across days.
+- **Cookie-free counting.** Nothing is stored on the visitor's device and no personal data is
+  kept (see the [legal note](privacy.md#legal-note); not legal advice). The trade-off is that
+  visitors cannot be followed across days.
 - **No pre-aggregation.** Every filter combination works on raw rows, and the schema stays simple.
 
 More in [decisions.md](decisions.md).

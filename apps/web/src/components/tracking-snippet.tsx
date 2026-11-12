@@ -50,7 +50,7 @@ export function TrackingSnippet({ siteId }: { siteId: string }) {
         <CodeBlock code={snippetFor(siteId)} />
         <p className="text-fg-muted">
           Page views (including client-side navigation) and outbound link clicks
-          are tracked automatically. No cookies, no consent banner needed.
+          are tracked automatically. The script sets no cookies.
         </p>
       </div>
       <div className="flex flex-col gap-2">

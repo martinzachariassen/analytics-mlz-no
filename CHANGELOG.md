@@ -29,6 +29,11 @@ All notable changes are documented here. The format follows
 - Tracker: nothing the script does can throw into the host page; a failure to send is swallowed.
 
 ### Fixed
+- Dashboard: deep links and `/` were served with Firebase Hosting's default one-hour cache, so after a deploy a visitor could get an `index.html` pointing at chunks that no longer existed. Every non-asset path is now `no-cache`; `/assets/**` and `/fonts/**` stay immutable. A stale chunk reloads the page once instead of showing a blank error.
+- Dashboard: URL parameters such as `?period=toString` or `?auth_error=__proto__` matched inherited object properties and crashed the page. Lookups use `Object.hasOwn`, and more than 10 filters in the URL are ignored instead of producing a `400`.
+- Dashboard: every view shows a failed request as a message instead of a skeleton that never ends (reports, realtime, detail sheet, overview cards, settings, site list). A `401` during a mutation re-checks the session like queries already did; a failed sign-out shows a toast instead of hanging. Error messages fall back to `HTTP <status>` when the server sends no text (HTTP/2 has no status text).
+- Dashboard: the GitHub avatar was blocked by the Content-Security-Policy in production; the menu shows initials instead. `Permissions-Policy` uses `browsing-topics` instead of the retired `interest-cohort`. `theme-color` matches `index.html`. The theme works when `localStorage` is unavailable.
+- Dashboard: table rows, the map's countries and the quick-filter button in lists can be reached with the keyboard.
 - `data-hash="true"` had no effect: the server dropped the fragment. Fragments that name a route (`#/docs`, `#!/docs`) are now part of the stored path; in-page anchors are still dropped.
 - Tracker: `history.replaceState` navigations (router redirects) and pages restored from the back-forward cache are counted. `*.localhost`, `0.0.0.0` and the whole `127.0.0.0/8` range count as localhost.
 - `PATCH /api/sites/{id}` with only `name` failed with "domain is required". Fields are now optional.
@@ -41,6 +46,7 @@ All notable changes are documented here. The format follows
 - Statistics queries are cancelled after 10 seconds.
 - Site creation, changes, deletion and purges are logged with the signed-in user.
 - `ReadJSON` rejects trailing data after the JSON body.
+- Dashboard: `make web TRACKER_ORIGIN=https://t.example.com` builds the "Tracking code" page with that host in the snippet (`docs/guides/deploy-gcp.md`). Vite refuses to start on another port than 5173, since the OAuth callback names it. `shadcn`, `tailwindcss` and `@tailwindcss/vite` are dev dependencies, so `npm audit --omit=dev` covers only what ships.
 - Tracker: CI fails if the gzipped script grows past 1024 bytes (`npm run check-size`). It is now 1.9 KB minified and 1.0 KB gzipped.
 - More `golangci-lint` linters (`gocritic`, `noctx`, `sqlclosecheck`, `rowserrcheck`, `nilerr`, `usestdlibvars`, `unparam`, `perfsprint`, `exhaustive`, `contextcheck`).
 - Server logs use `severity` and `message` instead of `level` and `msg`, so Cloud Logging shows the level and `severity>=ERROR` finds app errors. Update log queries that matched on `msg` or `level`.

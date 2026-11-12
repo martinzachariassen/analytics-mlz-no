@@ -44,6 +44,7 @@ src/
     format.ts            numbers, durations, percentages, countries
   routes/
     home.tsx             sign-in page, "Open demo dashboard"
+    error-page.tsx       root errorElement: reloads once on a stale chunk, else shows the error
     app-layout.tsx       auth check + sidebar shell
     sites.tsx            site list
     settings.tsx         site settings, tracking snippet
@@ -71,6 +72,11 @@ src/
 Everything under `/sites` is wrapped in `AppLayout`, which fetches `/api/auth/me` and sends you
 to `/` when you are not signed in. Site views are lazy-loaded.
 
+Both route trees have `ErrorPage` as `errorElement`. After a deploy, an open tab may ask for a
+lazy chunk that no longer exists; `ErrorPage` then reloads once (remembered in
+`sessionStorage`) so the user gets the new build. Any other error shows a real error page
+instead of React Router's default.
+
 ## State lives in the URL
 
 `useScope()` (`src/lib/use-scope.ts`) is the single source of view state for every site view.
@@ -93,6 +99,10 @@ links between views so the period and filters follow the user.
 Do not keep this kind of state in `useState`. If it should survive a reload or a shared link,
 it belongs in the URL.
 
+URL parameters are untrusted input. Look values up with `Object.hasOwn(TABLE, key)`, never
+`key in TABLE`: `?period=toString` or `?metric=constructor` pass an `in` check and crash the page.
+Filters beyond `MAX_FILTERS` (10, the API's limit) are dropped instead of turning into a `400`.
+
 ## Data fetching
 
 - `useStats(siteId, scope, interval)` and `useBreakdown(siteId, scope, dim, opts)` in
@@ -105,7 +115,13 @@ it belongs in the URL.
   success (see `components/add-site-dialog.tsx`).
 
 Every request goes through `request()` in `lib/api.ts`, which uses same-origin credentials,
-sends JSON and throws `ApiError` with the status code.
+URL-encodes the site id, sends JSON and throws `ApiError` with the status code (the message falls
+back to `HTTP <status>`, because HTTP/2 has no status text). A `401` during a mutation is handled
+by `MutationCache.onError` the same way as for queries.
+
+**Error states.** A failed query shows `<ErrorNote>` (`components/error-note.tsx`) with the
+message, never a skeleton that loads forever. Use it in every new view: check `isError` before
+`isPending`.
 
 ## App primitives
 
@@ -163,12 +179,26 @@ the right page. If the dimension is new to the API, start in [backend.md](backen
    both read this list.
 4. Point the dimensions to it in `DIM_VIEW`.
 
+## Building and hosting
+
+`make web` builds into `apps/web/dist`. `make deploy-web` publishes it to Firebase Hosting.
+
+| Setting | Where | Effect |
+|---|---|---|
+| `TRACKER_ORIGIN` | `make web TRACKER_ORIGIN=https://t.example.com` (becomes `VITE_TRACKER_ORIGIN`) | The host the **Tracking code** snippet points at. Without it, the dashboard's own origin |
+| `Cache-Control` | `firebase.json` | `no-cache` for every path (so `/` and deep links always get the latest `index.html`), and `immutable` for the hashed files under `/assets/**` and `/fonts/**`. Firebase matches header rules on the request path and the last match wins |
+| Security headers | `firebase.json` | CSP (`img-src 'self' data:`, so no third-party images such as GitHub avatars; the menu shows initials), HSTS, `X-Frame-Options`, `Permissions-Policy` |
+
+The Vite dev server uses `strictPort`, so it fails instead of moving to another port when 5173
+is taken (the server's `PUBLIC_URL` points at 5173).
+
 ## Tests
 
-Unit tests sit next to the code (`lib/*.test.ts`) and run with vitest: URL state parsing, period
-maths, formatting, and a check that the theme script in `index.html` is allowed by its hash in
-the Content-Security-Policy in `firebase.json`. If you edit that script, update the hash. Put
-logic in `lib/` as plain functions when you can, so it is easy to test.
+Unit tests sit next to the code (`lib/*.test.ts`) and run with vitest: the API client (error
+mapping, headers, id encoding, query strings), URL state parsing and the `hasOwn` guards, period
+maths, metrics, dimensions, formatting, and a check that the theme script in `index.html` is
+allowed by its hash in the Content-Security-Policy in `firebase.json`. If you edit that script,
+update the hash. Put logic in `lib/` as plain functions when you can, so it is easy to test.
 
 ## Next steps
 

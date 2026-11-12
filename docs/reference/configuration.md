@@ -19,7 +19,7 @@ Read by `apps/server/internal/config/config.go`, except `LITESTREAM_REPLICA_URL`
 | `DATABASE_PATH` | `data/analytics.db` (Docker: `/data/analytics.db`) | SQLite file |
 | `GEOIP_DB_PATH` | – (Docker: bundled DB-IP Lite) | MaxMind-format country database (DB-IP Lite). Without it, no country is recorded |
 | `PROXY_HOPS` | `0` | Number of trusted reverse proxies in front of the server: 1 for Cloud Run or nginx, 2 for Firebase → Cloud Run. See [below](#proxy_hops) |
-| `RETENTION_DAYS` | `0` | Delete events older than N days, checked hourly (0 = keep forever) |
+| `RETENTION_DAYS` | `0` | Delete events older than N days, checked at startup and hourly (0 = keep forever) |
 | `INGEST_RATE_LIMIT` | `200` | Max accepted events per second across all clients. Extra events get `503` (0 = no global limit) |
 | `MAX_DATABASE_MB` | `0` | Pause ingestion (`503`) while the database is larger than this. The dashboard keeps working (0 = no limit) |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. `debug` also logs every event dropped by rate limits or bot filtering |

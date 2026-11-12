@@ -104,7 +104,7 @@ What the server defends against, and what it does not, is in the
 
 | Package | What lives there |
 |---|---|
-| `cmd/analytics` | `main.go`: the binary. Subcommands `serve` (default), `sites add|list`, `events purge`, `seed`, `version`. Starts the retention loop and graceful shutdown |
+| `cmd/analytics` | `main.go`: the binary. Subcommands `serve` (default), `sites add|list`, `events purge`, `seed`, `version`. Starts the maintenance loop (`maintenance.go`: salt rotation at UTC midnight, expired sessions, `RETENTION_DAYS`) and graceful shutdown |
 | `cmd/loadtest` | Ingest load generator |
 | `internal/config` | `Load()` reads every environment variable. The single source of configuration |
 | `internal/server` | `New()` wires all routes and middleware. Start reading here. `sizeguard.go` pauses ingestion when `MAX_DATABASE_MB` is exceeded |

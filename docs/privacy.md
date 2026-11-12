@@ -55,15 +55,19 @@ The visitor id is `SHA-256(daily salt, site id, IP address, user agent)`, trunca
 (`apps/server/internal/visitor`).
 
 - The salt is random, stored in the database and **replaced every UTC day**. The previous
-  salt is deleted when the first event of the new day arrives (`Store.SaltForDay`).
+  salt is deleted just after midnight UTC by the server's maintenance run, whether or not
+  any traffic arrives (`maintain` in `cmd/analytics`, `Store.SaltForDay`).
 - Without the old salt, a stored id cannot be recomputed, so the same person cannot be linked
   from one day to the next, and the IP address cannot be recovered from stored data.
 - The site id is part of the hash, so the same person has different ids on different sites.
 - Consequence: "unique visitors" over several days is the sum of daily uniques. A returning
   visitor counts once per day.
 
-A quiet site keeps the previous day's salt until its next event. Backups and Litestream replicas
-contain the salt table as it was at that time, so keep backups as access-controlled as the database.
+On hosts that pause the CPU between requests (Cloud Run with request-based billing) the
+maintenance run happens at the first request after midnight; the Terraform setup's uptime check
+makes one every 5 minutes. A server that is not running at midnight rotates the salt when it
+starts. Backups and Litestream replicas contain the salt table as it was at the time they were
+taken, so keep backups as access-controlled as the database.
 
 ## Bots
 

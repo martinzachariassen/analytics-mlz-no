@@ -170,9 +170,7 @@ func serve(cfg config.Config, log *slog.Logger) error {
 		log.Warn("GITHUB_CLIENT_ID not set; dashboard sign-in is disabled")
 	}
 
-	if cfg.RetentionDays > 0 {
-		go retentionLoop(ctx, st, cfg.RetentionDays, log)
-	}
+	go maintenanceLoop(ctx, st, cfg.RetentionDays, log)
 
 	srv := &http.Server{
 		Addr:              cfg.Addr,
@@ -208,24 +206,6 @@ func serve(cfg config.Config, log *slog.Logger) error {
 		_ = srv.Close()
 	}
 	return nil
-}
-
-func retentionLoop(ctx context.Context, st *store.Store, days int, log *slog.Logger) {
-	tick := time.NewTicker(time.Hour)
-	defer tick.Stop()
-	for {
-		cutoff := time.Now().AddDate(0, 0, -days)
-		if n, err := st.DeleteEventsBefore(ctx, cutoff); err != nil {
-			log.Error("retention cleanup", "err", err)
-		} else if n > 0 {
-			log.Info("retention cleanup", "deleted", n)
-		}
-		select {
-		case <-ctx.Done():
-			return
-		case <-tick.C:
-		}
-	}
 }
 
 func sites(cfg config.Config, args []string) error {

@@ -50,6 +50,11 @@ the server guarantees instead:
   but keeps the dashboard working, the script cached at the CDN, and a single Cloud Run instance.
 - **Spam can be removed.** `POST /api/sites/{id}/purge` (signed in), or
   `analytics events purge -site ID -from … -to … [-path …]` on the host.
+- **What ships is what was reviewed.** Base images and the Litestream binary are pinned by digest,
+  GitHub Actions by commit. CI scans the image with Trivy (accepted findings are listed with a
+  reason and an expiry in `.trivyignore.yaml`) and runs CodeQL, `govulncheck` and `bun audit`.
+  Releases carry an SBOM and signed build provenance, and Dependabot keeps every ecosystem
+  current.
 
 What is not prevented: a distributed attack from many real IP addresses with browser-like
 requests can still add plausible-looking events, at up to the global rate. Purge them afterwards.

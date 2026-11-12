@@ -47,6 +47,57 @@ computed at query time from `session_id`. Nothing is pre-aggregated.
 dashboard and rewrites `/api/**` to one Cloud Run instance. Litestream streams the SQLite file to
 GCS. See [docs/guides/deploy-gcp.md](docs/guides/deploy-gcp.md).
 
+### A page view, end to end
+
+```mermaid
+sequenceDiagram
+    participant B as Visitor's browser
+    participant H as Firebase Hosting (CDN)
+    participant R as Cloud Run (Go server)
+    participant D as SQLite
+    participant L as Litestream → GCS
+
+    B->>H: GET /api/script.js
+    H-->>B: script.js (cached at the edge for an hour)
+    B->>H: POST /api/event {site, url, referrer} via sendBeacon
+    H->>R: proxied, X-Forwarded-For appended
+    R->>R: peer + client rate limits, bot check, site/host/Origin match
+    R->>D: salt for today (cached) → visitor id = hash(salt, site, ip, ua)
+    R->>D: INSERT event (no ip, no user agent)
+    R-->>B: 202
+    D-->>L: WAL frames, every second
+```
+
+The IP address exists only inside the request: it keys the rate limiters, resolves to a country
+and goes into the hash. Nothing writes it down. [docs/privacy.md](docs/privacy.md) lists every
+stored field, and [docs/operations/bots.md](docs/operations/bots.md) lists the checks in order.
+
+### Where the data lives
+
+```mermaid
+flowchart TB
+    subgraph instance [Cloud Run instance, max 1]
+        S[analytics serve] --- F[(/data/analytics.db on the in-memory disk)]
+        LS[litestream replicate] --- F
+    end
+    LS -->|every second| RB[(gs://project-db/analytics)]
+    RB -->|restore on cold start| F
+    J[Cloud Run job: backup.sh, hourly + daily] -->|restore| RB
+    J -->|gzip, create-only| BB[(gs://project-backups/hourly, daily)]
+```
+
+- The instance is the single writer, so `max_instance_count = 1`. Scale to zero is fine: the
+  first request waits for the restore (a second or two).
+- The replica is the primary durability mechanism. The standalone backup files defend against a
+  damaged or deleted replica. With `require_replica = true`, an empty replica stops the instance
+  and fails the backup job instead of starting fresh. The
+  [runbook](docs/operations/runbook.md) has the restore playbook.
+- Self-hosters get the same binary and scripts in `docker-compose.yml`, with any Litestream
+  target (S3, GCS, a local path) or none.
+
+What the server defends against, and what it does not, is in the
+[threat model](SECURITY.md#threat-model).
+
 ## Codemap
 
 ### `apps/server`: Go module
@@ -134,6 +185,23 @@ These must stay true. Each one is enforced in one place, so changing it is a con
 - **Bots and over-limit visitors get `202`**, the same as real events, so probes learn nothing.
 
 ## Cross-cutting concerns
+
+**Handler chain** (`server.New`, server settings in `cmd/analytics`):
+
+```
+net/http server (timeouts, 16 KB header cap)
+└── secure(): X-Robots-Tag, nosniff, Referrer-Policy, CSP, X-Frame-Options, HSTS
+    └── jsonErrors(): 404/405 as JSON, Allow header kept
+        └── ServeMux
+            ├── POST /api/event          ingest.Handler (limits → bot → payload → site → store)
+            ├── GET  /api/script.js      script.Handler (gzip, ETag, CDN cache headers)
+            ├── /api/auth/*              limit() → auth.Service (config, login, callback, me, logout)
+            ├── /api/sites/*             auth.Require → api.API (sites, stats, breakdown, heatmap, realtime, purge)
+            └── GET  /healthz            store.Ping
+```
+
+Everything below the mux is a plain `http.Handler` with the store injected. The
+`internal/server` tests use that to exercise the whole stack against a temporary database.
 
 **Request order for `POST /api/event`** (`ingest.Handler.ServeHTTP`): CORS → per-peer limit (429,
 first because its key cannot be forged) → per-client-IP limit (429) → global limit (503) → size

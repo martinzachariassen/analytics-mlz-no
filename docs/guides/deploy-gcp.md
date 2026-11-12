@@ -87,9 +87,13 @@ Outputs:
 | Output | Use |
 |---|---|
 | `public_url` | Dashboard URL. The OAuth callback is `<public_url>/api/auth/github/callback`. |
-| `dns_records` | Records to create for the custom domain and any extra domains (usually one CNAME each to `<site>.web.app`). |
+| `dns_records` | Records to create for `domain` and `extra_domains` (usually one CNAME each to `<site>.web.app`). |
 | `image_repo` | Where `make deploy` pushes images. |
-| `cloud_run_url` | Direct service URL, for debugging. |
+| `cloud_run_url` | The service's own `run.app` URL (Firebase Hosting proxies to it), for debugging. |
+| `firebase_site`, `firebase_default_url` | The Hosting site and its `web.app` URL. |
+| `dashboard_url`, `logs_url` | The operations dashboard and the warnings/errors log query. |
+
+Show them again at any time with `terraform output`.
 
 ## 3. GitHub client secret
 
@@ -200,18 +204,9 @@ it fails, and sends an alert, until the first `make deploy`.
 ## After the deploy
 
 Monitoring, logs, backups, restoring, secret rotation, spam clean-up and known trade-offs are in the
-[runbook](../operations/runbook.md).
-
-### Outputs
-
-| Output | What it is |
-|---|---|
-| `public_url` | The dashboard; `<public_url>/api/auth/github/callback` goes in the GitHub OAuth App |
-| `cloud_run_url` | The service's own `run.app` URL (Firebase Hosting proxies to it) |
-| `firebase_site`, `firebase_default_url` | The Hosting site and its `web.app` URL |
-| `dns_records` | Records to create for `domain` and `extra_domains` |
-| `image_repo` | Where `make deploy` pushes images |
-| `dashboard_url`, `logs_url` | The operations dashboard and the warnings/errors log query |
+[runbook](../operations/runbook.md). `terraform output dashboard_url` and `terraform output logs_url`
+open the operations dashboard and the log query; all outputs are listed under
+[step 2](#2-main-cloud-run-database-bucket-secret-firebase-hosting).
 
 ## Troubleshooting
 

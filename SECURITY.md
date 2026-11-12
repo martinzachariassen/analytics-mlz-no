@@ -57,7 +57,8 @@ the server guarantees instead:
   reason and an expiry in `.trivyignore.yaml`) and runs CodeQL, `govulncheck` and `bun audit`.
   Releases carry an SBOM and signed build provenance, and Dependabot keeps every ecosystem
   current. `main` only changes through a pull request with signed commits and every check
-  green, administrators included, and release tags cannot be moved
+  green (repository admins can bypass it in an emergency), and only admins create or move
+  release tags
   (`scripts/github-settings.sh`); [OpenSSF Scorecard](https://scorecard.dev) grades these
   practices weekly.
 

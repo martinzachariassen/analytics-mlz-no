@@ -11,10 +11,12 @@ set -euo pipefail
 repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
 mode=${1:-apply}
 
-# Every job that runs on pull requests (ci.yml and codeql.yml). A required check that does not
-# run on a pull request blocks it forever, so keep this in step with the workflows.
-checks=(lint go docs tracker web e2e infra docker security
-  "analyze (go, manual)" "analyze (javascript-typescript, none)" "analyze (actions, none)")
+# The job names (`name:`) of every job that runs on pull requests, in ci.yml and codeql.yml.
+# A required check that never runs blocks every pull request, so rename both together.
+checks=("Lint" "Go tests" "Docs links" "Tracker" "Dashboard" "Dashboard end-to-end" "Infra lint"
+  "Docker image" "Dependency audit" "CodeQL (go)" "CodeQL (javascript-typescript)"
+  "CodeQL (actions)")
+admin='{"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}' # role 5 = admin
 actions_app=15368 # GitHub Actions
 
 topics='["analytics","web-analytics","privacy","cookie-free","self-hosted","go","sqlite","react"]'
@@ -37,12 +39,13 @@ repo_settings='{
 }'
 
 # main: pull request, linear history, resolved threads, signed commits and every check passing
-# on an up-to-date branch. No bypass, administrators included.
-main_ruleset=$(jq -n --argjson app "$actions_app" --args '{
+# on an up-to-date branch. Administrators can bypass it (an emergency fix, a stuck check);
+# everyone else, Dependabot included, cannot.
+main_ruleset=$(jq -n --argjson app "$actions_app" --argjson admin "$admin" --args '{
   name: "main",
   target: "branch",
   enforcement: "active",
-  bypass_actors: [],
+  bypass_actors: [$admin],
   conditions: {ref_name: {include: ["~DEFAULT_BRANCH"], exclude: []}},
   rules: [
     {type: "deletion"},
@@ -66,14 +69,14 @@ main_ruleset=$(jq -n --argjson app "$actions_app" --args '{
 }' "${checks[@]}")
 
 # Release tags: only administrators create them, and nobody moves or deletes them.
-tag_ruleset='{
-  "name": "release tags",
-  "target": "tag",
-  "enforcement": "active",
-  "bypass_actors": [{"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}],
-  "conditions": {"ref_name": {"include": ["refs/tags/v*"], "exclude": []}},
-  "rules": [{"type": "creation"}, {"type": "update"}, {"type": "deletion"}, {"type": "non_fast_forward"}]
-}'
+tag_ruleset=$(jq -n --argjson admin "$admin" '{
+  name: "release tags",
+  target: "tag",
+  enforcement: "active",
+  bypass_actors: [$admin],
+  conditions: {ref_name: {include: ["refs/tags/v*"], exclude: []}},
+  rules: [{type: "creation"}, {type: "update"}, {type: "deletion"}, {type: "non_fast_forward"}]
+}')
 
 ruleset_id() {
   gh api "repos/$repo/rulesets" --jq ".[] | select(.name == \"$1\") | .id"

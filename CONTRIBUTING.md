@@ -118,7 +118,7 @@ style is described in [docs/README.md](docs/README.md#how-these-docs-are-written
 
 Two kinds of checks catch the most common drift:
 
-- **Links.** The `docs` CI job runs [lychee](https://lychee.cli.rs) offline on every Markdown
+- **Links.** The `Docs links` CI job runs [lychee](https://lychee.cli.rs) offline on every Markdown
   file, so a renamed page or heading fails the build. Run it locally with
   `lychee --offline --include-fragments '**/*.md'`.
 - **Reference tables.** `TestEveryVariableIsDocumented` (`internal/config`) fails when an

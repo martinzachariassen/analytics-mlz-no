@@ -9,6 +9,16 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Query retry policy: network errors, 5xx and 429 (rate limited; the limiter refills
+ * within a second) are retried twice with backoff. Other 4xx are final.
+ */
+export function shouldRetry(count: number, err: unknown): boolean {
+  if (count >= 2) return false
+  if (!(err instanceof ApiError)) return true
+  return err.status >= 500 || err.status === 429
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     credentials: "same-origin",

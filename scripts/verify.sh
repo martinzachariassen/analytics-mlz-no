@@ -2,7 +2,7 @@
 # The quality gate. CI and the Makefile run the same file, so "green locally" means "green in CI".
 #
 #   scripts/verify.sh            everything
-#   scripts/verify.sh go web     only these groups: go, tracker, web, infra, lint
+#   scripts/verify.sh go web     only these groups: lint, go, tracker, web, e2e, infra
 #
 # Tools come from mise.toml (`mise install`); packages from `bun install`.
 set -euo pipefail
@@ -10,7 +10,7 @@ cd "$(dirname "$0")/.."
 
 groups=("$@")
 if [ ${#groups[@]} -eq 0 ]; then
-  groups=(lint go tracker web infra)
+  groups=(lint go tracker web e2e infra)
 fi
 
 want() {
@@ -54,6 +54,12 @@ fi
 if want web; then
   step "Dashboard: types, tests, production build"
   (cd apps/web && bun run --silent typecheck && bun run --silent test && bun run --silent build)
+fi
+
+if want e2e; then
+  step "Dashboard end to end: Playwright + axe against the Go server with seeded data"
+  # A no-op once the browser is cached; CI installs it with system dependencies first.
+  (cd apps/web && bunx playwright install chromium >/dev/null && bun run --silent e2e)
 fi
 
 if want infra; then

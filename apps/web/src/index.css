@@ -82,13 +82,15 @@
   --surface-2: oklch(0.967 0.003 270);
   --fg: oklch(0.2 0.006 270);
   --fg-secondary: oklch(0.42 0.008 270);
-  --fg-muted: oklch(0.55 0.01 270);
+  /* Muted text, deltas and their 12% tints must reach WCAG AA (4.5:1) on the
+     accent-tinted list bars too; the e2e axe checks (apps/web/e2e) enforce it. */
+  --fg-muted: oklch(0.5 0.01 270);
   --border: oklch(0.92 0.004 270);
   --border-strong: oklch(0.86 0.006 270);
   --accent: #6250d6;
   --accent-deep: #5443c4;
-  --positive: oklch(0.52 0.13 152);
-  --negative: oklch(0.55 0.18 25);
+  --positive: oklch(0.48 0.13 152);
+  --negative: oklch(0.5 0.18 25);
   /* Categorical series, fixed order, validated (dataviz skill) on white. Three
      of them are under 3:1 on white, so charts with them carry a legend and a
      table. */
@@ -110,7 +112,8 @@
   --surface-2: oklch(0.215 0.006 270);
   --fg: oklch(0.965 0.003 270);
   --fg-secondary: oklch(0.79 0.006 270);
-  --fg-muted: oklch(0.62 0.01 270);
+  /* 0.65, not lower: muted labels also sit on the accent-tinted bars of lists (WCAG AA 4.5:1). */
+  --fg-muted: oklch(0.65 0.01 270);
   --border: oklch(0.255 0.006 270);
   --border-strong: oklch(0.33 0.008 270);
   --accent: #9085e9;
@@ -175,6 +178,7 @@
     ::before,
     ::after {
       animation-duration: 0.01ms !important;
+      animation-delay: 0ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
     }
@@ -283,6 +287,10 @@
   }
 }
 
+/* shadcn fades the label to 70%, which falls under 4.5:1 in the light theme. */
+[data-slot="sidebar-group-label"] {
+  color: var(--fg-muted);
+}
 [data-slot="card-title"] {
   font-size: 14px;
   font-weight: 600;

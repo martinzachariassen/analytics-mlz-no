@@ -32,7 +32,7 @@ in [docs/reference/configuration.md](docs/reference/configuration.md) and run `m
 | `make dev` | API, dashboard and demo site with seeded data |
 | `make run` | Server only, on :8080, data in `./data` |
 | `make dev-web` | Dashboard only, on :5173 (proxies `/api` to :8080) |
-| `make verify` | The full quality gate, `scripts/verify.sh`: lint, go, tracker, web, infra |
+| `make verify` | The full quality gate, `scripts/verify.sh`: lint, go, tracker, web, e2e, infra |
 | `make test` | Go (vet, race tests, golangci-lint), tracker and dashboard checks |
 | `make lint` | Biome (format + lint), gofmt and golangci-lint |
 | `make format` | Fix formatting (Biome and gofmt) |
@@ -48,7 +48,7 @@ in [docs/reference/configuration.md](docs/reference/configuration.md) and run `m
 per job, so green locally means green in CI.
 
 ```sh
-make verify     # everything: lint, go, tracker, web, infra
+make verify     # everything: lint, go, tracker, web, e2e, infra
 make test       # go, tracker and web only
 make lint       # Biome (format + lint) and gofmt, then golangci-lint
 make format     # fix formatting
@@ -60,7 +60,8 @@ make tracker    # if apps/tracker/src changed; commit script.js
 | `lint` | `biome ci .` and `gofmt -l` |
 | `go` | `go vet`, `go test -race`, `golangci-lint run` |
 | `tracker` | Types, tests, a rebuild that fails if the committed `script.js` is stale, the 1 KB gzip budget |
-| `web` | Types, tests, production build |
+| `web` | Types, unit and component tests (vitest), production build |
+| `e2e` | Playwright with axe against the Go server and seeded data: desktop, mobile and the light theme ([details](docs/development/dashboard.md#tests)) |
 | `infra` | `terraform fmt`/`validate`, shellcheck, hadolint, actionlint |
 
 Run one or more groups with `./scripts/verify.sh go web`. The pre-commit hook

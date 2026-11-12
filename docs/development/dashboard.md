@@ -12,10 +12,12 @@
 
 ```sh
 make dev                                  # API + dashboard on :5173 + demo site, seeded data
-./scripts/verify.sh lint web              # what CI checks: Biome, then types, tests and build
+./scripts/verify.sh lint web e2e          # what CI checks: Biome, types, tests, build, end to end
 cd apps/web
 bun run typecheck
-bun run test                              # vitest unit tests
+bun run test                              # vitest: unit and component tests
+bun run e2e                               # Playwright + axe (starts its own server, see Tests)
+bunx playwright test --ui                 # the same, step by step in a browser
 ```
 
 Packages come from `bun install` at the repository root (one Bun workspace for `apps/web` and
@@ -199,11 +201,31 @@ is taken (the server's `PUBLIC_URL` points at 5173).
 
 ## Tests
 
-Unit tests sit next to the code (`lib/*.test.ts`) and run with vitest: the API client (error
-mapping, headers, id encoding, query strings), URL state parsing and the `hasOwn` guards, period
-maths, metrics, dimensions, formatting, and a check that the theme script in `index.html` is
-allowed by its hash in the Content-Security-Policy in `firebase.json`. If you edit that script,
-update the hash. Put logic in `lib/` as plain functions when you can, so it is easy to test.
+There are three layers. Each one catches what the one before cannot.
+
+| Layer | Where | Runs with | What it covers |
+|---|---|---|---|
+| Unit | `src/lib/*.test.ts` | `bun run test` (vitest, Node) | The API client (error mapping, retry policy, headers, id encoding, query strings), URL state parsing and the `hasOwn` guards, period maths, metrics, dimensions, formatting, and the CSP hash of the theme script |
+| Component | `src/components/*.test.tsx` | `bun run test` (vitest, happy-dom, Testing Library) | Filter bar, date range picker and its shortcuts, detail sheet and `ErrorNote`, against a mocked `fetch`, with the URL as the observable state |
+| End to end | `e2e/*.spec.ts` | `bun run e2e` (Playwright) | The real Go server with seeded data and the production build: sign-in, every view of a site, filters, the detail sheet and settings, with an axe scan on every page |
+
+- **Unit tests:** put logic in `lib/` as plain functions when you can, so it is easy to test. If
+  you edit the theme script in `index.html`, update its hash in `firebase.json`; `csp.test.ts`
+  checks it.
+- **Component tests:** opt into a DOM with `// @vitest-environment happy-dom` at the top of the
+  file. `src/test/render.tsx` has `renderInSite`, which renders a component inside `/sites/:id`
+  with a fresh query client and returns the router so tests can assert on the URL, and
+  `mockFetch`, which answers API paths with fixed JSON.
+- **End-to-end tests:** `playwright.config.ts` seeds a throwaway database in the system temp
+  directory (`seed -reset -days 60`), runs the server on :18080 with `DEV_LOGIN=1`, and serves
+  `apps/web/dist` with `vite preview` on :4173, so it can run next to `make dev`.
+  - A setup project signs in once and shares the session, because the auth endpoints are rate
+    limited.
+  - Every test runs three times: desktop, mobile (Pixel 7) and the light theme.
+  - `expectAccessible` fails on serious or critical WCAG 2.1 AA violations. Fix the cause (a
+    token in `src/index.css`, a role, a label); don't exclude the rule.
+  - On failure, `apps/web/test-results/` holds a trace (`bunx playwright show-trace …`). CI
+    uploads it as the `playwright-traces` artifact.
 
 ## Next steps
 

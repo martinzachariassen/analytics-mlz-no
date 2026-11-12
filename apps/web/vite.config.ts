@@ -1,7 +1,9 @@
+/// <reference types="vitest/config" />
 import { resolve } from "node:path"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
+import { configDefaults } from "vitest/config"
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -22,5 +24,9 @@ export default defineConfig({
     alias: {
       "@": resolve(import.meta.dirname, "./src"),
     },
+  },
+  test: {
+    // Component tests opt into a DOM with `// @vitest-environment happy-dom`; e2e/ is Playwright.
+    exclude: [...configDefaults.exclude, "e2e/**"],
   },
 })

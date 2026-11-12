@@ -36,3 +36,8 @@ tfplan
 .DS_Store
 .claude/settings.local.json
 .storecode/
+
+# Playwright
+apps/web/e2e/.auth/
+apps/web/test-results/
+apps/web/playwright-report/

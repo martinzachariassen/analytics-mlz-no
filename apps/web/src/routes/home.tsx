@@ -146,7 +146,7 @@ export function HomePage() {
   return (
     <div className="flex min-h-svh flex-col bg-background">
       <header className="mx-auto flex w-full max-w-[1200px] items-center justify-between px-4 pt-7 pb-4 sm:px-8">
-        <Link to="/" aria-label="Home">
+        <Link to="/">
           <Wordmark />
         </Link>
         <div className="flex items-center gap-3">
@@ -299,7 +299,8 @@ function SectionTitle({ eyebrow, title }: { eyebrow: string; title: string }) {
 
 function Code({ children }: { children: ReactNode }) {
   return (
-    <pre className="overflow-x-auto rounded-lg border bg-surface-2 p-4 font-mono text-xs leading-relaxed text-fg">
+    // Wraps instead of scrolling sideways: a scroll box would need keyboard focus (WCAG).
+    <pre className="rounded-lg border bg-surface-2 p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere text-fg">
       <code>{children}</code>
     </pre>
   )

@@ -14,6 +14,7 @@ All notable changes are documented here. The format follows
 - Terraform: an "Analytics" operations dashboard in Cloud Monitoring (requests by status, latency, memory, CPU, instances, backups, uptime, server warnings). `terraform output dashboard_url` and `logs_url` link to it and to the logs.
 - `analytics sessions revoke [-user LOGIN]` signs dashboard users out everywhere.
 - Terraform: `require_replica` (see Fixed), labels on every resource, lock files for Linux and macOS, `terraform_version < 2.0`, and an outputs table plus a restore playbook (`docs/guides/deploy-gcp.md`, `docs/operations/runbook.md`). The Docker image records which DB-IP month it carries in `/usr/share/geoip/VERSION`.
+- Dashboard tests: component tests (Testing Library, happy-dom) for the filter bar, date range picker, detail sheet and error note, and Playwright end-to-end tests against a seeded server on desktop, mobile and the light theme, with an axe accessibility scan on every page. They run as the new `e2e` group of `scripts/verify.sh` and a CI job that uploads traces on failure.
 
 ### Security
 - Built with Go 1.27.4, which fixes a vulnerability in `net/http` ([GO-2026-6859](https://pkg.go.dev/vuln/GO-2026-6859)).
@@ -50,6 +51,8 @@ All notable changes are documented here. The format follows
 - A database error while looking up a visitor's session started a new session instead of failing the insert. Unique-constraint errors are detected by SQLite error code instead of message text. Duplicate migration version numbers fail at startup instead of being skipped.
 - Shutdown: a second signal ends the process, a shutdown timeout closes open connections instead of exiting non-zero, and `net/http`'s own errors are logged as JSON.
 - Terraform: scheduled backups never ran. The scheduler's service account had `roles/run.invoker`, but the schedules pass `args` as an override, which needs `roles/run.jobsExecutorWithOverrides`. A new alert (`alert_email`) fires when no backup has succeeded for two hours.
+- Dashboard: "Filter dashboard by this" in the detail sheet closed the sheet but dropped the filter, because two URL updates in one click overwrote each other. Requests that hit a rate limit (`429`) are now retried instead of shown as errors.
+- Dashboard accessibility (WCAG 2.1 AA): muted text, deltas and sidebar group labels have enough contrast in both themes; clickable table rows are real buttons instead of rows with `role="button"`; the clickable world map is a group instead of an image; the landing page's Home link is named by its visible text and its code block wraps instead of scrolling; animations skip their delay when reduced motion is on.
 
 ### Changed
 - Tooling: every tool is pinned in `mise.toml` (`mise install`), JavaScript packages are one Bun workspace (`bun install`), Biome replaces eslint and prettier, a pre-commit hook runs `bun run lint`, and `scripts/verify.sh` (`make verify`) is the one quality gate that CI runs too, including Terraform `fmt`/`validate`, shellcheck, hadolint and actionlint.

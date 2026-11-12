@@ -231,25 +231,14 @@ export function DataTable({
                 </TableRow>
               ))
             : sorted.map((r, i) => (
+                // The row stays a row for screen readers; the value cell holds the real
+                // button, and clicking anywhere on the row is a mouse shortcut for it.
                 <TableRow
                   key={r.value}
                   onClick={onOpen ? () => onOpen(r) : undefined}
-                  onKeyDown={
-                    onOpen
-                      ? (e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault()
-                            onOpen(r)
-                          }
-                        }
-                      : undefined
-                  }
-                  tabIndex={onOpen ? 0 : undefined}
-                  role={onOpen ? "button" : undefined}
                   className={cn(
                     "tnum text-xs",
-                    onOpen &&
-                      "cursor-pointer focus-visible:bg-accent focus-visible:outline-none"
+                    onOpen && "cursor-pointer has-focus-visible:bg-accent"
                   )}
                 >
                   <TableCell className="pl-4 text-right text-fg-muted">
@@ -262,15 +251,32 @@ export function DataTable({
                         className="absolute inset-y-0 left-0 rounded-[4px] bg-violet/12"
                         style={{ width: `${(r.visitors / max) * 100}%` }}
                       />
-                      <span
-                        className={cn(
-                          "relative truncate px-2",
-                          r.value === "" && "text-fg-muted"
-                        )}
-                        title={formatValue(dim, r.value)}
-                      >
-                        {formatValue(dim, r.value)}
-                      </span>
+                      {onOpen ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onOpen(r)
+                          }}
+                          className={cn(
+                            "relative truncate px-2 text-left focus-visible:outline-none",
+                            r.value === "" && "text-fg-muted"
+                          )}
+                          title={formatValue(dim, r.value)}
+                        >
+                          {formatValue(dim, r.value)}
+                        </button>
+                      ) : (
+                        <span
+                          className={cn(
+                            "relative truncate px-2",
+                            r.value === "" && "text-fg-muted"
+                          )}
+                          title={formatValue(dim, r.value)}
+                        >
+                          {formatValue(dim, r.value)}
+                        </span>
+                      )}
                     </div>
                   </TableCell>
                   {columns.map((c) => (

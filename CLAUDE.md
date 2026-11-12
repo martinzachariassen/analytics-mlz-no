@@ -32,8 +32,9 @@ Monorepo: `apps/` holds everything that runs (`server`, `web`, `tracker`, `demo`
 
 Tools are pinned in `mise.toml` (`mise install`); JavaScript packages are a Bun workspace (`bun install` at the root, which also installs the pre-commit hook). Biome replaces eslint and prettier.
 
-- `make verify` — `scripts/verify.sh`, the quality gate CI runs too (groups: `lint go tracker web infra`)
-- `make test` — Go tests (race) + tracker tests (vitest + happy-dom) + dashboard tests and build
+- `make verify` — `scripts/verify.sh`, the quality gate CI runs too (groups: `lint go tracker web e2e infra`)
+- `make test` — Go tests (race) + tracker tests (vitest + happy-dom) + dashboard unit/component tests and build
+- `cd apps/web && bun run e2e` — Playwright + axe end-to-end tests against a seeded server (`scripts/verify.sh e2e`); see `docs/development/dashboard.md#tests`
 - `make lint` — Biome + gofmt, then `golangci-lint run`; `make format` fixes formatting
 - `make run` — run the server locally on :8080 (data in `./data`)
 - `make dev` — local test environment: API + dashboard + demo site (:8081), two demo sites with two years of synthetic data in `data/dev.db`, one-click sign-in via `DEV_LOGIN=1` (localhost only). `make dev-reset` wipes it.

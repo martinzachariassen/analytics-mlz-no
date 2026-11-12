@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { ApiError, api } from "@/lib/api"
+import { ApiError, api, shouldRetry } from "@/lib/api"
 
 function respond(
   status: number,
@@ -80,5 +80,18 @@ describe("api requests", () => {
       new Response(null, { status: 204 })
     )
     await expect(api.deleteSite("s1")).resolves.toBeUndefined()
+  })
+})
+
+describe("shouldRetry", () => {
+  it("retries network errors, 5xx and 429, twice", () => {
+    expect(shouldRetry(0, new TypeError("Failed to fetch"))).toBe(true)
+    expect(shouldRetry(0, new ApiError(503, "unavailable"))).toBe(true)
+    expect(shouldRetry(1, new ApiError(429, "too many requests"))).toBe(true)
+    expect(shouldRetry(2, new ApiError(429, "too many requests"))).toBe(false)
+  })
+  it("does not retry other client errors", () => {
+    expect(shouldRetry(0, new ApiError(401, "unauthorized"))).toBe(false)
+    expect(shouldRetry(0, new ApiError(404, "not found"))).toBe(false)
   })
 })

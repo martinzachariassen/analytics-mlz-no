@@ -75,7 +75,9 @@ export function WorldMap({
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="h-auto w-full"
-        role="img"
+        // An "img" hides its children from assistive technology, so a map with clickable
+        // countries is a group of buttons instead.
+        role={onSelect ? "group" : "img"}
         aria-label="Visitors by country"
         onMouseLeave={() => setHover(null)}
       >

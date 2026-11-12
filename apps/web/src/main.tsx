@@ -12,7 +12,7 @@ import "./index.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { ApiError } from "@/lib/api"
+import { ApiError, shouldRetry } from "@/lib/api"
 import { AppLayout } from "@/routes/app-layout"
 import { ErrorPage } from "@/routes/error-page"
 import { HomePage } from "@/routes/home"
@@ -60,8 +60,7 @@ const queryClient: QueryClient = new QueryClient({
       // The API is same-origin (often localhost). Don't pause requests when the browser
       // thinks it is offline (VPNs, extensions); just try, and show an error if it fails.
       networkMode: "always",
-      retry: (count, err) =>
-        !(err instanceof ApiError && err.status < 500) && count < 2,
+      retry: shouldRetry,
     },
   },
 })

@@ -141,7 +141,7 @@ See [docs/development/dashboard.md](docs/development/dashboard.md).
 | `infra/terraform/main` | Cloud Run service and backup job, buckets, Secret Manager, Firebase Hosting, monitoring dashboard and alerts |
 | `.github/workflows` | `ci.yml` (one job per `scripts/verify.sh` group, plus docs links, Docker, security) `codeql.yml` (CodeQL for Go, TypeScript and the workflows) and `release.yml` (images with SBOM and provenance attestations, binaries on tag) |
 | `.trivyignore.yaml` | Image-scan findings CI may ignore, each with a reason and an expiry |
-| `scripts/verify.sh` | The quality gate: groups `lint`, `go`, `tracker`, `web`, `infra`. `make verify` and CI run it |
+| `scripts/verify.sh` | The quality gate: groups `lint`, `go`, `tracker`, `web`, `e2e`, `infra`. `make verify` and CI run it |
 | `mise.toml`, `package.json`, `bun.lock`, `biome.json`, `.githooks/` | Pinned tool versions, the Bun workspace (`apps/web`, `apps/tracker`), Biome config, the pre-commit hook |
 
 ## Data model

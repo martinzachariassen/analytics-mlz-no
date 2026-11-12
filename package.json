@@ -16,7 +16,7 @@
   ],
   "scripts": {
     "prepare": "git config core.hooksPath .githooks || true",
-    "lint": "biome ci . && test -z \"$(gofmt -l apps/server)\"",
+    "lint": "biome ci . && f=$(gofmt -l apps/server) && { [ -z \"$f\" ] || { echo \"gofmt needed:\"; echo \"$f\"; exit 1; }; }",
     "format": "biome check --write . && gofmt -w apps/server",
     "test": "./scripts/verify.sh go tracker web",
     "verify": "./scripts/verify.sh"

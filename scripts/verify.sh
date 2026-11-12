@@ -41,14 +41,13 @@ if want tracker; then
   # The committed script.js must be what the current source builds; rebuild and compare.
   script=apps/server/internal/script/script.js
   before="$(mktemp)"
+  trap 'rm -f "$before"' EXIT
   cp "$script" "$before"
   (cd apps/tracker && bun run --silent build)
   if ! cmp -s "$before" "$script"; then
-    rm -f "$before"
     echo "FAIL $script was stale and has been rebuilt: commit it" >&2
     exit 1
   fi
-  rm -f "$before"
   (cd apps/tracker && bun run --silent check-size)
 fi
 

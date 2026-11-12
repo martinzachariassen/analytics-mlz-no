@@ -57,6 +57,7 @@ All notable changes are documented here. The format follows
 ### Changed
 - Tooling: every tool is pinned in `mise.toml` (`mise install`), JavaScript packages are one Bun workspace (`bun install`), Biome replaces eslint and prettier, a pre-commit hook runs `bun run lint`, and `scripts/verify.sh` (`make verify`) is the one quality gate that CI runs too, including Terraform `fmt`/`validate`, shellcheck, hadolint and actionlint.
 - `404`, `405` and `429` responses are JSON like the API's other errors.
+- `GET /healthz` returns JSON, `{"status":"ok"}` or `503` with `{"status":"unavailable",…}`, instead of the plain text `ok`, and is never cached. Probes that only check the status code (Docker, Compose, Cloud Run) are unaffected; a script that compared the body to `ok` must check the status code instead.
 - Statistics queries are cancelled after 10 seconds.
 - Site creation, changes, deletion and purges are logged with the signed-in user.
 - `ReadJSON` rejects trailing data after the JSON body.

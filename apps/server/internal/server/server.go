@@ -64,10 +64,10 @@ func New(cfg config.Config, st *store.Store, authn *auth.Service, loc *geo.Locat
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()
 		if err := st.Ping(ctx); err != nil {
-			http.Error(w, "database unavailable", http.StatusServiceUnavailable)
+			httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unavailable", "error": "database unavailable"})
 			return
 		}
-		_, _ = w.Write([]byte("ok"))
+		httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
 	return secure(cfg, jsonErrors(mux))

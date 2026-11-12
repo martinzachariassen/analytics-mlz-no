@@ -74,7 +74,7 @@ resource "google_cloud_run_v2_job" "backup" {
       timeout         = "600s"
 
       containers {
-        # Replaced by `make deploy`; Terraform ignores later image changes.
+        # Replaced on every deploy (Deploy workflow or `make deploy`); Terraform ignores later image changes.
         image   = "us-docker.pkg.dev/cloudrun/container/hello"
         command = ["/usr/local/bin/backup.sh"]
         args    = ["hourly"]

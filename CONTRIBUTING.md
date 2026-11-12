@@ -110,7 +110,7 @@ style is described in [docs/README.md](docs/README.md#how-these-docs-are-written
 | What is stored or logged | [docs/privacy.md](docs/privacy.md) |
 | Tracker options or behaviour | [docs/guides/tracking.md](docs/guides/tracking.md) |
 | Bot filtering or rate limits | [docs/operations/bots.md](docs/operations/bots.md) |
-| Deployment, alerts, backups | [docs/guides/deploy-gcp.md](docs/guides/deploy-gcp.md) and [docs/operations/runbook.md](docs/operations/runbook.md) |
+| Deployment (`Makefile` deploy targets, `.github/workflows/deploy.yml`, `infra/terraform/main/deploy.tf`), alerts, backups | [docs/guides/deploy-gcp.md](docs/guides/deploy-gcp.md) and [docs/operations/runbook.md](docs/operations/runbook.md) |
 | A package, invariant or data flow | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | A metric's meaning | [docs/concepts.md](docs/concepts.md) and `apps/web/src/lib/metrics.ts` |
 | An architectural decision | [docs/decisions.md](docs/decisions.md) |

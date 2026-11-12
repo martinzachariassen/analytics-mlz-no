@@ -139,11 +139,11 @@ See [docs/development/dashboard.md](docs/development/dashboard.md).
 | `apps/demo` | Static demo site for `make dev` |
 | `infra/docker` | `Dockerfile` (static binary, DB-IP database, Litestream), `entrypoint.sh` (Litestream restore and replicate, `REQUIRE_REPLICA`), `docker-compose.yml` (hardened; settings from `.env`, template `.env.example`), `backup.sh` (the standalone backup job), `test-restore.sh`, `test-backup.sh` |
 | `infra/terraform/bootstrap` | GCP project, APIs, state bucket, budget |
-| `infra/terraform/main` | Cloud Run service and backup job, buckets, Secret Manager, Firebase Hosting, monitoring dashboard and alerts |
-| `.github/workflows` | `ci.yml` (one job per `scripts/verify.sh` group, plus docs links, Docker, security) `codeql.yml` (CodeQL for Go, TypeScript and the workflows), `scorecard.yml` (OpenSSF Scorecard) and `release.yml` (images with SBOM and provenance attestations, binaries on tag) |
+| `infra/terraform/main` | Cloud Run service and backup job, buckets, Secret Manager, Firebase Hosting, monitoring dashboard and alerts, Workload Identity Federation for the Deploy workflow (`deploy.tf`) |
+| `.github/workflows` | `ci.yml` (one job per `scripts/verify.sh` group, plus docs links, Docker, security) `codeql.yml` (CodeQL for Go, TypeScript and the workflows), `scorecard.yml` (OpenSSF Scorecard), `release.yml` (images with SBOM and provenance attestations, binaries on tag) and `deploy.yml` (deploys `main` to Cloud Run and Firebase Hosting after CI passes, through the `make deploy-*` targets) |
 | `.trivyignore.yaml` | Image-scan findings CI may ignore, each with a reason and an expiry |
 | `scripts/verify.sh` | The quality gate: groups `lint`, `go`, `tracker`, `web`, `e2e`, `infra`. `make verify` and CI run it |
-| `scripts/github-settings.sh` | GitHub repository settings and rulesets as code (`--check` for drift); see [releasing.md](docs/development/releasing.md#repository-settings) |
+| `scripts/github-settings.sh` | GitHub repository settings, rulesets and the `production` environment as code (`--check` for drift); see [releasing.md](docs/development/releasing.md#repository-settings) |
 | `mise.toml`, `package.json`, `bun.lock`, `biome.json`, `.githooks/` | Pinned tool versions, the Bun workspace (`apps/web`, `apps/tracker`), Biome config, the pre-commit hook |
 
 ## Data model

@@ -149,3 +149,13 @@ variable "backup_daily_retention_days" {
     error_message = "backup_daily_retention_days must be at least 1."
   }
 }
+
+variable "github_repository" {
+  description = "GitHub repository (owner/name) whose `production` environment may deploy through Workload Identity Federation (.github/workflows/deploy.yml). Empty = no CI deploys; use `make deploy`."
+  type        = string
+  default     = ""
+  validation {
+    condition     = var.github_repository == "" || can(regex("^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$", var.github_repository))
+    error_message = "github_repository must look like owner/name, or be empty."
+  }
+}

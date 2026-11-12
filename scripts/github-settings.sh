@@ -78,6 +78,20 @@ tag_ruleset=$(jq -n --argjson admin "$admin" '{
   rules: [{type: "creation"}, {type: "update"}, {type: "deletion"}, {type: "non_fast_forward"}]
 }')
 
+# The `production` environment the Deploy workflow runs in: only main may deploy. GCP trusts
+# only tokens from this environment (infra/terraform/main/deploy.tf).
+environment='{"deployment_branch_policy": {"protected_branches": false, "custom_branch_policies": true}}'
+
+env_state() {
+  if gh api "repos/$repo/environments/production" >/dev/null 2>&1; then
+    jq -n --argjson env "$(gh api "repos/$repo/environments/production" --jq '{deployment_branch_policy}')" \
+      --argjson branches "$(gh api "repos/$repo/environments/production/deployment-branch-policies" --jq '[.branch_policies[] | {name, type}]')" \
+      '$env + {branch_policies: $branches}'
+  else
+    echo null
+  fi
+}
+
 ruleset_id() {
   gh api "repos/$repo/rulesets" --jq ".[] | select(.name == \"$1\") | .id"
 }
@@ -100,22 +114,24 @@ state() {
     --argjson classic "$(gh api "repos/$repo/branches/main/protection" >/dev/null 2>&1 && echo true || echo false)" \
     --argjson main "$( [ -n "$main_id" ] && gh api "repos/$repo/rulesets/$main_id" --jq '{enforcement, bypass_actors, conditions, rules}' || echo null)" \
     --argjson tag "$( [ -n "$tag_id" ] && gh api "repos/$repo/rulesets/$tag_id" --jq '{enforcement, bypass_actors, conditions, rules}' || echo null)" \
+    --argjson env "$(env_state)" \
     '{repo: $repo, dependabot_security_updates: $dependabot, private_vulnerability_reporting: $pvr,
       actions: $actions, workflow_token: $token, classic_branch_protection: $classic,
-      main_ruleset: $main, tag_ruleset: $tag}'
+      main_ruleset: $main, tag_ruleset: $tag, production_environment: $env}'
 }
 
 desired() {
   jq -n \
     --argjson repo "$repo_settings" --argjson topics "$topics" \
-    --argjson main "$main_ruleset" --argjson tag "$tag_ruleset" \
+    --argjson main "$main_ruleset" --argjson tag "$tag_ruleset" --argjson env "$environment" \
     '{repo: ($repo + {topics: ($topics | sort)}), dependabot_security_updates: true,
       private_vulnerability_reporting: true,
       actions: {enabled: true, sha_pinning_required: true},
       workflow_token: {default_workflow_permissions: "read", can_approve_pull_request_reviews: false},
       classic_branch_protection: false,
       main_ruleset: ($main | {enforcement, bypass_actors, conditions, rules}),
-      tag_ruleset: ($tag | {enforcement, bypass_actors, conditions, rules})}'
+      tag_ruleset: ($tag | {enforcement, bypass_actors, conditions, rules}),
+      production_environment: ($env + {branch_policies: [{name: "main", type: "branch"}]})}'
 }
 
 # GitHub adds defaults to what it stores (extra rule parameters, ids), so the check asks whether
@@ -179,6 +195,16 @@ apply() {
     gh api -X DELETE "repos/$repo/branches/main/protection" >/dev/null
     echo "del  classic branch protection on main (replaced by the \"main\" ruleset)"
   fi
+
+  gh api -X PUT "repos/$repo/environments/production" --input - <<<"$environment" >/dev/null
+  local policies
+  policies=$(gh api "repos/$repo/environments/production/deployment-branch-policies" --jq '.branch_policies[] | "\(.id) \(.name)"')
+  while read -r id name; do
+    [ -n "$id" ] && [ "$name" != main ] && gh api -X DELETE "repos/$repo/environments/production/deployment-branch-policies/$id" >/dev/null
+  done <<<"$policies"
+  grep -q ' main$' <<<"$policies" ||
+    gh api -X POST "repos/$repo/environments/production/deployment-branch-policies" -f name=main -f type=branch >/dev/null
+  echo "set  environment \"production\": deploys from main only"
 
   check
 }

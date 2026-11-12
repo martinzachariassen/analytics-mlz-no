@@ -56,7 +56,9 @@ Edit the generated notes afterwards if needed, copying the relevant part of the 
 ## After the release
 
 - `docker run --rm ghcr.io/martinzachariassen/analytics-mlz-no:0.1.0 version` prints the tag.
-- Deploy to Cloud Run with `make deploy` (the version is taken from `git describe`).
+- Production already runs the tagged commit: the Deploy workflow deployed it when it merged to
+  `main` (the version is `git describe`, so it shows the tag from the next deploy on). Without
+  the workflow, deploy with `make deploy`.
 - The first push of the package to GHCR is private by default: set its visibility to public under
   the repository's Packages settings once.
 
@@ -72,6 +74,7 @@ with `1` on drift.
 | Merging | Squash only, with the pull request title as the commit title (so the title must be a Conventional Commit) and the branch's commit messages as the body. Branches are deleted after merge; "Update branch" and auto-merge are on. Wiki and Projects are off: the docs live in `docs/`. |
 | `main` ruleset | No direct pushes, force pushes or deletion; a pull request with every review thread resolved; linear history; signed commits (GitHub signs squash merges made on github.com); and these checks passing on a branch that is up to date with `main`: `Lint`, `Go tests`, `Docs links`, `Tracker`, `Dashboard`, `Dashboard end-to-end`, `Infra lint`, `Docker image`, `Dependency audit`, `CodeQL (go)`, `CodeQL (javascript-typescript)`, `CodeQL (actions)`. Repository admins can bypass it for an emergency fix or a stuck check; everyone else, Dependabot included, cannot. The checks are the jobs' `name:` in `ci.yml` and `codeql.yml`: a new or renamed job that runs on pull requests goes in the script's `checks` list too, because a required check that never runs blocks every pull request. |
 | `release tags` ruleset | Only admins create, move or delete `v*` tags. |
+| `production` environment | The Deploy workflow's environment; only `main` may deploy to it. GCP trusts only tokens from this environment ([deploy guide](../guides/deploy-gcp.md#deploy-on-merge-to-main-github-actions)). The `GCP_*` and `TRACKER_ORIGIN` repository variables are not in the script; they come from `terraform output github_deploy_variables`. |
 | Security | Dependabot alerts and security updates (the schedule is in `.github/dependabot.yml`), private vulnerability reporting (which `SECURITY.md` points to), secret scanning with push protection. Generic-pattern detection and validity checks need GitHub Secret Protection, which this repository does not have, so the API ignores them. |
 | Actions | Every action must be pinned to a full commit SHA; `GITHUB_TOKEN` is read-only by default and cannot approve pull requests. |
 | Description and topics | Topics `analytics`, `web-analytics`, `privacy`, `cookie-free`, `self-hosted`, `go`, `sqlite`, `react`. |

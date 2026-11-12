@@ -1,0 +1,98 @@
+name: Deploy
+
+# Deploys main to production once CI has passed on it: the server image to Cloud Run (and the
+# backup job), then the dashboard to Firebase Hosting, through the same Makefile targets as a
+# manual `make deploy`. Credentials come from Workload Identity Federation (no stored key); the
+# Terraform side is infra/terraform/main/deploy.tf. Setup: docs/guides/deploy-gcp.md.
+#
+# workflow_run always runs this file as it is on main, and only push events on main get here, so
+# no pull request code ever runs with deploy credentials.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions: {}
+
+# One deploy at a time (SQLite, max one instance). A queued run is replaced by a newer one,
+# never cancelled while running.
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  # CI runs for two quick merges can finish out of order; deploying the older one last would
+  # roll production back. Only the commit that is main right now gets deployed. This job runs
+  # inside the concurrency group, so it checks after any wait for an earlier deploy.
+  head:
+    name: Still the head of main
+    # Skipped in forks and clones without the GCP_* repository variables.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      vars.GCP_PROJECT_ID != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      current: ${{ steps.head.outputs.current }}
+    steps:
+      - name: Compare with main
+        id: head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          head="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)"
+          if [ "$head" = "$SHA" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Not deploying $SHA: main is now $head, which deploys in its own run."
+          fi
+
+  deploy:
+    name: Deploy to production
+    needs: head
+    if: needs.head.outputs.current == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    permissions:
+      contents: read
+      id-token: write # the OIDC token exchanged for GCP credentials
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0 # tags, so the version is `git describe` as with make deploy
+          persist-credentials: false
+      - name: Install Bun (mise.toml)
+        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
+        with:
+          install_args: bun
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+      - name: Log Docker in to Artifact Registry
+        run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+        env:
+          GCP_REGION: ${{ vars.GCP_REGION }}
+      # CI has already run the quality gate on this commit, hence SKIP_CHECK=1.
+      - name: Server to Cloud Run (service and backup job)
+        run: make deploy-server SKIP_CHECK=1 PROJECT="$GCP_PROJECT_ID" REGION="$GCP_REGION"
+        env:
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          GCP_REGION: ${{ vars.GCP_REGION }}
+      - name: Dashboard to Firebase Hosting
+        run: make deploy-web SKIP_CHECK=1 PROJECT="$GCP_PROJECT_ID" TRACKER_ORIGIN="$TRACKER_ORIGIN"
+        env:
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          TRACKER_ORIGIN: ${{ vars.TRACKER_ORIGIN }}

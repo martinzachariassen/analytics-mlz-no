@@ -152,7 +152,7 @@ test("a report table exports the filtered rows as CSV", async ({ page }) => {
   for await (const chunk of stream) csv += chunk
   const [header, first] = csv.split("\n")
   expect(header).toBe(
-    "path,visitors,pageviews,visits,bounce_rate,avg_duration_seconds,previous_visitors"
+    "\uFEFFpath,visitors,pageviews,visits,bounce_rate,avg_duration_seconds,previous_visitors"
   )
   expect(first).toMatch(/^\/[^,]*,\d+,\d+,\d+,\d\.\d{4},\d+\.\d,\d+$/)
 })

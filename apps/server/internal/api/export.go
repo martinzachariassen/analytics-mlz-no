@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/csv"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,19 +13,26 @@ import (
 	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/store"
 )
 
-// countColumn names what BreakdownRow.Count counts for each dimension. Dimensions that
-// count visits have no count column in exports, because the visits column says the same.
+// countColumn names what BreakdownRow.Count counts for every dimension in store.Dimensions.
+// Dimensions that count visits map to "": they get no count column, because the visits
+// column says the same.
 var countColumn = map[string]string{
 	"path":     "pageviews",
 	"hostname": "pageviews",
 	"event":    "events",
 	"prop":     "events",
 	"prop_key": "events",
+
+	"entry": "", "exit": "", "referrer": "", "utm_source": "", "utm_medium": "", "utm_campaign": "",
+	"country": "", "browser": "", "os": "", "device": "",
 }
+
+// bom makes Excel read the file as UTF-8 instead of the system code page.
+const bom = "\uFEFF"
 
 // export writes a breakdown or a time series as CSV, with the same period, filter and
 // compare parameters as breakdown and stats. Breakdowns default to 1000 rows and include
-// visit metrics where the dimension has them.
+// visit metrics where the dimension has them; X-Truncated: true says more rows existed.
 func (a *API) export(w http.ResponseWriter, r *http.Request) {
 	site, ok := a.site(w, r)
 	if !ok {
@@ -42,6 +50,7 @@ func (a *API) export(w http.ResponseWriter, r *http.Request) {
 
 	var name string
 	var records [][]string
+	truncated := false
 	switch v.Get("what") {
 	case "breakdown":
 		req, err := parseBreakdown(v, q, maxBreakdownLimit)
@@ -50,9 +59,15 @@ func (a *API) export(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		req.full = req.dim != "prop" && req.dim != "prop_key"
+		// One extra row tells whether the limit cut the list short.
+		limit := req.opt.Limit
+		req.opt.Limit++
 		rows, ok := a.breakdownRows(w, r, site.ID, q, req)
 		if !ok {
 			return
+		}
+		if len(rows) > limit {
+			rows, truncated = rows[:limit], true
 		}
 		name, records = req.dim, breakdownCSV(req, rows, q.compare != "")
 	case "timeseries":
@@ -72,18 +87,17 @@ func (a *API) export(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
 	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
+	if truncated {
+		w.Header().Set("X-Truncated", "true")
+	}
+	_, _ = io.WriteString(w, bom)
 	cw := csv.NewWriter(w)
 	_ = cw.WriteAll(records)
 }
 
 func breakdownCSV(req breakdownRequest, rows []store.BreakdownRow, compare bool) [][]string {
-	label := req.dim
-	if req.dim == "prop" {
-		label = req.opt.PropKey
-	}
 	count := countColumn[req.dim]
-	header := []string{cell(label), "visitors"}
+	header := []string{req.dim, "visitors"}
 	if count != "" {
 		header = append(header, count)
 	}
@@ -140,12 +154,16 @@ func bucketCSV(b store.Bucket) []string {
 
 // cell neutralises spreadsheet formulas: a value starting with =, +, -, @, tab or carriage
 // return gets a leading apostrophe, so paths, referrers and event names sent by any
-// browser cannot run as formulas when the file is opened (CSV injection).
+// browser cannot run as formulas when the file is opened (CSV injection). Plain numbers
+// such as -1 are left alone: a spreadsheet reads them as numbers, not formulas.
 func cell(s string) string {
-	if s != "" && strings.ContainsRune("=+-@\t\r", rune(s[0])) {
-		return "'" + s
+	if s == "" || !strings.ContainsRune("=+-@\t\r", rune(s[0])) {
+		return s
 	}
-	return s
+	if _, err := strconv.ParseFloat(s, 64); err == nil && !strings.ContainsAny(s, "xXpPiInN_") {
+		return s
+	}
+	return "'" + s
 }
 
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }

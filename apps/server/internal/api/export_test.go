@@ -18,7 +18,11 @@ func exportCSV(t *testing.T, h http.Handler, path string) ([][]string, http.Head
 	if w.Code != http.StatusOK {
 		t.Fatalf("GET %s = %d %s", path, w.Code, w.Body)
 	}
-	recs, err := csv.NewReader(w.Body).ReadAll()
+	body, ok := strings.CutPrefix(w.Body.String(), bom)
+	if !ok {
+		t.Fatalf("GET %s: no UTF-8 byte order mark", path)
+	}
+	recs, err := csv.NewReader(strings.NewReader(body)).ReadAll()
 	if err != nil {
 		t.Fatalf("GET %s: invalid CSV: %v", path, err)
 	}
@@ -109,12 +113,44 @@ func TestExportRejectsBadParameters(t *testing.T) {
 
 func TestCellEscapesFormulas(t *testing.T) {
 	for in, want := range map[string]string{
-		"=1+1": "'=1+1", "+1": "'+1", "-1": "'-1", "@A1": "'@A1", "\tx": "'\tx", "\rx": "'\rx",
+		"=1+1": "'=1+1", "+1+1": "'+1+1", "-1+cmd|' /C calc'!A0": "'-1+cmd|' /C calc'!A0",
+		"@A1": "'@A1", "\tx": "'\tx", "\rx": "'\rx", "-Inf": "'-Inf", "-0x1p3": "'-0x1p3",
+		"-1": "-1", "+2.5": "+2.5", "-1e3": "-1e3",
 		"/blog": "/blog", "": "", "a=b": "a=b",
 	} {
 		if got := cell(in); got != want {
 			t.Errorf("cell(%q) = %q; want %q", in, got, want)
 		}
+	}
+}
+
+func TestExportTruncation(t *testing.T) {
+	at := func(m int) time.Time { return time.Date(2026, 11, 2, 10, m, 0, 0, time.UTC) }
+	h, base := newTestAPI(t, at(30), []store.Event{
+		{Time: at(0), VisitorID: 1, Path: "/a"},
+		{Time: at(1), VisitorID: 1, Path: "/b"},
+		{Time: at(2), VisitorID: 1, Path: "/c"},
+	})
+	recs, hdr := exportCSV(t, h, base+"/export?what=breakdown&dim=path&from=2026-11-02&limit=2")
+	if len(recs) != 3 || hdr.Get("X-Truncated") != "true" {
+		t.Errorf("limit=2 of 3: %d records, X-Truncated %q; want 3 and true", len(recs), hdr.Get("X-Truncated"))
+	}
+	recs, hdr = exportCSV(t, h, base+"/export?what=breakdown&dim=path&from=2026-11-02&limit=3")
+	if len(recs) != 4 || hdr.Get("X-Truncated") != "" {
+		t.Errorf("limit=3 of 3: %d records, X-Truncated %q; want 4 and none", len(recs), hdr.Get("X-Truncated"))
+	}
+}
+
+// TestExportCoversEveryDimension fails when a dimension is added to the store without
+// deciding what its count column is called.
+func TestExportCoversEveryDimension(t *testing.T) {
+	for _, d := range store.Dimensions {
+		if _, ok := countColumn[d]; !ok {
+			t.Errorf("countColumn has no entry for dimension %q", d)
+		}
+	}
+	if len(countColumn) != len(store.Dimensions) {
+		t.Errorf("countColumn has %d entries for %d dimensions", len(countColumn), len(store.Dimensions))
 	}
 }
 

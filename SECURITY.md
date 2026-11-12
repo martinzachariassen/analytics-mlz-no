@@ -41,7 +41,7 @@ the server guarantees instead:
   its domain. Lengths, property counts and types are capped, control characters and bidi overrides
   are stripped, and referrers must be plain hostnames. The dashboard renders everything as text
   under a strict Content-Security-Policy, and CSV exports prefix any cell that starts with `=`,
-  `+`, `-`, `@`, tab or carriage return with `'`, so a sent path or event name cannot run as a
+  `+`, `-`, `@`, tab or carriage return (unless the cell is a plain number) with `'`, so a sent path or event name cannot run as a
   spreadsheet formula.
 - **Limited inflation from one source.** Limits apply per upstream address (which cannot be
   forged), per client IP, and per visitor (site plus daily hash). Limiter keys are parsed

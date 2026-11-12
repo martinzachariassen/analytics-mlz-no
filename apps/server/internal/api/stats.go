@@ -266,16 +266,18 @@ func (a *API) breakdown(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	req, err := parseBreakdown(r.URL.Query(), q, 10)
+	v := r.URL.Query()
+	req, err := parseBreakdown(v, q, 10)
 	if err != nil {
 		httpx.Error(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if m := r.URL.Query().Get("metrics"); m != "" && m != "full" {
+	m := v.Get("metrics")
+	if m != "" && m != "full" {
 		httpx.Error(w, http.StatusBadRequest, "metrics must be full")
 		return
 	}
-	req.full = r.URL.Query().Get("metrics") == "full"
+	req.full = m == "full"
 	rows, ok := a.breakdownRows(w, r, site.ID, q, req)
 	if !ok {
 		return
@@ -294,12 +296,16 @@ type breakdownRequest struct {
 // parseBreakdown reads dim, event, key and limit (default limit when absent).
 func parseBreakdown(v url.Values, q query, limit int) (breakdownRequest, error) {
 	req := breakdownRequest{
-		dim: v.Get("dim"),
 		opt: store.BreakdownOptions{Event: v.Get("event"), PropKey: v.Get("key"), Limit: limit, Filters: q.filters},
 	}
-	switch {
-	case !slices.Contains(store.Dimensions, req.dim):
+	// The dimension is taken from the whitelist rather than the request, so the string that
+	// reaches the SQL builder is never user input.
+	i := slices.Index(store.Dimensions, v.Get("dim"))
+	if i < 0 {
 		return req, errors.New("unknown dim")
+	}
+	req.dim = store.Dimensions[i]
+	switch {
 	case req.dim == "prop" && (req.opt.Event == "" || req.opt.PropKey == ""):
 		return req, errors.New("dim=prop requires event and key")
 	case req.dim == "prop_key" && req.opt.Event == "":

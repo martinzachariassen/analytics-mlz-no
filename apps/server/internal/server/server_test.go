@@ -448,7 +448,7 @@ func TestExportEndpoint(t *testing.T) {
 	w = call(h, "GET", path, "", c, "")
 	if w.Code != http.StatusOK || w.Header().Get("Content-Type") != "text/csv; charset=utf-8" ||
 		!strings.HasPrefix(w.Header().Get("Content-Disposition"), "attachment;") ||
-		!strings.HasPrefix(w.Body.String(), "path,visitors,pageviews,") {
+		!strings.HasPrefix(w.Body.String(), "\uFEFFpath,visitors,pageviews,") || w.Header().Get("X-Content-Type-Options") != "nosniff" {
 		t.Fatalf("export = %d %v %q", w.Code, w.Header(), w.Body)
 	}
 	if w := call(h, "GET", "/api/sites/nope/export?what=timeseries", "", c, ""); w.Code != http.StatusNotFound {

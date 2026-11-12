@@ -53,7 +53,7 @@ The product roadmap after the quality base, in order. Each is one pull request w
    `first_event_at`/`last_event_at` on sites.
 2. ✅ **Goals and conversions**: `goals` table (event name or path, `*` wildcard), conversions
    and rate per goal on the overview, management in settings.
-3. **CSV export**: breakdowns and time series with the same period and filter parameters,
+3. ✅ **CSV export**: breakdowns and time series with the same period and filter parameters,
    formula-escaped cells.
 4. **Shareable read-only links**: hashed tokens, a read-only `/api/share/{token}/…`, revocable
    from settings.

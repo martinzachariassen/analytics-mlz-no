@@ -145,7 +145,9 @@ Filters beyond `MAX_FILTERS` (10, the API's limit) are dropped instead of turnin
 Every request goes through `request()` in `lib/api.ts`, which uses same-origin credentials,
 URL-encodes the site id, sends JSON and throws `ApiError` with the status code (the message falls
 back to `HTTP <status>`, because HTTP/2 has no status text). A `401` during a mutation is handled
-by `MutationCache.onError` the same way as for queries.
+by `MutationCache.onError` the same way as for queries. CSV exports are the exception: `exportUrl` builds plain
+`<a download>` links, because the browser sends the session cookie on the same origin and saves
+the file under the name the server gives it.
 
 **Error states.** A failed query shows `<ErrorNote>` (`components/error-note.tsx`) with the
 message, never a skeleton that loads forever. Use it in every new view and panel: check
@@ -197,6 +199,7 @@ Use these before writing new layout:
 | `date-range-picker.tsx` | Period, custom range and interval selects |
 | `detail-sheet.tsx` | Side sheet for one value, with "Filter dashboard by this" |
 | `delta.tsx` | Up/down change, coloured with `--positive`/`--negative` |
+| `export-link.tsx` | The "CSV" download in a panel's action slot. Build its `href` with `exportUrl.breakdown`/`exportUrl.timeseries` from `lib/api.ts`, passing the panel's scope so the file matches what is on screen |
 | `goals-card.tsx`, `goals-settings.tsx`, `goal-button.tsx` | Conversions per goal on the overview (a row filters by the goal), goal management in settings (`#goals`), and "Make this a goal" in the detail sheet and the event properties panel. `lib/goals.ts` has the labels and the goal-to-filter mapping; `formatRate` in `lib/format.ts` formats conversion rates |
 | `heatmap.tsx`, `world-map.tsx`, `proportion-strip.tsx`, `sparkline.tsx` | Special charts |
 
@@ -259,7 +262,7 @@ There are three layers. Each one catches what the one before cannot.
 |---|---|---|---|
 | Unit | `src/lib/*.test.ts` | `bun run test` (vitest, Node) | The API client (error mapping, retry policy, headers, id encoding, query strings), URL state parsing and the `hasOwn` guards, period maths, metrics, dimensions, formatting, and the CSP hash of the theme script |
 | Component | `src/components/*.test.tsx`, `src/routes/**/*.test.tsx` | `bun run test` (vitest, happy-dom, Testing Library) | Filter bar, date range picker and its shortcuts, detail sheet, goals (the overview card, adding and removing in settings), `ErrorNote` (retry, focus, no flip on background refetches) and onboarding in the site layout (polling until the first event, then the dashboard), against a mocked `fetch`, with the URL as the observable state |
-| End to end | `e2e/*.spec.ts` | `bun run e2e` (Playwright) | The real Go server with seeded data and the production build: sign-in, every view of a site, filters, the detail sheet, settings, goals (conversions on the overview, adding and removing in settings), a failed request recovering with "Try again", and a new site waiting for its first event and switching to the dashboard when one is sent, with an axe scan on every page |
+| End to end | `e2e/*.spec.ts` | `bun run e2e` (Playwright) | The real Go server with seeded data and the production build: sign-in, every view of a site, filters, the detail sheet, settings, goals (conversions on the overview, adding and removing in settings), a CSV download with a filter, a failed request recovering with "Try again", and a new site waiting for its first event and switching to the dashboard when one is sent, with an axe scan on every page |
 
 - **Unit tests:** put logic in `lib/` as plain functions when you can, so it is easy to test. If
   you edit the theme script in `index.html`, update its hash in `firebase.json`; `csp.test.ts`

@@ -41,6 +41,7 @@ func (a *API) Register(mux *http.ServeMux, protect func(http.Handler) http.Handl
 		"GET /api/sites/{id}/breakdown": a.timed(a.breakdown),
 		"GET /api/sites/{id}/heatmap":   a.timed(a.heatmap),
 		"GET /api/sites/{id}/realtime":  a.timed(a.realtime),
+		"GET /api/sites/{id}/export":    a.timed(a.export),
 		"POST /api/sites/{id}/purge":    a.purge,
 
 		"GET /api/sites/{id}/goals":             a.listGoals,

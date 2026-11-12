@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { ApiError, api, shouldRetry } from "@/lib/api"
+import { ApiError, api, exportUrl, shouldRetry } from "@/lib/api"
 
 function respond(
   status: number,
@@ -80,6 +80,40 @@ describe("api requests", () => {
       new Response(null, { status: 204 })
     )
     await expect(api.deleteSite("s1")).resolves.toBeUndefined()
+  })
+})
+
+describe("exportUrl", () => {
+  const scope = {
+    from: "2026-11-01",
+    to: "2026-11-04",
+    tz: "Europe/Oslo",
+    filters: [{ dim: "country" as const, op: "is" as const, value: "NO" }],
+  }
+  it("links a breakdown export with the scope and the property options", () => {
+    const url = new URL(
+      exportUrl.breakdown("../x", scope, "prop", {
+        event: "signup",
+        key: "plan",
+      }),
+      "http://x"
+    )
+    expect(url.pathname).toBe("/api/sites/..%2Fx/export")
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      from: "2026-11-01",
+      to: "2026-11-04",
+      tz: "Europe/Oslo",
+      what: "breakdown",
+      dim: "prop",
+      event: "signup",
+      key: "plan",
+      f: "country:is:NO",
+    })
+  })
+  it("links a time series export with the interval", () => {
+    const url = new URL(exportUrl.timeseries("s1", scope, "week"), "http://x")
+    expect(url.searchParams.get("what")).toBe("timeseries")
+    expect(url.searchParams.get("interval")).toBe("week")
   })
 })
 

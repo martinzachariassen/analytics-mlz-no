@@ -140,6 +140,23 @@ test("goals can be added and removed in settings", async ({ page }) => {
   await expect(remove).toHaveCount(0)
 })
 
+test("a report table exports the filtered rows as CSV", async ({ page }) => {
+  const base = await openSite(page, "Demo blog")
+  await page.goto(`${base}/pages?f=device%3Ais%3Adesktop`)
+  const download = page.waitForEvent("download")
+  await page.getByRole("link", { name: "Export pages as CSV" }).click()
+  const file = await download
+  expect(file.suggestedFilename()).toMatch(/^localhost-path-\d{4}-\d{2}-\d{2}-\d{4}-\d{2}-\d{2}\.csv$/)
+  const stream = await file.createReadStream()
+  let csv = ""
+  for await (const chunk of stream) csv += chunk
+  const [header, first] = csv.split("\n")
+  expect(header).toBe(
+    "path,visitors,pageviews,visits,bounce_rate,avg_duration_seconds,previous_visitors"
+  )
+  expect(first).toMatch(/^\/[^,]*,\d+,\d+,\d+,\d\.\d{4},\d+\.\d,\d+$/)
+})
+
 test("a failed panel says so and recovers with Try again", async ({ page }) => {
   let fail = true
   await page.route("**/api/sites/*/heatmap*", (route) =>

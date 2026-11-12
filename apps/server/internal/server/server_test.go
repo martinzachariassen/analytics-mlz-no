@@ -434,3 +434,24 @@ func TestGoalEndpoints(t *testing.T) {
 		}
 	}
 }
+
+func TestExportEndpoint(t *testing.T) {
+	h, c := setup(t)
+	w := call(h, "POST", "/api/sites", `{"domain":"mlz.no"}`, c, "application/json")
+	var site struct{ ID string }
+	_ = json.Unmarshal(w.Body.Bytes(), &site)
+	path := "/api/sites/" + site.ID + "/export?what=breakdown&dim=path"
+
+	if w := call(h, "GET", path, "", nil, ""); w.Code != http.StatusUnauthorized {
+		t.Fatalf("anonymous export = %d, want 401", w.Code)
+	}
+	w = call(h, "GET", path, "", c, "")
+	if w.Code != http.StatusOK || w.Header().Get("Content-Type") != "text/csv; charset=utf-8" ||
+		!strings.HasPrefix(w.Header().Get("Content-Disposition"), "attachment;") ||
+		!strings.HasPrefix(w.Body.String(), "path,visitors,pageviews,") {
+		t.Fatalf("export = %d %v %q", w.Code, w.Header(), w.Body)
+	}
+	if w := call(h, "GET", "/api/sites/nope/export?what=timeseries", "", c, ""); w.Code != http.StatusNotFound {
+		t.Fatalf("export of unknown site = %d, want 404", w.Code)
+	}
+}

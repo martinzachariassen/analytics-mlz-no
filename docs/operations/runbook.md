@@ -25,7 +25,8 @@ Placeholders: `<project_id>`, `<region>` (default `europe-north1`) and `<domain>
 | **Monitoring dashboard** | `terraform output dashboard_url`: requests by status, latency, memory and CPU, instances, backup runs, uptime, and the server's warnings and errors |
 | **Error logs** | `terraform output logs_url`: Logs Explorer filtered to the server's warnings and errors |
 | **Logs from a terminal** | `gcloud run services logs read analytics --region <region> --project <project_id>` (or `gcloud beta run services logs tail …` to follow) |
-| **Alerts** | Email to `alert_email`: memory pressure, load shedding, failed backups, downtime (an uptime check fetches `/api/script.js` every five minutes), and any `ERROR` log line (at most one email per hour) |
+| **Alerts** | Email to `alert_email`: memory pressure, load shedding, a failed backup run, no successful backup for 2 hours, downtime (an uptime check asks for `/api/auth/me` through Firebase Hosting every five minutes and expects `401`), Litestream errors or an empty restore ("no backup found"), and any `ERROR` log line (at most one email per hour) |
+| **Liveness** | Cloud Run probes `/healthz` inside the container every 30 s and restarts the instance after 3 failures |
 | **Cost** | Billing console. The budget alert emails at 50 % and 90 % of the budget, and at 100 % of forecast spend |
 
 The server writes JSON log lines with `severity` and `message`. Litestream's own lines (restore,
@@ -100,8 +101,10 @@ A wrong value also breaks per-client rate limiting.
    through Firebase.
 2. Open the monitoring dashboard: memory (the database lives in the instance's 512 MiB of memory),
    instance count and `5xx`.
-3. Read the startup logs. A healthy start shows Litestream either restoring from the bucket or
-   reporting "no backup found, starting fresh", followed by "replicating to".
+3. Read the startup logs. A healthy start shows Litestream restoring from the bucket (or, on the
+   very first deploy only, "no backup found, starting fresh"), followed by "replicating to". With
+   `require_replica = true` an empty replica stops the start instead; see
+   [Restore the database from a backup](#restore-the-database-from-a-backup).
 4. The first request after an idle period waits 1–3 s for a cold start. That is expected.
 5. `/healthz` returns 404 on the `run.app` URL, because Cloud Run reserves paths ending in `z`.
    That is expected too.
@@ -125,8 +128,44 @@ gcloud storage cp gs://<project_id>-backups/daily/<file>.db.gz . && gunzip <file
 DATABASE_PATH=<file>.db make run
 ```
 
-To restore production from a backup file, start the server with `DATABASE_PATH` pointing at it.
-When Litestream is in use, remove the old replica first, or it is restored over your file.
+Litestream keeps hours of point-in-time history; the backup files reach back 90 days.
+
+**Symptoms:** the "Litestream reported a problem" alert, a backup run failing with "the replica is
+empty", an instance that refuses to start because the replica is empty (`require_replica = true`),
+or a dashboard that is suddenly empty.
+
+To restore production on Cloud Run:
+
+1. **Stop deploying.** A new revision restores from the replica, so it would start from the same
+   bad state.
+2. **Pick a file.** List `gs://<project_id>-backups/hourly/` (3 days) and `daily/` (90 days),
+   then fetch the newest good one:
+   ```sh
+   gcloud storage ls gs://<project_id>-backups/hourly/ gs://<project_id>-backups/daily/
+   gcloud storage cp gs://<project_id>-backups/daily/<file>.db.gz . && gunzip <file>.db.gz
+   ```
+3. **Check it.** `ts` is in milliseconds:
+   ```sh
+   sqlite3 <file>.db 'PRAGMA integrity_check; SELECT count(*), max(ts) FROM events'
+   ```
+4. **Seed a new replica path** from the file, so nothing old is restored over it:
+   ```sh
+   litestream replicate <file>.db gs://<project_id>-db/analytics-<date>
+   ```
+   Leave it running until the first snapshot is uploaded. Check from another terminal with
+   `gcloud storage ls -r gs://<project_id>-db/analytics-<date>`; once files are listed, stop it
+   with Ctrl+C.
+5. **Point the service and the backup job at it.** Set `replica_path = "analytics-<date>"` in
+   `infra/terraform/main/terraform.tfvars` and run `terraform apply`. That rolls out a new
+   revision that restores from the new path; no image build or `make deploy` is needed.
+6. **Confirm.** Run a backup by hand (below) and check that it writes a file, and that the
+   dashboard shows data. Delete the old replica path after a day.
+
+Events between the backup file and the restore are lost.
+
+With Docker, stop the container, put the file in the data volume as `analytics.db`, and point
+`LITESTREAM_REPLICA_URL` at a new path (or remove the old replica), or the old replica is
+restored over your file.
 
 ### Roll back a release
 
@@ -173,7 +212,16 @@ Sessions also expire by themselves after 7 days without use.
 1. Find the run with the "Backup job" filter above.
 2. After the first `terraform apply`, the job uses a placeholder image and fails until the first
    `make deploy`. `make deploy` updates the job's image together with the service.
-3. Re-run it by hand: `gcloud run jobs execute analytics-backup --region <region> --project <project_id>`.
+3. If it failed with "the replica is empty but BACKUP_EXPECT_DATA=1", the replica has lost its
+   data: follow [Restore the database from a backup](#restore-the-database-from-a-backup).
+4. Re-run it, or take a backup by hand at any time (the job is named `<service_name>-backup`,
+   `analytics-backup` by default):
+   `gcloud run jobs execute analytics-backup --args daily --region <region> --project <project_id>`.
+
+> [!TIP]
+> Set `require_replica = true` in `terraform.tfvars` once the service has data. Then an empty
+> replica stops the service from starting empty and fails the backup job, instead of both
+> quietly carrying on with nothing.
 
 ## Routine checks
 

@@ -7,7 +7,7 @@
 **Read this if:** you are about to make a larger change, or wonder why something is the way it is.
 
 Lightweight, privacy-friendly, self-hostable web analytics (inspired by Umami/Plausible, but smaller).
-This page records the architectural decisions and open items. Read it before larger changes.
+This page records the architectural decisions, open items and what must be settled before 1.0. Read it before larger changes.
 
 ## Decisions
 
@@ -23,9 +23,10 @@ This page records the architectural decisions and open items. Read it before lar
 | Events (v1) | Page views, SPA navigation (pushState/popstate), outbound links (auto), custom events via `data-mlz-event` attributes and `window.mlz.track(name, props)`. |
 | Dimensions (v1) | Views, uniques, bounce rate, top pages, referrer + UTM, browser/OS/device, country (DB-IP Lite, CC BY 4.0). |
 | Retention | Keep forever by default; `RETENTION_DAYS` deletes older events. |
-| Infra | Terraform, new GCP project. |
+| Infra | Terraform, new GCP project. `plan`/`apply` by hand, never from CI. |
 | CI | GitHub Actions running `scripts/verify.sh` (the same file as `make verify`), one group per job, plus a docs link check, `govulncheck`, `bun audit` and a Docker build. |
 | Tooling | Tool versions pinned in `mise.toml`; one Bun workspace (`apps/web`, `apps/tracker`) with a root `bun.lock`; Biome for TypeScript formatting and linting, gofmt and golangci-lint for Go. |
+| Supply chain | Digest-pinned images, commit-pinned Actions, Trivy and CodeQL in CI, SBOM and signed provenance on releases, Dependabot. |
 
 ## Milestones
 
@@ -35,14 +36,25 @@ This page records the architectural decisions and open items. Read it before lar
 4. ✅ **Dashboard** — React + Vite + shadcn/ui.
 5. ✅ **Terraform** — Artifact Registry, Cloud Run, GCS, Secret Manager, Firebase Hosting.
 6. ✅ **Contributor-friendliness** — README, CONTRIBUTING, SECURITY, issue/PR templates (good-first-issues: label some once the repo is public).
-7. **Release** — CI hardening, versioned builds, GHCR image + binaries on tag (`.github/workflows/release.yml`), privacy/upgrade docs. Code is ready; the first tag waits for the production checks in [releasing.md](development/releasing.md).
+7. ✅ **Release pipeline** — CI hardening, versioned builds, GHCR image + binaries on tag with SBOM and provenance (`.github/workflows/release.yml`), privacy/upgrade docs. The first tag waits for the remaining production checks in [releasing.md](development/releasing.md).
+8. ✅ **Hardening audit (November 2026)** — server, tracker, dashboard, tooling, infrastructure and docs reviewed and fixed in one series of pull requests; see the "Unreleased" section of the [changelog](../CHANGELOG.md).
 
 ## Open items
 
 - ✅ Production domain: `analytics.mlz.no` (dashboard and API), `t.mlz.no` (tracking script).
 - ✅ `PROXY_HOPS=2` on Cloud Run behind Firebase Hosting: production events carry the right country and one visitor per person.
+- The rest of the pre-release checklist in [releasing.md](development/releasing.md#pre-release-checklist), then the first tag.
+
+## Before 1.0
+
 - **Dashboard for self-hosters.** The Docker image contains the API only. The dashboard (`apps/web/`) is
   deployed to Firebase Hosting and reaches the API through a same-origin rewrite, so someone running
   `docker compose` has a working collector but no dashboard unless they serve `apps/web/dist`
-  themselves behind the same origin. Decide before 1.0 whether to embed `apps/web/dist` in the Go
+  themselves behind the same origin. Decide whether to embed `apps/web/dist` in the Go
   binary (simplest for self-hosting) or document a reverse-proxy recipe.
+- **Site ownership.** The dashboard is single-tenant: every allowlisted user can read and change
+  every site. Fine for one person or one team; more would need a `site_users` table.
+- **A second identity provider.** The `auth.Provider` interface is there; OIDC (Google, Keycloak)
+  would make self-hosting without GitHub possible.
+- **Schema freeze.** After 1.0, migrations stay additive and minor versions never break
+  configuration.

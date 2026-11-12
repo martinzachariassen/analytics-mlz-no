@@ -39,6 +39,7 @@ in [docs/reference/configuration.md](docs/reference/configuration.md) and run `m
 | `make tracker` | Rebuild `apps/server/internal/script/script.js` from `apps/tracker/src` |
 | `docker compose -f infra/docker/docker-compose.yml up --build` | Production image locally |
 | `infra/docker/test-restore.sh` | Check Litestream backup and restore |
+| `infra/docker/test-backup.sh` | Check the standalone backup script (`backup.sh`) |
 | `go run ./apps/server/cmd/loadtest` | Ingest load test |
 
 ## Checks before you open a pull request

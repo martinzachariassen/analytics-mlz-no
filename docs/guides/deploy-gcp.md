@@ -87,9 +87,13 @@ Outputs:
 | Output | Use |
 |---|---|
 | `public_url` | Dashboard URL. The OAuth callback is `<public_url>/api/auth/github/callback`. |
-| `dns_records` | Records to create for the custom domain and any extra domains (usually one CNAME each to `<site>.web.app`). |
+| `dns_records` | Records to create for `domain` and `extra_domains` (usually one CNAME each to `<site>.web.app`). |
 | `image_repo` | Where `make deploy` pushes images. |
-| `cloud_run_url` | Direct service URL, for debugging. |
+| `cloud_run_url` | The service's own `run.app` URL (Firebase Hosting proxies to it), for debugging. |
+| `firebase_site`, `firebase_default_url` | The Hosting site and its `web.app` URL. |
+| `dashboard_url`, `logs_url` | The operations dashboard and the warnings/errors log query. |
+
+Show them again at any time with `terraform output`.
 
 ## 3. GitHub client secret
 
@@ -145,10 +149,23 @@ gcloud auth configure-docker <region>-docker.pkg.dev   # once
 make deploy                                            # or: make deploy-server / make deploy-web
 ```
 
-- `deploy-server` builds a `linux/amd64` image, pushes it as `server:<git sha>` (with `-dirty` for uncommitted changes) and rolls out a new Cloud Run revision.
-- `deploy-web` builds `apps/web/dist` and publishes it to Firebase Hosting.
+- `deploy` (and `deploy-server` or `deploy-web` on their own) runs the quality gate
+  (`scripts/verify.sh`) once, and refuses to continue unless the working tree is clean (untracked
+  files included), on `main` and identical to `origin/main` (it fetches to compare, so it needs
+  the network). `FORCE=1 make deploy` skips those three checks for an emergency fix; the quality
+  gate still runs.
+- `deploy-server` builds a `linux/amd64` image, pushes it as `server:<git sha>` (with `-dirty` for
+  uncommitted or untracked changes) and rolls out a new Cloud Run revision and backup job image.
+- `deploy-web` builds `apps/web/dist` and publishes it to Firebase Hosting. Server first, then
+  web, so a new dashboard never goes live before the API it needs.
 
-Override `PROJECT`, `REGION` or `SERVICE` on the command line if yours differ.
+Override `PROJECT`, `REGION` or `SERVICE` on the command line if yours differ. `SERVICE` and
+`REGION` are also written into `apps/web/firebase.json` (the `/api/**` rewrite); change both.
+
+After the first deploy has data, set `require_replica = true` in `terraform.tfvars` and apply.
+From then on an instance refuses to start from an empty replica, and the backup job treats an
+empty replica as a failure, so a lost replica becomes an alert instead of a quiet fresh start.
+Leave it `false` for the very first deploy, when the replica is empty by design.
 
 ## 6. Verify
 
@@ -187,7 +204,9 @@ it fails, and sends an alert, until the first `make deploy`.
 ## After the deploy
 
 Monitoring, logs, backups, restoring, secret rotation, spam clean-up and known trade-offs are in the
-[runbook](../operations/runbook.md).
+[runbook](../operations/runbook.md). `terraform output dashboard_url` and `terraform output logs_url`
+open the operations dashboard and the log query; all outputs are listed under
+[step 2](#2-main-cloud-run-database-bucket-secret-firebase-hosting).
 
 ## Troubleshooting
 
@@ -199,7 +218,8 @@ Monitoring, logs, backups, restoring, secret rotation, spam clean-up and known t
 | `Secret Payload cannot be empty` | stdin wasn't a terminal (e.g. a non-interactive shell). Use the hidden-prompt command above. |
 | Sign-in fails with `redirect_uri` mismatch | The OAuth App's callback URL must be exactly `https://<domain>/api/auth/github/callback`. |
 | `Location 'europe-north1' is not a valid location` creating a Cloud Scheduler job | Cloud Scheduler is not available in every region. The backup schedules use `scheduler_region` (default `europe-west1`) and still trigger the job in `region`. |
-| `/healthz` returns 404 on the `run.app` URL | Cloud Run reserves paths ending in `z` on its public URL. The in-container startup probe still works. |
+| `/healthz` returns 404 on the `run.app` URL | Cloud Run reserves paths ending in `z` on its public URL. The in-container startup and liveness probes still work; from outside, use `/api/auth/me` (401) as the health signal, which is also what the uptime check does. |
+| The service starts but the dashboard is empty, and the log says "no backup found" | The replica is empty. With `require_replica = true` the instance would have refused to start; follow [Restore the database from a backup](../operations/runbook.md#restore-the-database-from-a-backup). |
 
 ## Next steps
 

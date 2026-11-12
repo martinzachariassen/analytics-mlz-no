@@ -63,6 +63,7 @@ dev-reset:
 # "Tracking code" page puts in the snippet (default: the dashboard's own origin).
 TRACKER_ORIGIN ?=
 web:
+	cd apps/web && bun install --frozen-lockfile --silent
 	cd apps/web && VITE_TRACKER_ORIGIN=$(TRACKER_ORIGIN) bun run build
 
 # ---------------------------------------------------------------- production (see infra/terraform)
@@ -71,17 +72,38 @@ PROJECT ?= analytics-mlz-no
 REGION  ?= europe-north1
 SERVICE ?= analytics
 BACKUP_JOB ?= $(SERVICE)-backup
-IMAGE   ?= $(REGION)-docker.pkg.dev/$(PROJECT)/analytics/server:$(shell git rev-parse --short HEAD)$(shell git diff --quiet HEAD -- apps infra go.work || echo -dirty)
+# Any change in the working tree counts, untracked files included: a build must match a commit,
+# or say that it does not. (Git-ignored files such as terraform.tfvars do not count.)
+DIRTY   := $(shell test -z "$$(git status --porcelain)" || echo -dirty)
+IMAGE   ?= $(REGION)-docker.pkg.dev/$(PROJECT)/analytics/server:$(shell git rev-parse --short HEAD)$(DIRTY)
 
-deploy: deploy-server deploy-web
+# Server first, then the dashboard: a new dashboard must never go live before the API it needs.
+# The check runs once here; SKIP_CHECK=1 stops the two sub-makes from repeating it.
+deploy: deploy-check
+	$(MAKE) deploy-server SKIP_CHECK=1
+	$(MAKE) deploy-web SKIP_CHECK=1
+
+# Refuses to deploy anything that is not a pushed commit on main, unless FORCE=1. Runs the
+# quality gate first, so what reaches production is what CI would have passed.
+deploy-check:
+ifneq ($(SKIP_CHECK),1)
+ifneq ($(FORCE),1)
+	@test -z "$(DIRTY)" || { echo "error: uncommitted changes (FORCE=1 to deploy anyway)"; exit 1; }
+	@test "$$(git rev-parse --abbrev-ref HEAD)" = main || { echo "error: not on main (FORCE=1 to deploy anyway)"; exit 1; }
+	@git fetch -q origin main || { echo "error: could not fetch origin/main to compare (offline? FORCE=1 to deploy anyway)"; exit 1; }
+	@test "$$(git rev-parse HEAD)" = "$$(git rev-parse origin/main)" || { echo "error: HEAD is not origin/main; push or pull first (FORCE=1 to deploy anyway)"; exit 1; }
+endif
+	./scripts/verify.sh lint go tracker web
+endif
 
 # Build for Cloud Run (amd64), push to Artifact Registry and roll out a new revision.
 # One-time setup: gcloud auth configure-docker $(REGION)-docker.pkg.dev
-deploy-server:
+deploy-server: deploy-check
 	docker buildx build --platform linux/amd64 --build-arg VERSION=$(VERSION) -f infra/docker/Dockerfile -t $(IMAGE) --push .
 	gcloud run deploy $(SERVICE) --image $(IMAGE) --region $(REGION) --project $(PROJECT) --quiet
 	gcloud run jobs update $(BACKUP_JOB) --image $(IMAGE) --region $(REGION) --project $(PROJECT) --quiet
 
 # Build the dashboard and publish it to Firebase Hosting (rewrites /api/** to Cloud Run).
-deploy-web: web
+# SERVICE and REGION are also hard-coded in apps/web/firebase.json; change both.
+deploy-web: deploy-check web
 	cd apps/web && bunx firebase-tools deploy --only hosting --project $(PROJECT) --non-interactive

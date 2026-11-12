@@ -131,3 +131,47 @@ test("a failed panel says so and recovers with Try again", async ({ page }) => {
   await expect(page.getByText("Active hours")).toBeVisible()
   await expectAccessible(page)
 })
+
+test("a new site waits for its first event, then moves on by itself", async ({
+  page,
+}, testInfo) => {
+  // One site per project and run: the projects share the database, and `seed -reset`
+  // keeps sites added by an earlier run.
+  const domain = `onboarding-${testInfo.project.name}-${Date.now()}.example`
+  await page.goto("/sites")
+  await page.getByRole("button", { name: "Add site" }).first().click()
+  await page.getByLabel("Domain").fill(domain)
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Add site" })
+    .click()
+
+  await expect(page).toHaveURL(/\/settings\?new=1$/)
+  const status = page.getByRole("status").filter({ hasText: "Waiting" })
+  await expect(status).toContainText("Site added. Waiting for the first event")
+  await expectAccessible(page)
+  const siteId = new URL(page.url()).pathname.split("/")[2]!
+
+  await page.goto(`/sites/${siteId}`)
+  await expect(page.getByText(`No data for ${domain} yet`)).toBeVisible()
+  await expectAccessible(page)
+
+  // What the tracking script sends, straight to the API server (the preview proxy may
+  // rewrite headers). A browser user agent, since bots are dropped silently.
+  const res = await page.request.post("http://localhost:18080/api/event", {
+    headers: {
+      "Content-Type": "text/plain",
+      Origin: `https://${domain}`,
+      "User-Agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    },
+    data: JSON.stringify({ site: siteId, url: `https://${domain}/` }),
+  })
+  expect(res.status()).toBe(202)
+
+  // The overview polls the site every 5 seconds and swaps in the dashboard.
+  await expect(page.getByText(`No data for ${domain} yet`)).toBeHidden({
+    timeout: 15_000,
+  })
+  await expect(page.getByText("Visitors").first()).toBeVisible()
+})

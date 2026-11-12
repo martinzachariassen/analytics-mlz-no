@@ -7,6 +7,9 @@ All notable changes are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Onboarding: a site that has never received an event shows "Waiting for the first event…" with its snippet and troubleshooting tips instead of empty charts, and switches to the dashboard by itself (with a "First event received" toast) when the first event arrives. Settings shows the same status and when the last event arrived; the site list shows "Waiting for first event" instead of an empty trend.
+- API: sites have `first_event_at` and `last_event_at` (oldest and newest stored events, `null` before the first one).
+- `docs/decisions.md` has a "Next" section with the product roadmap.
 - Documentation reorganised around reader needs: a start page with reading paths (`docs/README.md`), guides, reference (API, configuration, CLI), an operations runbook, and development guides. Every page starts with a TL;DR.
 - `ARCHITECTURE.md`: a page view end to end, where the data lives (replica and backups), and the server's handler chain. `docs/decisions.md` lists what must be settled before 1.0; `SECURITY.md` covers the supply chain.
 - Terraform: an alert (`alert_email`) when the server logs an error, at most one email per hour. `docs/operations/runbook.md` lists useful Logs Explorer filters.

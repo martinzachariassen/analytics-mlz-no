@@ -141,6 +141,25 @@ dot (`localhost` and `*.localhost` excepted), so a bare TLD cannot match every s
 Names are trimmed to 100 characters. Site creation, changes, deletion and purges are logged with
 the signed-in user.
 
+Every site object (list, get, create, update) has this shape:
+
+```json
+{
+  "id": "k3m9x2p7q4rt",
+  "name": "mlz.no",
+  "domain": "mlz.no",
+  "created_at": "2026-11-01T09:00:00Z",
+  "first_event_at": "2026-11-01T09:04:12.345Z",
+  "last_event_at": "2026-11-12T17:58:03.120Z"
+}
+```
+
+`first_event_at` and `last_event_at` are the oldest and newest **stored** events, and both are
+`null` until the first event arrives. The dashboard shows onboarding instead of charts while
+`first_event_at` is `null`. They are read fresh on every request (two index lookups), so polling
+`GET /api/sites/{id}` is the way to notice the first event. Purges and `RETENTION_DAYS` move
+`first_event_at` forward; deleting every event makes both `null` again.
+
 ## Cleaning up spam
 
 `POST /api/sites/{id}/purge` with `{"from": "2026-11-01T00:00:00Z", "to": "2026-11-02T00:00:00Z", "path": "/optional"}`

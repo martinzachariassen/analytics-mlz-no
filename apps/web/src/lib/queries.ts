@@ -2,6 +2,24 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query"
 
 import { api, type Dimension, type Interval, type Scope } from "@/lib/api"
 
+/** How often a site without data is re-fetched to notice its first event. */
+export const WAITING_POLL_MS = 5_000
+
+/**
+ * One site. While it has never received an event, it is polled so onboarding moves on
+ * by itself the moment the first event is stored.
+ */
+export function useSite(siteId: string) {
+  return useQuery({
+    queryKey: ["site", siteId],
+    queryFn: () => api.site(siteId),
+    refetchInterval: (q) =>
+      q.state.data && q.state.data.first_event_at === null
+        ? WAITING_POLL_MS
+        : false,
+  })
+}
+
 export function useStats(
   siteId: string,
   scope: Scope,

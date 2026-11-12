@@ -52,11 +52,14 @@ resource "google_service_account" "deploy" {
   display_name = "analytics deploys from GitHub Actions"
 }
 
+# Bound to the repository attribute, not the subject: the `sub` claim's format depends on the
+# repository's OIDC settings (immutable subjects add owner and repository ids), while the
+# provider's attribute_condition above already pins repository, ref and environment.
 resource "google_service_account_iam_member" "deploy_from_github" {
   count              = local.deploy_count
   service_account_id = google_service_account.deploy[0].name
   role               = "roles/iam.workloadIdentityUser"
-  member             = "principal://iam.googleapis.com/${google_iam_workload_identity_pool.github[0].name}/subject/repo:${var.github_repository}:environment:production"
+  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github[0].name}/attribute.repository/${var.github_repository}"
 }
 
 # What `make deploy-server` and `make deploy-web` need, and nothing more: push images, roll out

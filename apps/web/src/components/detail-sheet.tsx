@@ -118,7 +118,14 @@ function DetailBody({ d }: { d: Detail }) {
         </div>
       </SheetHeader>
 
-      {stats.isError && <ErrorNote error={stats.error} className="px-5" />}
+      {stats.isError && (
+        <ErrorNote
+          error={stats.error}
+          onRetry={stats.refetch}
+          retrying={stats.isFetching}
+          className="px-5"
+        />
+      )}
       <div className="grid grid-cols-3 gap-px border-b bg-border">
         {SHEET_METRICS.map((k) => {
           const m = METRIC[k]
@@ -202,7 +209,12 @@ function Related({
         {DIMS[dim].plural}
       </h3>
       {q.isError ? (
-        <ErrorNote error={q.error} className="py-2" />
+        <ErrorNote
+          error={q.error}
+          onRetry={q.refetch}
+          retrying={q.isFetching}
+          className="py-2"
+        />
       ) : (
         <BarList
           dim={dim}

@@ -61,7 +61,11 @@ export function SettingsPage() {
       {site.data ? (
         <GeneralForm key={site.data.id} site={site.data} />
       ) : site.isError ? (
-        <ErrorNote error={site.error} />
+        <ErrorNote
+          error={site.error}
+          onRetry={site.refetch}
+          retrying={site.isFetching}
+        />
       ) : (
         <Skeleton className="h-56" />
       )}

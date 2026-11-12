@@ -27,7 +27,13 @@ export function RealtimePage() {
 
   return (
     <div className="flex flex-col gap-3 lg:gap-4">
-      {rt.isError && <ErrorNote error={rt.error} />}
+      {rt.isError && (
+        <ErrorNote
+          error={rt.error}
+          onRetry={rt.refetch}
+          retrying={rt.isFetching}
+        />
+      )}
       <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-3">
         <Stat
           label="Visitors now"

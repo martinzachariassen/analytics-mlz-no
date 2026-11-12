@@ -4,6 +4,7 @@ import { Navigate, Outlet, useLocation } from "react-router"
 
 import { AppSidebar } from "@/components/app-sidebar"
 import { CommandMenu } from "@/components/command-menu"
+import { ErrorNote } from "@/components/error-note"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ApiError, api } from "@/lib/api"
@@ -33,9 +34,12 @@ export function AppLayout() {
   }
   if (me.isError) {
     return (
-      <p className="p-6 text-destructive">
-        Could not reach the server: {me.error.message}
-      </p>
+      <ErrorNote
+        error={me.error}
+        onRetry={me.refetch}
+        retrying={me.isFetching}
+        className="p-6"
+      />
     )
   }
 

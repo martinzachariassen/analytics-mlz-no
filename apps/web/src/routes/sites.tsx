@@ -37,7 +37,13 @@ export function SitesPage() {
             ))}
           </div>
         )}
-        {sites.isError && <ErrorNote error={sites.error} />}
+        {sites.isError && (
+          <ErrorNote
+            error={sites.error}
+            onRetry={sites.refetch}
+            retrying={sites.isFetching}
+          />
+        )}
         {count === 0 && (
           <div className="flex flex-col items-start gap-4 rounded-lg border border-dashed px-6 py-14 sm:px-10">
             <p className="display text-2xl">No sites yet</p>

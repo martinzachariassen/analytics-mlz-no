@@ -15,6 +15,8 @@ All notable changes are documented here. The format follows
 - `analytics sessions revoke [-user LOGIN]` signs dashboard users out everywhere.
 - Terraform: `require_replica` (see Fixed), labels on every resource, lock files for Linux and macOS, `terraform_version < 2.0`, and an outputs table plus a restore playbook (`docs/guides/deploy-gcp.md`, `docs/operations/runbook.md`). The Docker image records which DB-IP month it carries in `/usr/share/geoip/VERSION`.
 - Dashboard tests: component tests (Testing Library, happy-dom) for the filter bar, date range picker, detail sheet and error note, and Playwright end-to-end tests against a seeded server on desktop, mobile and the light theme, with an axe accessibility scan on every page. They run as the new `e2e` group of `scripts/verify.sh` and a CI job that uploads traces on failure.
+- Dashboard: every error message has a "Try again" button that refetches only what failed. The overview and the "could not reach the server" page now use the same error message as the other views.
+- Dashboard: gzipped size budgets for the production build (entry script, CSS, largest lazy chunk, all JavaScript), checked by `bun run check-size` in the `web` verify group. TypeScript also checks `noUncheckedIndexedAccess`.
 
 ### Security
 - Built with Go 1.27.4, which fixes a vulnerability in `net/http` ([GO-2026-6859](https://pkg.go.dev/vuln/GO-2026-6859)).

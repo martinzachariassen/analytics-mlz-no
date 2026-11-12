@@ -108,8 +108,20 @@ export function ReportPage({ report }: { report: keyof typeof REPORTS }) {
   return (
     <div className="flex flex-col gap-3 lg:gap-4">
       <KpiStrip stats={stats.data} now={stats.dataUpdatedAt} />
-      {stats.isError && <ErrorNote error={stats.error} />}
-      {rows.isError && !stats.isError && <ErrorNote error={rows.error} />}
+      {stats.isError && (
+        <ErrorNote
+          error={stats.error}
+          onRetry={stats.refetch}
+          retrying={stats.isFetching}
+        />
+      )}
+      {rows.isError && !stats.isError && (
+        <ErrorNote
+          error={rows.error}
+          onRetry={rows.refetch}
+          retrying={rows.isFetching}
+        />
+      )}
       {cfg.extra === "map" && (
         <Panel
           title="Visitor map"
@@ -171,8 +183,20 @@ export function EventsPage() {
   return (
     <div className="flex flex-col gap-3 lg:gap-4">
       <KpiStrip stats={stats.data} now={stats.dataUpdatedAt} />
-      {stats.isError && <ErrorNote error={stats.error} />}
-      {events.isError && !stats.isError && <ErrorNote error={events.error} />}
+      {stats.isError && (
+        <ErrorNote
+          error={stats.error}
+          onRetry={stats.refetch}
+          retrying={stats.isFetching}
+        />
+      )}
+      {events.isError && !stats.isError && (
+        <ErrorNote
+          error={events.error}
+          onRetry={events.refetch}
+          retrying={events.isFetching}
+        />
+      )}
       <Panel
         title="Top events over time"
         description="Visitors who triggered each event"
@@ -251,7 +275,11 @@ function Properties({
       }
     >
       {keys.isError || values.isError ? (
-        <ErrorNote error={keys.error ?? values.error} />
+        <ErrorNote
+          error={keys.error ?? values.error}
+          onRetry={() => (keys.isError ? keys.refetch() : values.refetch())}
+          retrying={keys.isFetching || values.isFetching}
+        />
       ) : keys.data && keys.data.length === 0 ? (
         <p className="py-10 text-center text-xs text-fg-muted">
           This event has no properties.

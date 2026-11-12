@@ -24,6 +24,15 @@ Packages come from `bun install` at the repository root (one Bun workspace for `
 `apps/tracker`). Formatting and linting is Biome (`biome.json` at the root); `make format` fixes
 both TypeScript and Go.
 
+TypeScript runs in strict mode with `noUncheckedIndexedAccess`: `rows[0]` is `Row | undefined`,
+so handle the empty case instead of asserting it away with `!`.
+
+**Size budget.** After the production build, `bun run check-size` (`check-size.mjs`, part of
+the `web` verify group) fails when gzipped output grows past its budget: the entry script
+160 KB, CSS 25 KB, any lazy chunk 125 KB, all JavaScript 450 KB. Keep heavy libraries in lazy
+routes or `lazy()` components (charts and the world map already are). If a budget has to grow,
+raise it in `check-size.mjs` and say why in the PR.
+
 The Vite dev server proxies `/api` to `http://localhost:8080` (override with `API_PROXY`). In
 production, Firebase Hosting does the same rewrite, so the dashboard always calls the API on its
 own origin. That is required for the `__session` cookie and the CSRF model.
@@ -115,8 +124,10 @@ Filters beyond `MAX_FILTERS` (10, the API's limit) are dropped instead of turnin
 - `useStats(siteId, scope, interval)` and `useBreakdown(siteId, scope, dim, opts)` in
   `lib/queries.ts`. The query key includes the whole scope, so changing a filter refetches.
   `placeholderData: keepPreviousData` keeps the old numbers on screen while new ones load.
-- Defaults in `main.tsx`: `staleTime` 30 s, two retries for network and `5xx` errors, none for
-  `4xx`. A `401` from any query re-checks `/api/auth/me`, which sends the user to sign-in.
+- Defaults in `main.tsx`: `staleTime` 30 s, two retries for network errors, `5xx` and `429`
+  (the rate limiter refills within a second), none for other `4xx` (`shouldRetry` in
+  `lib/api.ts`). A `401` from any query re-checks `/api/auth/me`, which sends the user to
+  sign-in.
 - Realtime refetches every 10 s, the sidebar's live counts every 15 s (`refetchInterval`).
 - Changes use `useMutation` around an `api.*` call and invalidate the affected queries on
   success (see `components/add-site-dialog.tsx`).
@@ -128,7 +139,14 @@ by `MutationCache.onError` the same way as for queries.
 
 **Error states.** A failed query shows `<ErrorNote>` (`components/error-note.tsx`) with the
 message, never a skeleton that loads forever. Use it in every new view: check `isError` before
-`isPending`.
+`isPending`, and pass the query's `refetch` and `isFetching` so the user gets a "Try again"
+button:
+
+```tsx
+{q.isError && (
+  <ErrorNote error={q.error} onRetry={q.refetch} retrying={q.isFetching} />
+)}
+```
 
 ## App primitives
 

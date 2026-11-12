@@ -1,5 +1,13 @@
 # Privacy
 
+> **TL;DR** — No cookies on tracked sites, no IP addresses, no raw user agents. Each event keeps
+> only the path, referrer host, UTM tags, country, browser, OS, device type and an anonymous
+> visitor id. That id is a hash with a salt that is replaced and deleted every day, so a person
+> cannot be followed from one day to the next.
+
+**Read this if:** you need to answer a privacy question, write a privacy notice, or change what
+is stored (then update this page in the same pull request).
+
 The goal is to answer "how many people read what" without being able to follow an individual.
 This page describes exactly what the server stores. Each statement below is enforced in code;
 the file in parentheses is where to check it.
@@ -7,7 +15,7 @@ the file in parentheses is where to check it.
 ## No cookies, no client-side storage
 
 The tracking script sets no cookies and does not use `localStorage` to identify visitors. The only
-thing it reads from `localStorage` is the opt-out key `mlz_ignore` (see the README). The dashboard
+thing it reads from `localStorage` is the opt-out key `mlz_ignore` (see [tracking.md](guides/tracking.md#excluding-your-own-visits)). The dashboard
 uses one session cookie, `__session`, for signed-in users only.
 
 ## What is stored for each event
@@ -60,7 +68,7 @@ contain the salt table as it was at that time, so keep backups as access-control
 ## Bots
 
 Requests from known crawlers and automation are dropped before anything is stored. See
-[BOTS.md](BOTS.md) for what is filtered, how floods are limited and what cannot be stopped.
+[bots.md](operations/bots.md) for what is filtered, how floods are limited and what cannot be stopped.
 
 ## Custom events: your responsibility
 

@@ -39,7 +39,7 @@ variable "extra_domains" {
 }
 
 variable "github_client_id" {
-  description = "GitHub OAuth App client id (not secret). The client secret goes in Secret Manager, see docs/DEPLOY.md."
+  description = "GitHub OAuth App client id (not secret). The client secret goes in Secret Manager, see docs/guides/deploy-gcp.md."
   type        = string
   default     = ""
 }
@@ -57,7 +57,7 @@ variable "retention_days" {
 }
 
 variable "proxy_hops" {
-  description = "Trusted proxies in front of the server. Firebase Hosting -> Cloud Run is expected to be 2; verify after deploy (docs/DEPLOY.md)."
+  description = "Trusted proxies in front of the server. Firebase Hosting -> Cloud Run is expected to be 2; verify after deploy (docs/reference/configuration.md)."
   type        = number
   default     = 2
 }

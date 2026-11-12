@@ -10,7 +10,7 @@ an issue first if you are unsure whether something fits.
 
 ## Setup
 
-Every tool (Go, Bun, Node, Terraform, golangci-lint, shellcheck, hadolint, actionlint, tflint) is
+Every tool (Go, Bun, Node, Terraform, golangci-lint, shellcheck, hadolint, actionlint) is
 pinned in [`mise.toml`](mise.toml), so one command installs them all. You also need Python 3
 (serves the demo site) and, optionally, Docker.
 

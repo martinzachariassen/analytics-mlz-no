@@ -99,7 +99,7 @@ func (s *Store) CreateSession(ctx context.Context, tokenHash []byte, userID int6
 func (s *Store) UserBySession(ctx context.Context, tokenHash []byte, now time.Time) (User, time.Time, error) {
 	var u User
 	var expires int64
-	err := s.db.QueryRowContext(ctx,
+	err := s.rdb.QueryRowContext(ctx,
 		`SELECT u.id, u.provider, u.provider_id, u.login, s.expires_at FROM sessions s
 		 JOIN users u ON u.id = s.user_id
 		 WHERE s.token_hash = ? AND s.expires_at > ?`, tokenHash, now.UnixMilli()).

@@ -36,7 +36,7 @@ func (s *Store) Summary(ctx context.Context, siteID string, r Range, f Filters) 
 	sc := scope{site: siteID, r: r, filters: f}
 
 	where, args := sc.rows(false)
-	err := s.db.QueryRowContext(ctx,
+	err := s.rdb.QueryRowContext(ctx,
 		`SELECT COALESCE(SUM(type = 'pageview'), 0), COUNT(DISTINCT visitor_id)
 		 FROM events WHERE `+where, args...).Scan(&out.Pageviews, &out.Visitors)
 	if err != nil {
@@ -46,7 +46,7 @@ func (s *Store) Summary(ctx context.Context, siteID string, r Range, f Filters) 
 	var bounces int64
 	var avgMs float64
 	where, args = sc.rows(true)
-	err = s.db.QueryRowContext(ctx,
+	err = s.rdb.QueryRowContext(ctx,
 		`SELECT COUNT(*), COALESCE(SUM(pv <= 1), 0), COALESCE(AVG(dur), 0) FROM (`+visitsSQL(where)+`)`,
 		args...).Scan(&out.Visits, &bounces, &avgMs)
 	if err != nil {
@@ -93,7 +93,7 @@ func (s *Store) Timeseries(ctx context.Context, siteID string, bounds []time.Tim
 	// Page views and visitors: one index range scan per bucket.
 	where, wargs := sc.rowsOf("ev", false)
 	// #nosec G202 -- only "(?, ?, ?)" placeholders are concatenated.
-	rows, err := s.db.QueryContext(ctx,
+	rows, err := s.rdb.QueryContext(ctx,
 		`WITH b(i, s, e) AS (VALUES `+strings.Join(values, ", ")+`)
 		SELECT b.i, COALESCE(SUM(ev.type = 'pageview'), 0), COUNT(DISTINCT ev.visitor_id)
 		FROM b LEFT JOIN events ev ON ev.ts >= b.s AND ev.ts < b.e AND `+where+`
@@ -119,7 +119,7 @@ func (s *Store) Timeseries(ctx context.Context, siteID string, bounds []time.Tim
 	// Visits: one row per visit, placed in the bucket in which it started.
 	where, wargs = sc.rows(true)
 	// #nosec G202 -- where, col and keep are built from whitelisted columns; values are placeholders.
-	rows, err = s.db.QueryContext(ctx, `SELECT start, pv, dur FROM (`+visitsSQL(where)+`)`, wargs...)
+	rows, err = s.rdb.QueryContext(ctx, `SELECT start, pv, dur FROM (`+visitsSQL(where)+`)`, wargs...)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +258,7 @@ func (s *Store) Breakdown(ctx context.Context, siteID string, r Range, dim strin
 	query += ` ORDER BY 2 DESC, 3 DESC, 1 LIMIT ?`
 	args = append(args, limit)
 
-	rows, err := s.db.QueryContext(ctx, query, args...)
+	rows, err := s.rdb.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +310,7 @@ func (s *Store) VisitMetrics(ctx context.Context, siteID string, r Range, dim st
 	// One pass: window functions give every row its visit's page views and
 	// duration, then each (visit, value) pair is counted once.
 	// #nosec G202 -- where, col and keep are built from whitelisted columns; values are placeholders.
-	q, err := s.db.QueryContext(ctx,
+	q, err := s.rdb.QueryContext(ctx,
 		`SELECT value, COUNT(*), COALESCE(SUM(pv <= 1), 0), COALESCE(AVG(dur), 0) FROM (
 		   SELECT DISTINCT session_id, value, pv, dur FROM (
 		     SELECT session_id, `+col+` AS value, (`+keep+`) AS keep,
@@ -367,7 +367,7 @@ func (s *Store) Histogram(ctx context.Context, siteID string, r Range, f Filters
 	where, args := scope{site: siteID, r: r, filters: f}.rows(false)
 	from := r.From.UnixMilli()
 	// #nosec G202 -- where, col and keep are built from whitelisted columns; values are placeholders.
-	rows, err := s.db.QueryContext(ctx,
+	rows, err := s.rdb.QueryContext(ctx,
 		`SELECT (ts - ?) / ?, COUNT(DISTINCT visitor_id), COALESCE(SUM(type = 'pageview'), 0)
 		 FROM events WHERE `+where+` GROUP BY 1 ORDER BY 1`,
 		append([]any{from, ms}, args...)...)
@@ -392,7 +392,7 @@ func (s *Store) Histogram(ctx context.Context, siteID string, r Range, f Filters
 // CurrentVisitors counts distinct visitors with activity since t.
 func (s *Store) CurrentVisitors(ctx context.Context, siteID string, since time.Time) (int64, error) {
 	var n int64
-	err := s.db.QueryRowContext(ctx,
+	err := s.rdb.QueryRowContext(ctx,
 		`SELECT COUNT(DISTINCT visitor_id) FROM events WHERE site_id = ? AND ts >= ?`,
 		siteID, since.UnixMilli()).Scan(&n)
 	return n, err

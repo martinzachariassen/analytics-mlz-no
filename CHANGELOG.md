@@ -44,6 +44,7 @@ All notable changes are documented here. The format follows
 - Tracker: nothing the script does can throw into the host page; a failure to send is swallowed.
 
 ### Fixed
+- Ingestion no longer drops events with `503` while the dashboard loads a long period: statistics run on a separate read-only SQLite connection pool, and writes have a connection of their own. Health checks use the read pool, so a busy writer does not fail them.
 - Terraform: `public_url` was `https://https://<site>.web.app` when `domain` was empty, which broke the OAuth callback for installs without a custom domain.
 - A lost Litestream replica was invisible: the next cold start began with an empty database and replicated that over the bucket, while the backup job kept succeeding on nothing. `require_replica = true` (`REQUIRE_REPLICA=1`, `BACKUP_EXPECT_DATA=1`) makes an empty replica a startup failure and a failed backup, and a new alert fires on Litestream errors and empty restores (`infra/docker/test-restore.sh` checks that the log lines it matches still exist). `docs/operations/runbook.md` has a restore playbook, and the Terraform variable `replica_path` points the service and the backup job at a freshly seeded replica without a code change.
 - The uptime check fetched `/api/script.js`, which the CDN caches for an hour, so it could pass while Cloud Run was down. It now expects a `401` from the uncached `/api/auth/me`. Cloud Run gets a liveness probe, so a hung instance is replaced.

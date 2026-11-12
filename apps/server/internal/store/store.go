@@ -21,10 +21,20 @@ import (
 var migrationsFS embed.FS
 
 // Store is the application's data access layer.
+//
+// It holds two connection pools. db is the only one that writes: one connection, because
+// SQLite has one writer and more connections only queue on its lock. rdb is read-only and
+// serves statistics and lookups, so slow dashboard queries never hold the connection an
+// incoming event needs. WAL mode lets the readers run while the writer commits.
 type Store struct {
 	db    *sql.DB
+	rdb   *sql.DB
 	sites siteCache
 }
+
+// readConns is how many read queries run at once. Each dashboard view sends a handful in
+// parallel; more would only compete for the same CPU.
+const readConns = 4
 
 // Open opens (or creates) the SQLite database at path and applies pending migrations.
 func Open(ctx context.Context, path string) (*Store, error) {
@@ -34,52 +44,73 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		}
 	}
 
-	q := url.Values{}
-	q.Add("_pragma", "journal_mode(WAL)")
-	q.Add("_pragma", "busy_timeout(5000)")
-	q.Add("_pragma", "foreign_keys(1)")
-	q.Add("_pragma", "synchronous(NORMAL)")
-	q.Set("_txlock", "immediate")
-	dsn := "file:" + path + "?" + q.Encode()
-
-	db, err := sql.Open("sqlite", dsn)
+	w := url.Values{}
+	w.Add("_pragma", "journal_mode(WAL)")
+	w.Add("_pragma", "busy_timeout(5000)")
+	w.Add("_pragma", "foreign_keys(1)")
+	w.Add("_pragma", "synchronous(NORMAL)")
+	w.Set("_txlock", "immediate")
+	db, err := openPool(ctx, "file:"+path+"?"+w.Encode(), 1)
 	if err != nil {
 		return nil, err
 	}
-	if path == ":memory:" {
-		// Each connection to :memory: is a separate database.
-		db.SetMaxOpenConns(1)
-	} else {
-		db.SetMaxOpenConns(4)
-	}
-	if err := db.PingContext(ctx); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("open database: %w", err)
-	}
 
-	s := &Store{db: db}
+	s := &Store{db: db, rdb: db}
 	if err := s.migrate(ctx); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
+	// Each connection to :memory: is a separate database, so it has to share the writer.
+	if path == ":memory:" {
+		return s, nil
+	}
+
+	// Opened after the migrations, so the file exists and is already in WAL mode.
+	r := url.Values{}
+	r.Add("_pragma", "busy_timeout(5000)")
+	r.Add("_pragma", "query_only(1)")
+	if s.rdb, err = openPool(ctx, "file:"+path+"?"+r.Encode(), readConns); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
 	return s, nil
+}
+
+func openPool(ctx context.Context, dsn string, conns int) (*sql.DB, error) {
+	db, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		return nil, err
+	}
+	db.SetMaxOpenConns(conns)
+	db.SetMaxIdleConns(conns)
+	if err := db.PingContext(ctx); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("open database: %w", err)
+	}
+	return db, nil
 }
 
 // Size returns the bytes in use by the database: pages holding data, excluding free pages
 // (so it drops right after deleting events, without a VACUUM) and the WAL.
 func (s *Store) Size(ctx context.Context) (int64, error) {
 	var n int64
-	err := s.db.QueryRowContext(ctx,
+	err := s.rdb.QueryRowContext(ctx,
 		`SELECT (page_count - freelist_count) * page_size
 		 FROM pragma_page_count(), pragma_freelist_count(), pragma_page_size()`).Scan(&n)
 	return n, err
 }
 
 // Close closes the database.
-func (s *Store) Close() error { return s.db.Close() }
+func (s *Store) Close() error {
+	if s.rdb != s.db {
+		_ = s.rdb.Close()
+	}
+	return s.db.Close()
+}
 
 // Ping checks database connectivity.
-func (s *Store) Ping(ctx context.Context) error { return s.db.PingContext(ctx) }
+// It uses the read pool, so a busy writer does not fail health checks.
+func (s *Store) Ping(ctx context.Context) error { return s.rdb.PingContext(ctx) }
 
 func (s *Store) migrate(ctx context.Context) error {
 	if _, err := s.db.ExecContext(ctx,

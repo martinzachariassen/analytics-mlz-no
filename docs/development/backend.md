@@ -121,8 +121,14 @@ with `-race`, as CI does.
 <details>
 <summary>Advanced: performance and SQLite</summary>
 
-- The database is opened in WAL mode (`store.Open`). SQLite allows one writer at a time, so concurrent inserts wait on SQLite's lock,
-  so `ingest` limits them to 32 write slots and returns `503` after waiting 2 seconds.
+- The database is opened in WAL mode (`store.Open`) with two connection pools. All writes go
+  through the write pool, which has one connection because SQLite allows one writer at a time.
+  Statistics and lookups use a read-only pool (`query_only`, `readConns` connections), so a
+  slow dashboard query never holds the connection an incoming event needs. A new store method
+  that only reads uses `s.rdb`; anything that writes, or reads inside a write transaction,
+  uses `s.db`.
+- Concurrent inserts queue for the write connection, so `ingest` limits them to 32 write slots
+  and returns `503` after waiting 2 seconds.
 - Stats are computed from raw rows. Visit metrics group by `session_id`. If a query gets slow,
   check the indexes in the migrations before adding caching.
 - `go run ./apps/server/cmd/loadtest` sends synthetic events to a running server. Use it to see

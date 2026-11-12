@@ -61,7 +61,7 @@ func normalizeGoal(kind, value string) (string, error) {
 
 // ListGoals returns a site's goals, oldest first.
 func (s *Store) ListGoals(ctx context.Context, siteID string) ([]Goal, error) {
-	rows, err := s.db.QueryContext(ctx,
+	rows, err := s.rdb.QueryContext(ctx,
 		`SELECT id, site_id, kind, value, created_at FROM goals WHERE site_id = ? ORDER BY id`, siteID)
 	if err != nil {
 		return nil, err
@@ -171,7 +171,7 @@ func (s *Store) GoalStats(ctx context.Context, siteID string, r Range, f Filters
 		dest = append(dest, &out.Goals[i].Visitors, &out.Goals[i].Completions)
 	}
 	query, args := goalStatsSQL(siteID, r, f, goals)
-	err := s.db.QueryRowContext(ctx, query, args...).Scan(dest...)
+	err := s.rdb.QueryRowContext(ctx, query, args...).Scan(dest...)
 	return out, err
 }
 

@@ -159,7 +159,7 @@ func (s *Store) GetSite(ctx context.Context, id string) (Site, error) {
 func (s *Store) getSite(ctx context.Context, id string) (Site, error) {
 	var site Site
 	var created int64
-	err := s.db.QueryRowContext(ctx,
+	err := s.rdb.QueryRowContext(ctx,
 		`SELECT id, name, domain, created_at FROM sites WHERE id = ?`, id).
 		Scan(&site.ID, &site.Name, &site.Domain, &created)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -174,7 +174,7 @@ func (s *Store) getSite(ctx context.Context, id string) (Site, error) {
 
 // ListSites returns all sites ordered by name.
 func (s *Store) ListSites(ctx context.Context) ([]Site, error) {
-	rows, err := s.db.QueryContext(ctx,
+	rows, err := s.rdb.QueryContext(ctx,
 		`SELECT id, name, domain, created_at FROM sites ORDER BY name`)
 	if err != nil {
 		return nil, err
@@ -216,7 +216,7 @@ const allSiteActivitySQL = `SELECT id,
 // SiteActivity returns the site's Activity.
 func (s *Store) SiteActivity(ctx context.Context, siteID string) (Activity, error) {
 	var first, last sql.NullInt64
-	err := s.db.QueryRowContext(ctx, siteActivitySQL, siteID).Scan(&first, &last)
+	err := s.rdb.QueryRowContext(ctx, siteActivitySQL, siteID).Scan(&first, &last)
 	if err != nil {
 		return Activity{}, err
 	}
@@ -225,7 +225,7 @@ func (s *Store) SiteActivity(ctx context.Context, siteID string) (Activity, erro
 
 // AllSiteActivity returns the Activity of every site, keyed by site id.
 func (s *Store) AllSiteActivity(ctx context.Context) (map[string]Activity, error) {
-	rows, err := s.db.QueryContext(ctx, allSiteActivitySQL)
+	rows, err := s.rdb.QueryContext(ctx, allSiteActivitySQL)
 	if err != nil {
 		return nil, err
 	}

@@ -1,10 +1,30 @@
 # Deploying to Google Cloud
 
-This sets up the production layout from `docs/PLAN.md`. The dashboard runs on Firebase Hosting, and Firebase rewrites `/api/**` to a single Cloud Run instance, so the dashboard, API and tracking script share one origin. SQLite lives on the instance and Litestream replicates it to a GCS bucket.
+> **TL;DR** — Two Terraform stacks (`bootstrap`, then `main`), one secret, DNS records, then
+> `make deploy`. You end up with the dashboard on Firebase Hosting, the API on one Cloud Run
+> instance, and SQLite replicated to GCS. It costs about $1 a month for personal traffic.
+> Time: about an hour, mostly waiting for DNS and certificates.
 
-For personal traffic this stays inside the free tiers. The only steady cost is Litestream's writes to GCS, which come to roughly $1 a month. The hourly and daily backups add a few cents.
+**Read this if:** you want the same production setup as `analytics.mlz.no`. Self-hosting without
+GCP? See [self-hosting.md](self-hosting.md). Day-to-day operations after the deploy are in the
+[runbook](../operations/runbook.md).
 
-Self-hosting without GCP? Use `docker compose -f infra/docker/docker-compose.yml up --build` instead (see the README).
+```mermaid
+flowchart LR
+  browser[Visitor's browser] -->|script.js, POST /api/event| fh[Firebase Hosting<br/>analytics.example.com]
+  you[You] -->|dashboard| fh
+  fh -->|"/api/** rewrite"| run[Cloud Run<br/>1 instance, SQLite]
+  run -->|Litestream| db[(GCS bucket<br/>project-db)]
+  job[Cloud Run Job<br/>analytics-backup] -->|hourly + daily| bk[(GCS bucket<br/>project-backups)]
+  db --> job
+```
+
+The dashboard runs on Firebase Hosting, and Firebase rewrites `/api/**` to a single Cloud Run
+instance, so the dashboard, API and tracking script share one origin. SQLite lives on the instance
+and Litestream replicates it to a GCS bucket. The reasons are in [decisions.md](../decisions.md).
+
+For personal traffic this stays inside the free tiers. The only steady cost is Litestream's writes
+to GCS, which come to roughly $1 a month. The hourly and daily backups add a few cents.
 
 ## Prerequisites
 
@@ -85,13 +105,7 @@ On other systems, run `gcloud secrets versions add github-client-secret --data-f
 
 Avoid a trailing newline, because it becomes part of the secret. Cloud Run reads `latest`, so the new version is used from the next deploy or cold start.
 
-**Rotating the secret.** If the secret leaks or you want a new one: in GitHub, open the OAuth App
-(Settings, Developer settings), choose *Generate a new client secret*, add it with the command above
-(it becomes the new `latest` version), then run `make deploy`. The new revision reads `latest` at startup.
-
-Check that sign-in works, then delete the old secret in GitHub and disable the old version with
-`gcloud secrets versions disable <n> --secret github-client-secret --project <project_id>`.
-Sessions are not affected.
+To rotate the secret later, see the [runbook](../operations/runbook.md#rotate-the-github-client-secret).
 
 ## 4. DNS
 
@@ -144,62 +158,32 @@ The logs should show Litestream either restoring from the bucket or reporting "n
 
 Then sign in at `https://<domain>`, add a site and embed the tracking snippet shown in the dashboard. If you use an extra domain for the script, replace the host in the snippet with it.
 
-**`PROXY_HOPS`.** The server takes the client IP from `X-Forwarded-For`, skipping `PROXY_HOPS` trusted proxies from the right. Firebase Hosting → Cloud Run is expected to be 2. If countries show up wrong, or every visitor looks the same, check the header Cloud Run receives and adjust `proxy_hops` in `terraform.tfvars`.
+**Check `PROXY_HOPS`.** Firebase Hosting → Cloud Run is expected to be 2. Visit a tracked site
+yourself and check that the realtime view shows your country. If countries are wrong or every
+visitor looks the same, follow the
+[runbook](../operations/runbook.md#wrong-countries-or-every-visitor-looks-the-same).
 
-The service must also be reachable on its `run.app` URL, because Firebase Hosting rewrites go
-through it (disabling the default URL breaks them). A request sent there directly can forge
-`X-Forwarded-For`. The server therefore also rate-limits by the address Cloud Run itself saw
-(the rightmost entry), which cannot be forged.
+<details>
+<summary>Why the <code>run.app</code> URL stays public</summary>
 
-**Abuse limits.** `ingest_rate_limit` (default 50 events/s) and `max_database_mb` (default 200)
-bound how fast and how far a flood can grow the database, which on Cloud Run lives in the
-instance's 512 MiB of memory. Set `alert_email` to be told about memory pressure, load
-shedding, failed backups and (with `domain` set) downtime: an uptime check fetches
-`/api/script.js` through the public hostname every five minutes. To remove spam afterwards, call `POST /api/sites/{id}/purge` while signed in (see
-docs/API.md), since Cloud Run has no shell for `analytics events purge`.
+The service must stay reachable on its `run.app` URL, because Firebase Hosting rewrites go through
+it (disabling the default URL breaks them). A request sent there directly can forge
+`X-Forwarded-For`. The server therefore also rate-limits by the address Cloud Run itself saw (the
+rightmost entry), which cannot be forged.
+</details>
 
-## Operations
+**Abuse limits and alerts.** `ingest_rate_limit` (default 50 events/s) and `max_database_mb`
+(default 200) bound how fast and how far a flood can grow the database, which on Cloud Run lives in
+the instance's 512 MiB of memory. Set `alert_email` to be told about memory pressure, load
+shedding, failed backups, server errors and (with `domain` set) downtime.
 
-- **Dashboard:** `terraform output dashboard_url` opens the "Analytics" dashboard in Cloud
-  Monitoring: requests by status, latency, memory and CPU, instances, backup runs, uptime and
-  the server's warnings and errors. `terraform output logs_url` opens Logs Explorer on the
-  server's warnings and errors.
-- **Logs:** in the console under Cloud Run → `analytics` → *Logs*, or in
-  [Logs Explorer](https://console.cloud.google.com/logs/query) for search and filters. From a terminal:
-  `gcloud run services logs read analytics --region <region> --project <project_id>`
-  (or `gcloud beta run services logs tail …` to follow). The server writes JSON lines with
-  `severity` and `message`, so the usual filters work. Useful queries in Logs Explorer:
+The backup job (`analytics-backup`) uses a placeholder image after the first `terraform apply`, so
+it fails, and sends an alert, until the first `make deploy`.
 
-  | What | Filter |
-  |---|---|
-  | Server errors and warnings | `resource.type="cloud_run_revision" resource.labels.service_name="analytics" log_id("run.googleapis.com/stdout") severity>=WARNING` |
-  | Requests that failed (4xx/5xx) | `resource.type="cloud_run_revision" resource.labels.service_name="analytics" log_id("run.googleapis.com/requests") httpRequest.status>=400` |
-  | Sign-ins | `resource.type="cloud_run_revision" jsonPayload.message="signed in"` |
-  | Backup job | `resource.type="cloud_run_job" resource.labels.job_name="analytics-backup"` |
-  | Backup schedules | `resource.type="cloud_scheduler_job"` |
-  | Why events were rejected | `resource.type="cloud_run_revision" jsonPayload.message="event rejected"` |
+## After the deploy
 
-  A rejected event logs its `reason` (for example `missing origin`, `unknown site`), the status,
-  the Origin's hostname and the site id, never the IP address or user agent. Bad payloads log at
-  `INFO`. Rate limits, bots and load shedding log only at `DEBUG`, because a flood would
-  otherwise flood the logs too. To see them, run `terraform apply -var log_level=debug`, which
-  rolls out a new revision. Set it back to `info` when you are done.
-
-  Litestream's own lines (restore, replication) are plain text without a severity. With
-  `alert_email` set, any `ERROR` line from the server sends at most one email per hour.
-- **Backups:** the bucket `<project_id>-db` holds the Litestream replica. To restore it locally:
-  `litestream restore -o analytics.db gs://<project_id>-db/analytics`
-- **Standalone backups:** a Cloud Run Job (`analytics-backup`) restores the replica every hour and every day and writes a gzipped SQLite file to the separate bucket `<project_id>-backups` (`hourly/` is kept 3 days, `daily/` 90 days; see `backup_*_retention_days`). It reads the replica and never touches the running service. `make deploy` updates the job's image together with the service. After the first `terraform apply` the job uses a placeholder image, so it fails (and, with `alert_email`, sends an alert) until the first `make deploy`. To restore from a file:
-  `gcloud storage cp gs://<project_id>-backups/daily/<file>.db.gz . && gunzip <file>.db.gz`, then start the server with `DATABASE_PATH` pointing at it (with Litestream, remove the old replica first).
-- **Cost:** check the billing console. The budget alert emails at 50% and 90%, and at 100% of forecast spend.
-
-## Known trade-offs
-
-- **Scale to zero:** the first request after an idle period waits for a cold start (1–3 s, including the database restore). Events aren't lost, because the request waits.
-- **Replication between requests:** with request-based billing the instance has almost no CPU between requests, so Litestream can fall behind. If an instance dies without SIGTERM, the last seconds of events can be lost.
-- **Deploys:** Cloud Run briefly runs the old and new revision side by side. The new one restores from the replica while the old one still serves, so events from those few seconds can be lost. Deploy when traffic is quiet.
-- **What the backups cover:** the Litestream replica trails the live database by about a second; the hourly and daily files are full copies and survive damage to the replica. Together they lose at most the events from the two cases above. Older events are never lost, because every daily file contains all of them (with `retention_days = 0`).
-- **One instance:** `max_instance_count = 1`, because SQLite has a single writer. This handles far more than personal traffic needs.
+Monitoring, logs, backups, restoring, secret rotation, spam clean-up and known trade-offs are in the
+[runbook](../operations/runbook.md).
 
 ## Troubleshooting
 
@@ -212,3 +196,9 @@ docs/API.md), since Cloud Run has no shell for `analytics events purge`.
 | Sign-in fails with `redirect_uri` mismatch | The OAuth App's callback URL must be exactly `https://<domain>/api/auth/github/callback`. |
 | `Location 'europe-north1' is not a valid location` creating a Cloud Scheduler job | Cloud Scheduler is not available in every region. The backup schedules use `scheduler_region` (default `europe-west1`) and still trigger the job in `region`. |
 | `/healthz` returns 404 on the `run.app` URL | Cloud Run reserves paths ending in `z` on its public URL. The in-container startup probe still works. |
+
+## Next steps
+
+- [Runbook](../operations/runbook.md): what to check now and when something goes wrong
+- [Tracking your site](tracking.md)
+- [Configuration](../reference/configuration.md)

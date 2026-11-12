@@ -18,6 +18,9 @@ All notable changes are documented here. The format follows
 ### Fixed
 - Terraform: scheduled backups never ran. The scheduler's service account had `roles/run.invoker`, but the schedules pass `args` as an override, which needs `roles/run.jobsExecutorWithOverrides`. A new alert (`alert_email`) fires when no backup has succeeded for two hours.
 
+### Security
+- Built with Go 1.27.4, which fixes a vulnerability in `net/http` ([GO-2026-6859](https://pkg.go.dev/vuln/GO-2026-6859)).
+
 ## [0.1.0] - 2026-11-04
 
 ### Security

@@ -12,10 +12,11 @@ Releases are cut by pushing a version tag. The pipeline in `.github/workflows/re
 
 Code and docs are ready; these steps need real infrastructure and are not automated.
 
-- [ ] **Production domain** chosen and DNS pointed at Firebase Hosting ([deploy-gcp.md](../guides/deploy-gcp.md)).
-- [ ] **`PROXY_HOPS` verified** on Cloud Run behind Firebase Hosting. Log `X-Forwarded-For` for a
-      request, count the proxies, and confirm the stored country and visitor hash match your own
-      IP. A wrong value breaks rate limiting and visitor counting.
+- [x] **Production domain** chosen and DNS pointed at Firebase Hosting ([deploy-gcp.md](../guides/deploy-gcp.md)):
+      `analytics.mlz.no` and `t.mlz.no`.
+- [x] **`PROXY_HOPS` verified** on Cloud Run behind Firebase Hosting (`2`). Log `X-Forwarded-For`
+      for a request, count the proxies, and confirm the stored country and visitor hash match your
+      own IP. A wrong value breaks rate limiting and visitor counting.
 - [ ] **End-to-end smoke test in production:** GitHub sign-in works, the tracking script on a real
       page produces an event in the dashboard, and the Litestream restore log line appears after a
       redeploy.
@@ -24,14 +25,19 @@ Code and docs are ready; these steps need real infrastructure and are not automa
 - [ ] `CHANGELOG.md`: move "Unreleased" under the new version heading with today's date.
 - [ ] `main` is green in CI.
 
-Also settle the open item about the dashboard for self-hosters in
-[decisions.md](../decisions.md#open-items) before 1.0.
+Before 1.0, also settle the items in [decisions.md](../decisions.md#before-10), starting with the
+dashboard for self-hosters.
 
 ## Cutting a release
 
+Releases follow [Semantic Versioning](https://semver.org/). `CHANGELOG.md` is the source: move
+"Unreleased" under the new version heading with today's date, add the compare link, commit as
+`release: vX.Y.Z` on a `release/vX.Y.Z` branch and merge it through a pull request. Then tag the
+merge commit with an annotated tag:
+
 ```sh
 git checkout main && git pull
-git tag v0.1.0            # pre-release: v0.1.0-rc.1
+git tag -a v0.1.0 -m "v0.1.0"   # pre-release: v0.1.0-rc.1
 git push origin v0.1.0
 ```
 

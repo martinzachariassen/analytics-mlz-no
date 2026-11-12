@@ -12,7 +12,10 @@ Cloud, see [deploy-gcp.md](deploy-gcp.md).
 > **The dashboard is not in the server image yet.** The image serves the API, the tracking script
 > and event collection. The dashboard in `apps/web/` is a static single-page app, and it must be
 > served from the **same origin** as `/api` (production uses Firebase Hosting with a rewrite).
-> This will be settled before 1.0 (see [decisions.md](../decisions.md#open-items)).
+> If you serve `apps/web/dist` yourself, send headers equivalent to those in
+> `apps/web/firebase.json`: the server sets its own security headers for `/api`, but the
+> dashboard's Content-Security-Policy comes from whatever serves the static files.
+> This will be settled before 1.0 (see [decisions.md](../decisions.md#before-10)).
 
 ## 1. Install
 

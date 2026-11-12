@@ -8,6 +8,7 @@ All notable changes are documented here. The format follows
 
 ### Added
 - Documentation reorganised around reader needs: a start page with reading paths (`docs/README.md`), guides, reference (API, configuration, CLI), an operations runbook, and development guides. Every page starts with a TL;DR.
+- `ARCHITECTURE.md`: a page view end to end, where the data lives (replica and backups), and the server's handler chain. `docs/decisions.md` lists what must be settled before 1.0; `SECURITY.md` covers the supply chain.
 - Terraform: an alert (`alert_email`) when the server logs an error, at most one email per hour. `docs/operations/runbook.md` lists useful Logs Explorer filters.
 - `LOG_LEVEL` (`debug`, `info`, `warn`, `error`; Terraform `log_level`). Rejected events log why (`event rejected` with a `reason`, never the IP or user agent): bad payloads at `INFO`, rate limits, bots and load shedding at `DEBUG`.
 - Terraform: an "Analytics" operations dashboard in Cloud Monitoring (requests by status, latency, memory, CPU, instances, backups, uptime, server warnings). `terraform output dashboard_url` and `logs_url` link to it and to the logs.

@@ -102,9 +102,37 @@ describe("page views", () => {
     delete (document as { prerendering?: boolean }).prerendering;
   });
 
-  it("keeps the hash in hash mode", () => {
+  it("keeps the hash in hash mode and follows hashchange", () => {
     start({ ...base, hash: true });
     expect(sent[0]!.url).toBe("https://www.example.com/start?utm_source=newsletter#top");
+    window.happyDOM.setURL("https://www.example.com/start?utm_source=newsletter#/docs");
+    window.dispatchEvent(new Event("hashchange"));
+    expect(sent[1]!.url).toBe("https://www.example.com/start?utm_source=newsletter#/docs");
+  });
+
+  it("ignores hashchange outside hash mode", () => {
+    start(base);
+    window.happyDOM.setURL("https://www.example.com/start?utm_source=newsletter#other");
+    window.dispatchEvent(new Event("hashchange"));
+    expect(sent).toHaveLength(1);
+  });
+
+  it("tracks replaceState navigations (router redirects)", () => {
+    start(base);
+    history.replaceState({}, "", "/login");
+    history.replaceState({}, "", "/login"); // duplicate
+    expect(sent.map((p) => p.url)).toEqual(["https://www.example.com/start?utm_source=newsletter", "https://www.example.com/login"]);
+  });
+
+  it("counts a page restored from the back-forward cache again", () => {
+    const pageshow = (persisted: boolean) =>
+      Object.defineProperty(new Event("pageshow"), "persisted", { value: persisted });
+    start(base);
+    window.dispatchEvent(pageshow(false));
+    expect(sent).toHaveLength(1);
+    window.dispatchEvent(pageshow(true));
+    expect(sent).toHaveLength(2);
+    expect(sent[1]!.url).toBe(sent[0]!.url);
   });
 });
 
@@ -126,6 +154,26 @@ describe("sending", () => {
     vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new TypeError("offline"))));
     expect(() => start(base)).not.toThrow();
     await Promise.resolve(); // let the rejection settle; an unhandled one would fail the run
+  });
+
+  it("uses fetch when sendBeacon does not exist", () => {
+    Object.defineProperty(navigator, "sendBeacon", { configurable: true, value: undefined });
+    const fetch = vi.fn(() => Promise.resolve(new Response()));
+    vi.stubGlobal("fetch", fetch);
+    start(base);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("never throws into the page, even when sending fails synchronously", () => {
+    Object.defineProperty(navigator, "sendBeacon", {
+      configurable: true,
+      value: () => {
+        throw new TypeError("blocked by CSP");
+      },
+    });
+    const api = start(base);
+    expect(() => history.pushState({}, "", "/a")).not.toThrow();
+    expect(() => api.track("x", { cyclic: 1 })).not.toThrow();
   });
 });
 
@@ -170,6 +218,14 @@ describe("events", () => {
     ]);
   });
 
+  it("sends only the origin and path of an outbound link", () => {
+    document.body.innerHTML = `<a id="out" href="https://other.example/reset?token=secret#step-2">Reset</a>`;
+    start({ ...base, auto: false });
+    document.getElementById("out")!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    expect(sent[0]!.props).toEqual({ url: "https://other.example/reset" });
+    expect(JSON.stringify(sent)).not.toContain("secret");
+  });
+
   it("counts middle clicks but not other auxiliary clicks", () => {
     document.body.innerHTML = `<a id="out" href="https://github.com/x">GitHub</a>`;
     start({ ...base, auto: false });
@@ -201,6 +257,33 @@ describe("disabling", () => {
 
     start({ ...base, allowLocalhost: true });
     expect(sent).toHaveLength(1);
+  });
+
+  it("treats *.localhost, loopback addresses and file: as local", () => {
+    for (const url of ["http://app.localhost/", "http://127.0.0.2:8080/", "http://0.0.0.0/", "http://[::1]/", "file:///tmp/index.html"]) {
+      window.happyDOM.setURL(url);
+      start(base);
+    }
+    expect(sent).toHaveLength(0);
+    window.happyDOM.setURL("http://localhost.example.com/");
+    start(base);
+    expect(sent).toHaveLength(1);
+  });
+
+  it("tracks when localStorage is unavailable", () => {
+    const storage = Object.getOwnPropertyDescriptor(window, "localStorage")!;
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      get() {
+        throw new DOMException("denied", "SecurityError");
+      },
+    });
+    try {
+      start(base);
+      expect(sent).toHaveLength(1);
+    } finally {
+      Object.defineProperty(window, "localStorage", storage);
+    }
   });
 
   it("ignores automated browsers", () => {

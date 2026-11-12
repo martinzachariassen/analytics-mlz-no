@@ -43,11 +43,16 @@ export function init(cfg: Config): Api & { stop?(): void } {
 
   function send(p: Payload): void {
     if (disabled) return;
-    // A string body is sent as text/plain, a CORS-safelisted type: no preflight request is needed.
-    // undefined fields (name, referrer, props) are dropped by JSON.stringify.
-    const body = JSON.stringify({ site: cfg.site, ...p });
-    if (!navigator.sendBeacon?.(cfg.endpoint, body)) {
-      fetch(cfg.endpoint, { method: "POST", body, keepalive: true }).catch(() => {});
+    // Nothing here may throw into the host page: a tracker must never break a router or a click.
+    try {
+      // A string body is sent as text/plain, a CORS-safelisted type: no preflight request is needed.
+      // undefined fields (name, referrer, props) are dropped by JSON.stringify.
+      const body = JSON.stringify({ site: cfg.site, ...p });
+      if (!navigator.sendBeacon?.(cfg.endpoint, body)) {
+        fetch(cfg.endpoint, { method: "POST", body, keepalive: true }).catch(() => {});
+      }
+    } catch {
+      // ignore
     }
   }
 
@@ -56,7 +61,7 @@ export function init(cfg: Config): Api & { stop?(): void } {
   }
 
   function pageview(url = currentUrl()): void {
-    if (url === lastUrl) return; // ignore duplicate navigations (e.g. replaceState, hash-only changes)
+    if (url === lastUrl) return; // ignore duplicate navigations (e.g. hash-only changes)
     // The referrer only describes how the visitor arrived, so it is sent with the first page view only.
     send({ type: "pageview", url, referrer: lastUrl ? undefined : document.referrer || undefined });
     lastUrl = url;
@@ -75,22 +80,37 @@ export function init(cfg: Config): Api & { stop?(): void } {
 
     const link = target?.closest?.<HTMLAnchorElement>("a[href]");
     if (link && /^https?:$/.test(link.protocol) && link.host !== location.host) {
-      track("outbound-link", { url: link.href });
+      // Origin and path only: a link's query string or fragment can carry tokens, and is not ours to keep.
+      track("outbound-link", { url: link.origin + link.pathname });
     }
   }
 
   const onNavigate = () => pageview();
+  // A page restored from the back-forward cache is a new view, but `load` does not fire again.
+  const onPageShow = (e: PageTransitionEvent) => {
+    if (e.persisted) {
+      lastUrl = "";
+      pageview();
+    }
+  };
   const push = history.pushState;
+  const replace = history.replaceState;
 
   document.addEventListener("click", onClick, true);
   document.addEventListener("auxclick", onClick, true);
 
   if (cfg.auto) {
+    // Routers navigate with pushState and redirect with replaceState; both change the page.
     history.pushState = function (this: History, ...args: Parameters<History["pushState"]>) {
       push.apply(this, args);
       pageview();
     };
+    history.replaceState = function (this: History, ...args: Parameters<History["replaceState"]>) {
+      replace.apply(this, args);
+      pageview();
+    };
     addEventListener("popstate", onNavigate);
+    addEventListener("pageshow", onPageShow);
     if (cfg.hash) addEventListener("hashchange", onNavigate);
 
     // Don't count prerendered pages (Speculation Rules) until the user actually navigates to them.
@@ -109,9 +129,13 @@ export function init(cfg: Config): Api & { stop?(): void } {
           document.removeEventListener("click", onClick, true);
           document.removeEventListener("auxclick", onClick, true);
           removeEventListener("popstate", onNavigate);
+          removeEventListener("pageshow", onPageShow);
           removeEventListener("hashchange", onNavigate);
           document.removeEventListener("prerenderingchange", onNavigate);
-          if (cfg.auto) history.pushState = push;
+          if (cfg.auto) {
+            history.pushState = push;
+            history.replaceState = replace;
+          }
         },
       }
     : { track, pageview };
@@ -128,11 +152,13 @@ export function dataProps(el: HTMLElement): Props | undefined {
   return props;
 }
 
+/** Hostnames that mean "this is a developer's machine": loopback, *.localhost, or no host (file:). */
+const localHost = /^(localhost|.+\.localhost|127\.\d+\.\d+\.\d+|0\.0\.0\.0|\[::1\]|)$/;
+
 function isDisabled(cfg: Config): boolean {
   try {
     return (
-      // An empty hostname means file: (or another non-network URL).
-      (!cfg.allowLocalhost && /^(localhost|127\.0\.0\.1|\[::1\]|)$/.test(location.hostname)) ||
+      (!cfg.allowLocalhost && localHost.test(location.hostname)) ||
       !!navigator.webdriver ||
       (cfg.respectDnt && navigator.doNotTrack === "1") ||
       // Lets site owners exclude their own visits: localStorage.setItem("mlz_ignore", "true")

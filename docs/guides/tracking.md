@@ -8,7 +8,7 @@
 >
 > Page views (including single-page-app navigation) and outbound link clicks are tracked
 > automatically. For custom events, add `data-mlz-event="name"` to an element or call
-> `window.mlz.track("name", { ... })`. No cookies, about 0.9 KB gzipped.
+> `window.mlz?.track("name", { ... })`. No cookies, about 1 KB gzipped.
 
 **Read this if:** you want to add analytics to a website, track custom events, or your site uses a
 Content Security Policy.
@@ -48,8 +48,11 @@ another tool on the page. That also makes it safe to run two analytics tools sid
 **From JavaScript:**
 
 ```js
-window.mlz.track("signup", { plan: "pro", seats: 3 });
+window.mlz?.track("signup", { plan: "pro", seats: 3 });
 ```
+
+Use optional chaining (`?.`): the script loads with `defer`, so `window.mlz` does not exist until
+it has run, and is never defined when the visitor blocks it.
 
 > [!WARNING]
 > Event names and properties are stored exactly as sent. Never put personal data (email
@@ -63,7 +66,7 @@ window.mlz.track("signup", { plan: "pro", seats: 3 });
 | `data-api` | Collection endpoint, if it is not on the same host as the script |
 | `data-auto="false"` | Turn off automatic page views and call `mlz.pageview()` yourself |
 | `data-hash="true"` | Include the `#hash` in paths (for hash-based routers) |
-| `data-allow-localhost="true"` | Also track on `localhost` |
+| `data-allow-localhost="true"` | Also track on a developer's machine: `localhost`, `*.localhost`, `127.0.0.0/8`, `0.0.0.0`, `[::1]` and `file:` pages |
 | `data-respect-dnt="true"` | Don't track visitors who have Do Not Track enabled |
 
 ## Excluding your own visits
@@ -82,15 +85,28 @@ connect-src https://analytics.example.com;
 
 ## What it sends
 
-The page URL, the referrer and, for custom events, a name and properties. The server reduces this
-to the fields listed in [privacy.md](../privacy.md). The script reads and writes no cookies.
+The page URL, the referrer and, for custom events, a name and properties. Clicks on links to
+other sites send an `outbound-link` event with the link's origin and path, never its query string
+or fragment. The server reduces all of this to the fields listed in [privacy.md](../privacy.md).
+The script reads and writes no cookies.
+
+## Page views in single-page apps
+
+`history.pushState` and `history.replaceState` are wrapped, and `popstate` is observed, so router
+navigations and redirects count as page views. A page restored from the back-forward cache counts
+again. The same URL twice in a row is counted once. With `data-hash="true"`, `hashchange` counts
+too and the fragment is sent; the server keeps it only when it looks like a route (`#/docs`,
+`#!/docs`).
+
+Nothing the script does can throw into your page: a failure to send is swallowed.
 
 ## How it works
 
 <details>
 <summary>Size, browser support and caching</summary>
 
-- About 1.7 KB minified, 0.9 KB gzipped, no dependencies.
+- About 1.9 KB minified, 1 KB gzipped, no dependencies. CI fails if the gzipped script grows
+  past 1024 bytes.
 - Served gzip-compressed when the browser accepts it (compressed once at startup).
 - Targets ES2022 (Chrome/Edge 94+, Firefox 93+, Safari 15.4+). Older browsers cannot parse it and
   are simply not counted. The page itself is unaffected.
@@ -104,7 +120,8 @@ to the fields listed in [privacy.md](../privacy.md). The script reads and writes
 <details>
 <summary>Bots and automation</summary>
 
-The script does nothing when `navigator.webdriver` is set, and it does not count prerendered pages.
+The script does nothing when `navigator.webdriver` is set. A prerendered page (Speculation
+Rules) is counted only when the visitor actually navigates to it.
 The server drops known bots and non-browser clients; see [bots.md](../operations/bots.md).
 </details>
 

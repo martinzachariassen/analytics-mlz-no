@@ -15,7 +15,8 @@ cd apps/tracker
 npm ci
 npm test            # vitest with happy-dom
 npm run typecheck
-npm run size        # build, then print the gzipped size in bytes
+npm run size        # build, then check the gzipped size (fails above 1024 bytes)
+npm run check-size  # the same check without rebuilding (what CI runs)
 cd ../.. && make tracker   # build script.js (same as npm run build)
 ```
 
@@ -28,22 +29,30 @@ After `make tracker`, restart the server (it embeds the file at build time) and 
 |---|---|
 | `src/index.ts` | Entry point. Reads `data-site`, `data-api`, `data-auto`, `data-hash`, `data-allow-localhost`, `data-respect-dnt` from `document.currentScript`, calls `init` and sets `window.mlz` |
 | `src/core.ts` | `init(cfg)` returns `{ track, pageview }`. Contains everything else |
-| `src/core.test.ts` | Tests in a fake DOM (happy-dom) |
+| `src/core.test.ts` | Tests for `init` in a fake DOM (happy-dom) |
+| `src/index.test.ts` | Tests for the entry point: attribute parsing, the endpoint taken from `script.src`, `data-api`, the double-load guard |
+| `check-size.mjs` | Fails if the gzipped `script.js` is larger than 1024 bytes |
 
 What `init` does:
 
-1. **Decides whether to run** (`isDisabled`): not on `localhost` or `file:` unless allowed, not
+1. **Decides whether to run** (`isDisabled`): not on a developer's machine (`localhost`,
+   `*.localhost`, `127.0.0.0/8`, `0.0.0.0`, `[::1]`, `file:`) unless allowed, not
    under WebDriver, not with Do Not Track if `data-respect-dnt` is set, not when
    `localStorage.mlz_ignore` is `"true"`.
 2. **Sends a page view** on load, except for prerendered pages, which wait until they are shown.
    The referrer is sent with the first page view only.
-3. **Follows single-page apps** by wrapping `history.pushState` and listening for `popstate`
-   (and `hashchange` with `data-hash`). The same URL twice in a row is ignored.
+3. **Follows single-page apps** by wrapping `history.pushState` and `history.replaceState` and
+   listening for `popstate` (and `hashchange` with `data-hash`). A page restored from the
+   back-forward cache (`pageshow` with `persisted`) counts again. The same URL twice in a row is
+   ignored.
 4. **Handles clicks** (left and middle): an element with `data-mlz-event` sends a custom event
    with its `data-mlz-event-*` attributes as properties. Otherwise a link to another host sends
-   `outbound-link`.
+   `outbound-link` with the link's origin and path only (no query string, fragment or
+   credentials).
 5. **Sends** with `navigator.sendBeacon`, falling back to `fetch(..., { keepalive: true })`. The
-   body is a JSON string sent as `text/plain`, which avoids a CORS preflight request.
+   body is a JSON string sent as `text/plain`, which avoids a CORS preflight request. `send()` is
+   wrapped in `try`/`catch`, so a CSP-blocked beacon or unserialisable props never reach the host
+   page's click handler or router.
 
 The payload is `{ site, type, url, name?, referrer?, props? }`. The server does all the
 normalisation (path, referrer host, UTM, user agent parsing). The script sends the full URL and
@@ -74,8 +83,8 @@ package `internal/script` embeds the result with `//go:embed`, gzips it once at 
 serves it with an `ETag` and `Cache-Control: public, max-age=3600`. A change can therefore take
 up to an hour (plus CDN caching) to reach visitors.
 
-CI (`.github/workflows/ci.yml`, job `tracker`) runs typecheck and tests, rebuilds, and fails if
-`git diff` shows that `script.js` changed.
+CI (`.github/workflows/ci.yml`, job `tracker`) runs typecheck and tests, rebuilds, fails if
+`git diff` shows that `script.js` changed, and then runs `npm run check-size`.
 
 </details>
 

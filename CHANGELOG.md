@@ -25,10 +25,12 @@ All notable changes are documented here. The format follows
 - `PUBLIC_URL` must be an origin (no path or query) and must be `https://` when sign-in is enabled, except on localhost. A logged `Config` never includes the client secret.
 - Site ids are validated before the database or its cache is consulted, so junk ids cannot fill the site cache.
 - Site domains are validated: internationalised names are stored as punycode (`ærø.no` → `xn--r-3fa9c.no`, so they match the host ingest sees), a dot is required (a bare `no` would have matched every site under it) and names are capped at 100 characters without control characters.
-- The automatic `outbound-link` event stores the link's origin and path only: query strings, fragments and credentials are removed server-side (the tracker does the same in a following release). Page URLs must be `http(s)`.
+- The automatic `outbound-link` event stores the link's origin and path only: query strings, fragments and credentials are removed by the tracker and again by the server. Page URLs must be `http(s)`.
+- Tracker: nothing the script does can throw into the host page; a failure to send is swallowed.
 
 ### Fixed
 - `data-hash="true"` had no effect: the server dropped the fragment. Fragments that name a route (`#/docs`, `#!/docs`) are now part of the stored path; in-page anchors are still dropped.
+- Tracker: `history.replaceState` navigations (router redirects) and pages restored from the back-forward cache are counted. `*.localhost`, `0.0.0.0` and the whole `127.0.0.0/8` range count as localhost.
 - `PATCH /api/sites/{id}` with only `name` failed with "domain is required". Fields are now optional.
 - A database error while looking up a visitor's session started a new session instead of failing the insert. Unique-constraint errors are detected by SQLite error code instead of message text. Duplicate migration version numbers fail at startup instead of being skipped.
 - Shutdown: a second signal ends the process, a shutdown timeout closes open connections instead of exiting non-zero, and `net/http`'s own errors are logged as JSON.
@@ -39,6 +41,7 @@ All notable changes are documented here. The format follows
 - Statistics queries are cancelled after 10 seconds.
 - Site creation, changes, deletion and purges are logged with the signed-in user.
 - `ReadJSON` rejects trailing data after the JSON body.
+- Tracker: CI fails if the gzipped script grows past 1024 bytes (`npm run check-size`). It is now 1.9 KB minified and 1.0 KB gzipped.
 - More `golangci-lint` linters (`gocritic`, `noctx`, `sqlclosecheck`, `rowserrcheck`, `nilerr`, `usestdlibvars`, `unparam`, `perfsprint`, `exhaustive`, `contextcheck`).
 - Server logs use `severity` and `message` instead of `level` and `msg`, so Cloud Logging shows the level and `severity>=ERROR` finds app errors. Update log queries that matched on `msg` or `level`.
 - Dependencies updated: Litestream 0.5.18 in the Docker image, `modernc.org/sqlite` 1.62.0, and the dashboard's npm packages (Vite 8.3, Tailwind 4.3, TanStack Query 5.107).

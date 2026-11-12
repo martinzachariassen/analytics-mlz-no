@@ -66,6 +66,7 @@ jobs:
             echo "::error::apps/server/internal/script/script.js is stale. Run 'npm run build' in apps/tracker/ and commit."
             exit 1
           }
+      - run: npm run check-size
 
   web:
     runs-on: ubuntu-latest

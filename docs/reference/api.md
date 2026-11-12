@@ -1,8 +1,46 @@
-# API
+# API reference
 
-All dashboard endpoints require a session cookie (`__session`) obtained by signing in.
-Responses are JSON; errors look like `{"error": "message"}`.
-Requests with a body must use `Content-Type: application/json` (this is also the CSRF protection).
+> **TL;DR** — Three public endpoints: `POST /api/event` (the tracker), `GET /api/script.js` and
+> `GET /healthz`. Everything under `/api/sites` needs the `__session` cookie from signing in. It
+> returns sites and statistics as JSON for a date range, a time zone and optional filters.
+> Errors are `{"error": "message"}`. Requests with a body must send
+> `Content-Type: application/json`, which is also the CSRF protection.
+
+**Read this if:** you are building on the API, debugging the dashboard, or want to know what a
+status code means. The dashboard's typed client is `apps/web/src/lib/api.ts`.
+
+| Section | Endpoints |
+|---|---|
+| [Public](#public) | `/api/event`, `/api/script.js`, `/healthz` |
+| [Authentication](#authentication) | `/api/auth/*` |
+| [Sites](#sites) | `/api/sites`, `/api/sites/{id}` |
+| [Cleaning up spam](#cleaning-up-spam) | `/api/sites/{id}/purge` |
+| [Statistics](#statistics) | `/stats`, `/breakdown`, `/heatmap`, `/realtime` |
+
+## Calling the API from a shell
+
+There are no API tokens. Use the session cookie. Locally, with `make dev` running, sign in as the
+dev user into a cookie jar:
+
+```sh
+curl -s -c jar -b jar -L -o /dev/null http://localhost:8080/api/auth/dev/login
+curl -s -b jar http://localhost:8080/api/auth/me          # {"login":"dev","provider":"dev"}
+curl -s -b jar http://localhost:8080/api/sites
+curl -s -b jar "http://localhost:8080/api/sites/<id>/stats?from=2026-11-01&to=2026-11-07&tz=Europe/Oslo"
+curl -s -b jar "http://localhost:8080/api/sites/<id>/breakdown?dim=referrer&limit=5&f=country:is:NO"
+```
+
+Requests with a body need the JSON content type, or they get `400`:
+
+```sh
+curl -s -b jar -H 'Content-Type: application/json' \
+  -d '{"from":"2026-11-03T14:00:00Z","to":"2026-11-03T15:00:00Z","path":"/wp-login.php"}' \
+  http://localhost:8080/api/sites/<id>/purge
+```
+
+In production, sign in with the browser, copy the `__session` cookie from the developer tools,
+and pass it with `-b "__session=…"`. Treat it like a password: it is valid for 30 days or until
+you sign out.
 
 ## Public
 
@@ -167,4 +205,11 @@ With `detail=1`, the response also has:
 ## Privacy note on "visitors"
 
 Visitor ids rotate daily, so a person visiting on three different days counts as three
-visitors in a multi-day range. This is the trade-off for not using cookies.
+visitors in a multi-day range. This is the trade-off for not using cookies. Every metric is
+defined in [concepts.md](../concepts.md#glossary).
+
+## Next steps
+
+- [Concepts](../concepts.md): what each number means
+- [CLI reference](cli.md): the same site and purge operations from a shell
+- [Backend development](../development/backend.md#add-a-dashboard-endpoint): add an endpoint

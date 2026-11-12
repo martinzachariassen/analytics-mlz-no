@@ -32,9 +32,7 @@ repo_settings='{
   "allow_auto_merge": true,
   "security_and_analysis": {
     "secret_scanning": {"status": "enabled"},
-    "secret_scanning_push_protection": {"status": "enabled"},
-    "secret_scanning_non_provider_patterns": {"status": "enabled"},
-    "secret_scanning_validity_checks": {"status": "enabled"}
+    "secret_scanning_push_protection": {"status": "enabled"}
   }
 }'
 
@@ -90,7 +88,7 @@ state() {
     --argjson repo "$(gh api "repos/$repo" --jq '{has_wiki, has_projects, allow_merge_commit,
       allow_rebase_merge, allow_squash_merge, squash_merge_commit_title,
       squash_merge_commit_message, delete_branch_on_merge, allow_update_branch, allow_auto_merge,
-      security_and_analysis: (.security_and_analysis | del(.dependabot_security_updates)),
+      security_and_analysis: (.security_and_analysis | {secret_scanning, secret_scanning_push_protection}),
       topics: (.topics | sort)}')" \
     --argjson dependabot "$(gh api "repos/$repo/automated-security-fixes" --jq .enabled)" \
     --argjson pvr "$(gh api "repos/$repo/private-vulnerability-reporting" --jq .enabled)" \

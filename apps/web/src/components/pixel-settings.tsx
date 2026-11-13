@@ -34,8 +34,9 @@ export function PixelSettings({ site }: { site: Site }) {
         <CardTitle>Tracking pixel</CardTitle>
         <CardDescription>
           For places that can't run the script, such as a GitHub README or an
-          email. Counts views only: no unique visitors, and through an image
-          proxy (GitHub, Gmail, Yahoo Mail) no country or device.
+          email. Counts views; unique visitors only roughly, and through an
+          image proxy (GitHub, Gmail, Yahoo Mail) not at all, nor country or
+          device.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4 text-sm">

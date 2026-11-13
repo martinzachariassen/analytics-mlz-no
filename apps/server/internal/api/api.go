@@ -152,20 +152,16 @@ func (a *API) updateSite(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	var site store.Site
 	var err error
-	if req.PixelEnabled == nil || req.Name != "" || req.Domain != "" {
-		site, err = a.Store.UpdateSite(r.Context(), id, req.Name, req.Domain)
-		if a.siteError(w, err) {
-			return
-		}
-		a.audit(r, "site updated", "site", site.ID, "domain", site.Domain)
-	}
-	if req.PixelEnabled != nil {
+	// UpdateSite would reset a custom name to the domain, so a pixel-only body takes its own path.
+	if req.PixelEnabled != nil && req.Name == "" && req.Domain == "" {
 		site, err = a.Store.SetSitePixel(r.Context(), id, *req.PixelEnabled)
-		if a.siteError(w, err) {
-			return
-		}
-		a.audit(r, "site pixel changed", "site", site.ID, "enabled", site.PixelEnabled)
+	} else {
+		site, err = a.Store.UpdateSite(r.Context(), id, req.Name, req.Domain, req.PixelEnabled)
 	}
+	if a.siteError(w, err) {
+		return
+	}
+	a.audit(r, "site updated", "site", site.ID, "domain", site.Domain, "pixel_enabled", site.PixelEnabled)
 	// The update is stored; failing to read the event span must not report it as failed.
 	j, err := a.withActivity(r.Context(), site)
 	if err != nil {

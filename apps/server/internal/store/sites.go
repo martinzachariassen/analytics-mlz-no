@@ -287,9 +287,9 @@ func newID(n int) string {
 	return string(out)
 }
 
-// UpdateSite changes a site's name and domain. An empty domain keeps the current one; an
-// empty name defaults to the domain.
-func (s *Store) UpdateSite(ctx context.Context, id, name, domain string) (Site, error) {
+// UpdateSite changes a site's name and domain, and its pixel setting when pixel is not nil,
+// in one write. An empty domain keeps the current one; an empty name defaults to the domain.
+func (s *Store) UpdateSite(ctx context.Context, id, name, domain string, pixel *bool) (Site, error) {
 	if strings.TrimSpace(domain) == "" {
 		current, err := s.getSite(ctx, id)
 		if err != nil {
@@ -301,7 +301,9 @@ func (s *Store) UpdateSite(ctx context.Context, id, name, domain string) (Site, 
 	if err != nil {
 		return Site{}, err
 	}
-	res, err := s.db.ExecContext(ctx, `UPDATE sites SET name = ?, domain = ? WHERE id = ?`, name, domain, id)
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE sites SET name = ?, domain = ?, pixel_enabled = COALESCE(?, pixel_enabled) WHERE id = ?`,
+		name, domain, pixel, id)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return Site{}, ErrDomainTaken

@@ -1,7 +1,7 @@
 # Documentation
 
 > **TL;DR** — analytics-mlz-no is a small, self-hostable, cookie-free web analytics service.
-> A ~1 KB script on your site sends page views and events to a Go server, which stores them in
+> A ~1.1 KB script on your site sends page views and events to a Go server, which stores them in
 > SQLite without IP addresses. A React dashboard shows the numbers. Try everything locally with
 > `make dev`.
 

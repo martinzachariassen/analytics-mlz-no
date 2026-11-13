@@ -7,7 +7,7 @@ Lightweight, privacy-friendly, self-hostable web analytics written in Go.
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 - **Cookie-free and anonymous.** No IP addresses or user agents are stored. Visitors are counted with a hash that changes every day.
-- **Tiny script.** About 1 KB gzipped. Tracks page views, single-page-app navigation, outbound links and custom events.
+- **Tiny script.** About 1.1 KB gzipped. Tracks page views, single-page-app navigation, outbound links and custom events.
 - **One binary, one SQLite file.** Optional continuous backup with Litestream.
 - **Modern dashboard.** React + Vite + shadcn/ui, with GitHub sign-in. Filters, comparisons, realtime, goals with conversion rates, and CSV export.
 

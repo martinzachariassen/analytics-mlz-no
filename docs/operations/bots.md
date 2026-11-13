@@ -16,6 +16,7 @@ one, what the server does about it, what it cannot do, and what to check now and
 | Uptime monitors, benchmarks, link-preview fetchers | `POST /api/event` from non-browser clients | Not counted (see the marker list in `apps/server/internal/ingest/ingest.go`). |
 | Headless browsers and test tools (Puppeteer, Playwright, Lighthouse) | The tracking script runs | The script does nothing when `navigator.webdriver` is set, and counts a prerendered page only once the visitor navigates to it. Headless Chrome that does not announce itself is dropped by its user agent where it says "Headless". |
 | Scripts posting fake events (referrer spam, junk paths, floods) | `POST /api/event` | Rejected or dropped as described below. What gets through can be removed with the purge endpoint. |
+| Image proxies (GitHub Camo, Gmail, Yahoo Mail) and scripts requesting the pixel | `GET /api/pixel.gif` | Counted only for sites with the pixel turned on. See [the tracking pixel](#the-tracking-pixel). |
 
 ## How events are filtered
 
@@ -39,9 +40,10 @@ before it costs anything.
 4. **Payload.** At most 8 KB (`413`) of valid JSON (`400`).
 5. **Site, host and origin.** The site id must have the shape of a real id and exist, the page
    URL must be `http(s)` and its host the site's domain or a subdomain, and `Origin` must be
-   present and match the same domain (`null` is allowed for sandboxed contexts). Mismatches get
-   `400`. Browsers always send `Origin` on a `POST`, including `sendBeacon`, so this stops naive
-   replays from `curl`.
+   present and match the same domain. Mismatches get `400`, and so does `Origin: null`: any page
+   can create a sandboxed iframe that sends it, which would let a third party post events for
+   every site from its own visitors' browsers. Browsers always send `Origin` on a `POST`,
+   including `sendBeacon`, so this also stops naive replays from `curl`.
 6. **Text cleanup.** Control characters and bidirectional overrides are stripped from stored text,
    referrers with an invalid host are discarded, and the `outbound-link` event's URL is reduced to
    origin and path.
@@ -49,6 +51,35 @@ before it costs anything.
    answered `202` and dropped, so a script replaying one visitor cannot inflate counts.
 8. **Write queue.** A bounded number of concurrent inserts; a request that waits more than two
    seconds for a slot gets `503`.
+
+### The tracking pixel
+
+`GET /api/pixel.gif` (`apps/server/internal/ingest/pixel.go`) shares the address limits, the
+global limit, the size cap and the write queue with `POST /api/event` (steps 1, 2 and 8, same
+answers). The rest differs, because an image request has no body and no `Origin`:
+
+- **Opt-in per site.** Only sites with the pixel turned on store anything. Without an `Origin`
+  to check, anyone who knows the site id can send views, so the exposure is limited to sites
+  that asked for it. Leave it off for your main website.
+- **Always an image.** Bots, unknown sites, sites with the pixel off, invalid parameters,
+  requests over any rate limit and requests while ingestion is paused all get the same `200` GIF
+  as a real view, with nothing stored. A prober learns nothing, and a page never shows a broken
+  image.
+- **Image proxies pass the bot check.** GitHub's Camo (exactly `github-camo (<hex>)`), Gmail's
+  `GoogleImageProxy` and Yahoo's `YahooMailProxy` are not bots for the pixel, and skip the per-visitor limit, because every
+  reader behind them shares one visitor id. A user agent that also carries a bot marker
+  (`curl/8 github-camo (1)`) is never treated as a proxy. A client can still send a proxy's exact
+  user agent; it then gets the same address limits and stores views without country or device,
+  which is no more than rotating user agents already gives.
+- **Embedding by others.** Anyone can put a site's pixel on their own busy page, and real
+  browsers then load it from many addresses, so no rate limit stops it. Leaving the pixel off
+  unless you need it is the main defence. When it happens, the referrer shows where: without a
+  `ref` parameter, the pixel stores the host of the `Referer` the browser sends, so an unexpected
+  referrer in **Sources** points at the page that embeds it.
+
+Fake pixel views are removed the same way as other spam, with the purge endpoint: filter by the
+unexpected referrer first, as described in the
+[runbook](runbook.md#spam-a-traffic-spike-or-a-flood).
 
 Sign-in endpoints have their own limits (5 requests/s per client, burst 30, and 20/s per upstream
 address). Dashboard and sign-in endpoints reject changes that a browser marks as cross-origin

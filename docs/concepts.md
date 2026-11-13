@@ -29,7 +29,9 @@ sequenceDiagram
 ```
 
 1. **Collect.** The tracking script on your site sends a small JSON payload for each page view
-   (including navigation in single-page apps), outbound link click and custom event.
+   (including navigation in single-page apps), outbound link click and custom event. Where
+   scripts cannot run, the [tracking pixel](guides/tracking.md#tracking-pixel-no-javascript)
+   (`GET /api/pixel.gif`) records a page view or event when an image loads.
 2. **Filter and reduce.** The server drops bots and floods, checks that the event belongs to a
    registered site, and reduces the request to the fields in [privacy.md](privacy.md). The IP
    address and user agent are used once, in memory, and then discarded.
@@ -73,6 +75,7 @@ How a filter applies depends on the kind of dimension (visitor, page or visit). 
 
 | Term | Meaning |
 |---|---|
+| **Tracking pixel** | A 1×1 image (`/api/pixel.gif`) that records a view where JavaScript cannot run, such as a README or an email. Off per site until turned on. Through an image proxy (GitHub, Gmail, Yahoo Mail) it stores no country or device, and every reader shares one visitor id, so count its page views, not its visitors |
 | **Site** | A domain you track, with a public **site id** used in the script tag. Subdomains of the domain are accepted |
 | **Daily salt** | A random secret, replaced every UTC day. The visitor id is `SHA-256(salt, site id, IP, user agent)`. Once the salt is deleted, ids cannot be linked across days and the IP cannot be recovered |
 | **`PROXY_HOPS`** | How many trusted proxies sit in front of the server. Needed to find the real client IP in `X-Forwarded-For`. See [configuration](reference/configuration.md#proxy_hops) |

@@ -33,6 +33,7 @@ Ground rules (each one is explained in [ARCHITECTURE.md](../../ARCHITECTURE.md#i
 | Request | Path through the code |
 |---|---|
 | `POST /api/event` | `server.New` → `ingest.Handler.ServeHTTP` (limits, bot check, `buildEvent`) → `visitor.Hasher.ID` → `geo.Locator.Country` → `store.InsertEvent` |
+| `GET /api/pixel.gif` | `server.New` → `ingest.Handler.Pixel` (shared `admit`, proxy or bot check, `buildPixelEvent`) → `visitor.Hasher.ID` → `geo.Locator.Country` (not for image proxies) → `record` → `store.InsertEvent` |
 | `GET /api/sites/{id}/stats` | `server.New` → `auth.Service.Require` → `api.API.stats` → `parseQuery` (period, tz, filters) → `store.Summary` and `store.Timeseries` |
 | `GET /api/sites/{id}/breakdown` | … → `api.API.breakdown` → check against `store.Dimensions` → `store.Breakdown` |
 | `/api/auth/github/*` | `server.New` (rate limit 5/30 per IP) → `auth.Service` → `auth.GitHub` |

@@ -25,8 +25,9 @@ var imageProxies = []imageProxy{
 // matchProxy returns the image proxy that sent a request with this user agent, if any.
 // The match is strict and a user agent with a bot marker (curl, python-requests, …) never
 // counts, but anyone can still send a proxy's exact user agent. What that gains: the event
-// is stored without dimensions and skips the bot check and the per-visitor limit, while the
-// address limits still apply. Rotating user agents defeats the per-visitor limit anyway.
+// is stored without dimensions, skips the bot check and the per-visitor limit, and gets the
+// more generous ProxyLimiter per address; the peer and global limits still apply. Rotating
+// user agents defeats the per-visitor limit anyway.
 func matchProxy(ua string) (imageProxy, bool) {
 	if hasBotMarker(strings.ToLower(ua)) {
 		return imageProxy{}, false

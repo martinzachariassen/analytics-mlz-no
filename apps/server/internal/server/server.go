@@ -31,6 +31,8 @@ func New(cfg config.Config, st *store.Store, authn *auth.Service, loc *geo.Locat
 		Geo:      loc,
 		// A real visitor sends a handful of events per page; bursts cover fast navigation.
 		Limiter: httpx.NewRateLimiter(10, 30),
+		// Pixel requests from GitHub, Gmail or Yahoo image proxies: many readers per address.
+		ProxyLimiter: httpx.NewRateLimiter(100, 1000),
 		// Behind a CDN the peer is an edge address shared by many visitors, so this is generous.
 		// It only matters when a request bypasses a proxy and forges X-Forwarded-For.
 		PeerLimiter: httpx.NewRateLimiter(50, 200),

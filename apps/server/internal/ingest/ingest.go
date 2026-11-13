@@ -58,6 +58,8 @@ type VisitorHasher interface {
 //
 // Abuse protection, in request order (every limiter is optional):
 //   - Limiter: per client IP. Rejected with 429.
+//   - ProxyLimiter: per client IP for pixel requests from a known image proxy, in place of
+//     Limiter: a proxy carries many readers from a few addresses. Falls back to Limiter.
 //   - PeerLimiter: per PeerIP (the address the nearest proxy saw, which cannot be forged).
 //     Catches clients that bypass a proxy and forge X-Forwarded-For. Rejected with 429.
 //   - Global: across all clients, protects the single SQLite writer. Rejected with 503.
@@ -70,6 +72,7 @@ type Handler struct {
 	Visitors       VisitorHasher
 	Geo            *geo.Locator
 	Limiter        *httpx.RateLimiter
+	ProxyLimiter   *httpx.RateLimiter
 	PeerLimiter    *httpx.RateLimiter
 	Global         *rate.Limiter
 	VisitorLimiter *httpx.RateLimiter
@@ -99,7 +102,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "internal error", status)
 		}
 	}
-	ip, ok := h.admit(r, fail)
+	ip, ok := h.admit(r, h.Limiter, fail)
 	if !ok {
 		return
 	}
@@ -142,9 +145,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.record(r, ev, true, func() { w.WriteHeader(http.StatusAccepted) }, fail)
 }
 
-// admit applies the address limits, the global limit and the pause switch, in that order.
-// When the request must stop it calls fail with the status (429 or 503) and reports false.
-func (h *Handler) admit(r *http.Request, fail func(status int)) (ip string, ok bool) {
+// admit applies the address limits (the peer limiter, then lim per client), the global limit
+// and the pause switch, in that order. When the request must stop it calls fail with the
+// status (429 or 503) and reports false.
+func (h *Handler) admit(r *http.Request, lim *httpx.RateLimiter, fail func(status int)) (ip string, ok bool) {
 	// The peer limit runs first: its key cannot be forged, so a flood of forged client
 	// addresses is cut off before each one gets its own limiter entry.
 	ip = httpx.ClientIP(r, h.ProxyHops)
@@ -155,7 +159,7 @@ func (h *Handler) admit(r *http.Request, fail func(status int)) (ip string, ok b
 			return "", false
 		}
 	}
-	if h.Limiter != nil && !h.Limiter.Allow(ip) {
+	if lim != nil && !lim.Allow(ip) {
 		h.reject(r, slog.LevelDebug, "rate limit (client)", http.StatusTooManyRequests, "")
 		fail(http.StatusTooManyRequests)
 		return "", false

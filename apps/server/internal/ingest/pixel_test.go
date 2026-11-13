@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"image/gif"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -192,6 +193,45 @@ func TestPixelSharesLimits(t *testing.T) {
 
 	if len(rec.events) != 1 {
 		t.Fatalf("stored %d events, want 1", len(rec.events))
+	}
+}
+
+// Image proxies carry many readers from a few addresses, so they get ProxyLimiter instead of
+// the per-client Limiter.
+func TestPixelProxyLimiter(t *testing.T) {
+	hd, _, site := setup(t)
+	rec := hd.Store.(*recordingStore)
+	if _, err := rec.SetSitePixel(context.Background(), site.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	h := hd.Pixel()
+	query := "site=" + site.ID
+	hd.Limiter = httpx.NewRateLimiter(1, 1)
+	hd.ProxyLimiter = httpx.NewRateLimiter(1, 3)
+	for i := 0; i < 5; i++ {
+		assertGIF(t, pixel(h, http.MethodGet, query, camoUA))
+	}
+	if len(rec.events) != 3 {
+		t.Fatalf("proxy: stored %d events, want 3 (the proxy limiter's burst)", len(rec.events))
+	}
+	// A browser from the same address is still held to the client limit.
+	assertGIF(t, pixel(h, http.MethodGet, query, chromeUA))
+	assertGIF(t, pixel(h, http.MethodGet, query, chromeUA))
+	if len(rec.events) != 4 {
+		t.Fatalf("browser: stored %d events in total, want 4", len(rec.events))
+	}
+}
+
+// A pixel left on a page after it was turned off keeps arriving; it must not log at Info.
+func TestPixelDisabledLogsAtDebug(t *testing.T) {
+	hd, _, site := setup(t)
+	var buf bytes.Buffer
+	hd.Log = slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	h := hd.Pixel()
+	assertGIF(t, pixel(h, http.MethodGet, "site="+site.ID, camoUA))
+	assertGIF(t, pixel(h, http.MethodGet, "site=abcdefghijkm", chromeUA))
+	if buf.Len() != 0 {
+		t.Fatalf("logged at Info: %s", buf.String())
 	}
 }
 

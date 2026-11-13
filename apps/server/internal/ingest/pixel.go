@@ -36,12 +36,33 @@ func (h *Handler) Pixel() http.Handler {
 			return
 		}
 		fail := func(int) { writeGIF(w, r) }
-		ip, ok := h.admit(r, fail)
+		ua := r.UserAgent()
+		proxy, viaProxy := matchProxy(ua)
+		lim := h.Limiter
+		if viaProxy && h.ProxyLimiter != nil {
+			lim = h.ProxyLimiter
+		}
+		ip, ok := h.admit(r, lim, fail)
 		if !ok {
 			return
 		}
-		ua := r.UserAgent()
-		proxy, viaProxy := matchProxy(ua)
+
+		// The site check comes before parsing the user agent: it is cheaper, and a pixel left
+		// in a README after it was turned off keeps arriving. Such rejections log at Debug,
+		// since a third-party page, not the client, decides they keep coming.
+		q := r.URL.Query()
+		site, err := h.pixelSite(r.Context(), q.Get("site"))
+		var br badRequest
+		if errors.As(err, &br) {
+			h.reject(r, slog.LevelDebug, br.reason, http.StatusOK, q.Get("site"))
+			writeGIF(w, r)
+			return
+		}
+		if err != nil {
+			h.Log.Error("pixel site", "err", err)
+			writeGIF(w, r)
+			return
+		}
 		parsedUA := useragent.Parse(ua)
 		if !viaProxy && isBot(ua, parsedUA) {
 			h.reject(r, slog.LevelDebug, "bot", http.StatusOK, "")
@@ -49,11 +70,9 @@ func (h *Handler) Pixel() http.Handler {
 			return
 		}
 
-		q := r.URL.Query()
-		ev, err := h.buildPixelEvent(r.Context(), q, r.Referer(), ip, ua, parsedUA, proxy, viaProxy)
-		var br badRequest
+		ev, err := h.buildPixelEvent(r.Context(), site, q, r.Referer(), ip, ua, parsedUA, proxy, viaProxy)
 		if errors.As(err, &br) {
-			h.reject(r, slog.LevelInfo, br.reason, http.StatusOK, q.Get("site"))
+			h.reject(r, slog.LevelInfo, br.reason, http.StatusOK, site.ID)
 			writeGIF(w, r)
 			return
 		}
@@ -62,8 +81,8 @@ func (h *Handler) Pixel() http.Handler {
 			writeGIF(w, r)
 			return
 		}
-		// Every reader behind a proxy shares the proxy's visitor id, so the per-visitor
-		// limit would cut real traffic; the address limits still apply.
+		// Readers behind a proxy share its few addresses and so its visitor ids, so the
+		// per-visitor limit would cut real traffic; the address limits still apply.
 		h.record(r, ev, !viaProxy, func() { writeGIF(w, r) }, fail)
 	})
 }
@@ -83,22 +102,26 @@ func writeGIF(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) buildPixelEvent(ctx context.Context, q url.Values, referer, ip, ua string, parsed useragent.UserAgent, proxy imageProxy, viaProxy bool) (store.Event, error) {
-	id := q.Get("site")
+// pixelSite is the site a pixel request names, if it exists and has the pixel enabled.
+func (h *Handler) pixelSite(ctx context.Context, id string) (store.Site, error) {
 	if !store.ValidSiteID(id) {
-		return store.Event{}, invalid("unknown site")
+		return store.Site{}, invalid("unknown site")
 	}
 	site, err := h.Store.GetSite(ctx, id)
+	if errors.Is(err, store.ErrNotFound) {
+		return store.Site{}, invalid("unknown site")
+	}
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			return store.Event{}, invalid("unknown site")
-		}
-		return store.Event{}, err
+		return store.Site{}, err
 	}
 	if !site.PixelEnabled {
-		return store.Event{}, invalid("pixel disabled for site")
+		return store.Site{}, invalid("pixel disabled for site")
 	}
+	return site, nil
+}
 
+func (h *Handler) buildPixelEvent(ctx context.Context, site store.Site, q url.Values, referer, ip, ua string, parsed useragent.UserAgent, proxy imageProxy, viaProxy bool) (store.Event, error) {
+	var err error
 	ev := store.Event{
 		SiteID:   site.ID,
 		Time:     h.now(),

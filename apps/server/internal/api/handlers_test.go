@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -249,5 +250,39 @@ func TestSiteActivityFields(t *testing.T) {
 	list := get[[]siteJSON](t, h, "/api/sites")
 	if len(list) != 1 || list[0].FirstEventAt == nil || !list[0].LastEventAt.Equal(*site.LastEventAt) {
 		t.Fatalf("list = %+v, want the same activity as the site", list)
+	}
+}
+
+func TestUpdateSitePixel(t *testing.T) {
+	h, base := newTestAPI(t, time.Now(), nil)
+	patch := func(body string) siteJSON {
+		t.Helper()
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPatch, base, strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		h.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("PATCH %s = %d %s", body, w.Code, w.Body)
+		}
+		var s siteJSON
+		if err := json.Unmarshal(w.Body.Bytes(), &s); err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+
+	if s := get[siteJSON](t, h, base); s.PixelEnabled {
+		t.Fatal("pixel enabled by default")
+	}
+	patch(`{"name":"Blog","domain":"mlz.no"}`)
+	// Only pixel_enabled: the name must survive, not fall back to the domain.
+	if s := patch(`{"pixel_enabled":true}`); !s.PixelEnabled || s.Name != "Blog" || s.Domain != "mlz.no" {
+		t.Fatalf("site = %+v", s)
+	}
+	if s := patch(`{"name":"Blog 2"}`); !s.PixelEnabled || s.Name != "Blog 2" {
+		t.Fatalf("name change reset the pixel: %+v", s)
+	}
+	if s := patch(`{"name":"Blog 3","pixel_enabled":false}`); s.PixelEnabled || s.Name != "Blog 3" {
+		t.Fatalf("site = %+v", s)
 	}
 }

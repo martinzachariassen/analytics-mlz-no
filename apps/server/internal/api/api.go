@@ -66,6 +66,8 @@ type siteJSON struct {
 	Name      string    `json:"name"`
 	Domain    string    `json:"domain"`
 	CreatedAt time.Time `json:"created_at"`
+	// Whether GET /api/pixel.gif accepts events for this site.
+	PixelEnabled bool `json:"pixel_enabled"`
 	// The oldest and newest stored events, null until the first one arrives. The
 	// dashboard shows onboarding instead of empty charts while first_event_at is null.
 	FirstEventAt *time.Time `json:"first_event_at"`
@@ -73,7 +75,7 @@ type siteJSON struct {
 }
 
 func toJSON(s store.Site, act store.Activity) siteJSON {
-	out := siteJSON{ID: s.ID, Name: s.Name, Domain: s.Domain, CreatedAt: s.CreatedAt}
+	out := siteJSON{ID: s.ID, Name: s.Name, Domain: s.Domain, CreatedAt: s.CreatedAt, PixelEnabled: s.PixelEnabled}
 	if !act.FirstEvent.IsZero() {
 		out.FirstEventAt, out.LastEventAt = &act.FirstEvent, &act.LastEvent
 	}
@@ -89,6 +91,8 @@ func (a *API) withActivity(ctx context.Context, s store.Site) (siteJSON, error) 
 type siteRequest struct {
 	Name   string `json:"name"`
 	Domain string `json:"domain"`
+	// Only read by PATCH; absent leaves the setting as it is.
+	PixelEnabled *bool `json:"pixel_enabled"`
 }
 
 func (a *API) listSites(w http.ResponseWriter, r *http.Request) {
@@ -137,18 +141,31 @@ func (a *API) getSite(w http.ResponseWriter, r *http.Request) {
 }
 
 // updateSite changes the fields that are present: an absent or empty domain keeps the
-// current one, an absent or empty name defaults to the domain.
+// current one, an absent or empty name defaults to the domain. A body with only
+// pixel_enabled changes that setting and leaves name and domain alone.
 func (a *API) updateSite(w http.ResponseWriter, r *http.Request) {
 	var req siteRequest
 	if err := httpx.ReadJSON(w, r, &req); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid request")
 		return
 	}
-	site, err := a.Store.UpdateSite(r.Context(), r.PathValue("id"), req.Name, req.Domain)
-	if a.siteError(w, err) {
-		return
+	id := r.PathValue("id")
+	var site store.Site
+	var err error
+	if req.PixelEnabled == nil || req.Name != "" || req.Domain != "" {
+		site, err = a.Store.UpdateSite(r.Context(), id, req.Name, req.Domain)
+		if a.siteError(w, err) {
+			return
+		}
+		a.audit(r, "site updated", "site", site.ID, "domain", site.Domain)
 	}
-	a.audit(r, "site updated", "site", site.ID, "domain", site.Domain)
+	if req.PixelEnabled != nil {
+		site, err = a.Store.SetSitePixel(r.Context(), id, *req.PixelEnabled)
+		if a.siteError(w, err) {
+			return
+		}
+		a.audit(r, "site pixel changed", "site", site.ID, "enabled", site.PixelEnabled)
+	}
 	// The update is stored; failing to read the event span must not report it as failed.
 	j, err := a.withActivity(r.Context(), site)
 	if err != nil {

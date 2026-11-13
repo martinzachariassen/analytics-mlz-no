@@ -134,16 +134,17 @@ Responses:
 
 | Status | Meaning |
 |---|---|
-| `200` | A 1×1 transparent GIF with `Cache-Control: no-cache, no-store, must-revalidate, max-age=0`. The only answer: sent whether or not an event was stored, for bots, unknown sites, sites with the pixel off, requests over any rate limit (the per-address limits and load shedding it shares with `POST /api/event`) and while ingestion is paused. A broken image would show on the page, and a prober learns nothing. `HEAD` gets the same headers and stores nothing |
+| `200` | A 1×1 transparent GIF with `Cache-Control: no-cache, no-store, must-revalidate, max-age=0`. The only answer: sent whether or not an event was stored, for bots, unknown sites, sites with the pixel off, requests over any rate limit (the per-address limits, with a higher per-address limit for image proxies, and load shedding it shares with `POST /api/event`) and while ingestion is paused. A broken image would show on the page, and a prober learns nothing. `HEAD` gets the same headers and stores nothing |
 
 **Image proxies.** GitHub (Camo, user agent exactly `github-camo (<hex>)`), Gmail (a user
 agent containing `GoogleImageProxy`) and Yahoo Mail (starting with `YahooMailProxy`) fetch images on their readers' behalf, so the request
 carries the proxy's address and user agent. A user agent with a bot marker (`curl/`,
 `python-requests`, …) is never treated as a proxy. For proxies the server stores no country,
 browser, OS or device, sets the referrer to `github.com`, `mail.google.com` or `mail.yahoo.com` unless `ref` is
-given (their `Referer` describes the proxy, so it is ignored), and skips the per-visitor limit,
-because every reader shares the proxy's visitor id. Unique visitors are therefore not
-meaningful for proxied views; page views are.
+given (their `Referer` describes the proxy, so it is ignored), skips the per-visitor limit and
+applies a higher per-address limit (100/s, burst 1000, instead of 10/s, burst 30), because a
+proxy carries many readers from a few addresses. Its visitor ids describe the proxy's addresses,
+so unique visitors are not meaningful for proxied views; page views are.
 
 ## Authentication
 

@@ -41,7 +41,7 @@ What `init` does:
    under WebDriver, not with Do Not Track if `data-respect-dnt` is set, not when
    `localStorage.mlz_ignore` is `"true"`.
 2. **Sends a page view** on load, except for prerendered pages, which wait until they are shown.
-   The referrer is sent with the first page view only, as its origin (`https://news.example.org`).
+   The referrer is sent with the first page view only, as its scheme and host (`https://news.example.org`, or `android-app://com.google.android.gm` for an app, whose URL origin would be `null`).
 3. **Follows single-page apps** by wrapping `history.pushState` and `history.replaceState` and
    listening for `popstate` (and `hashchange` with `data-hash`). A page restored from the
    back-forward cache (`pageshow` with `persisted`) counts again. The same URL twice in a row is
@@ -57,7 +57,7 @@ What `init` does:
 
 The payload is `{ site, type, url, name?, referrer?, props? }`. Before sending, `cleanUrl` drops
 every query parameter except `utm_*`, so tokens in a URL (`?token=…`, `?email=…`) never leave the
-browser, and the referrer is reduced to its origin. A query inside a hash route
+browser, and the referrer is reduced to its scheme and host. A query inside a hash route
 (`#/reset?token=…`) is dropped by the server instead: stripping it in the script too would not
 fit the size budget. The server does the rest of the normalisation (path, referrer host, UTM,
 user agent parsing).

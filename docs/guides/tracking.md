@@ -86,7 +86,7 @@ connect-src https://analytics.example.com;
 
 ## What it sends
 
-The page URL without its query string (only `utm_*` tags are kept), the referrer's origin and,
+The page URL without its query string (only `utm_*` tags are kept), the referrer's scheme and host and,
 for custom events, a name and properties. Clicks on links to
 other sites send an `outbound-link` event with the link's origin and path, never its query string
 or fragment. The server reduces all of this to the fields listed in [privacy.md](../privacy.md).
@@ -153,7 +153,8 @@ tags. The full reference is in [api.md](../reference/api.md#get-apipixelgif).
 GitHub fetches every README image through its image proxy (Camo), and Gmail and Yahoo Mail
 through their own.
 The server then sees the proxy, not the reader, so it stores no country or device for those
-views, and all of them share one visitor id. The pixel is served with `no-store`, so the proxies
+views. Their visitor ids describe the proxy's addresses, not readers, so unique visitors mean
+nothing for them; the pixel is served with `no-store`, so the proxies
 fetch it again on most views, but a proxy or mail client may still cache it now and then, and
 some mail clients load images before anyone opens the email. Treat the numbers as a trend, not
 an exact count.

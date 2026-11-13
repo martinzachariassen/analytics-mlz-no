@@ -26,7 +26,7 @@ uses one session cookie, `__session`, for signed-in users only.
 |---|---|
 | time | When the event arrived |
 | hostname, path | Of the page. The **query string is not stored**, and the tracker does not even send it, except the `utm_*` tags. The fragment is dropped too, unless it names a route in a hash-based router (`#/docs`, `#!/docs`), which is kept as part of the path without any query inside it (`#/reset?token=…` is stored as `#/reset`) |
-| referrer | The referrer's **hostname only**, and only when it is another site. The tracker sends only the referrer's origin |
+| referrer | The referrer's **hostname only**, and only when it is another site. The tracker sends only the referrer's scheme and host |
 | `utm_source`, `utm_medium`, `utm_campaign` | Read from the page URL |
 | country | Two-letter code from a local DB-IP Lite database. No city or region |
 | browser, OS, device type | Derived from the user agent, e.g. "Firefox", "macOS", "mobile" |
@@ -95,7 +95,7 @@ where you send it; in the EU and EEA it usually does.
 
 When the request comes through an image proxy (GitHub's Camo, the image proxies of Gmail and Yahoo Mail), the address
 and user agent belong to the proxy. No country, browser, OS or device is stored for those
-events, and the visitor id is a hash of the proxy's address, not the reader's. The only new
+events, and the visitor id is a hash of the proxy's address and user agent, not the reader's. The only new
 stored field is the per-site setting `pixel_enabled`.
 
 ## Exports

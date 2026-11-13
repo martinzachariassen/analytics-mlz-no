@@ -1,6 +1,6 @@
 # Architecture
 
-> **TL;DR** — There are three programs. A **tracking script** (TypeScript, ~1 KB) runs on your
+> **TL;DR** — There are three programs. A **tracking script** (TypeScript, ~1.1 KB) runs on your
 > site and posts events. A **Go server** filters them, hashes the visitor anonymously and writes
 > them to **SQLite**, then answers stats queries. A **React dashboard** shows the results. The Go
 > binary embeds the script and the database migrations, so one binary plus one database file is
@@ -228,10 +228,11 @@ and existence, `http(s)` URL, URL host and `Origin` match the domain (400), text
 **`GET /api/pixel.gif`** (`ingest.Handler.Pixel`) shares `admit` (the address, global and size
 checks) and `record` (per-visitor limit, write slot, insert) with `ServeHTTP`. In between:
 `HEAD` stops early, a known image proxy (`proxy.go`: GitHub Camo by its exact user agent, Gmail, Yahoo Mail,
-never a user agent with a bot marker) skips the bot check and the per-visitor limit and stores no
-country, browser, OS or device, and `buildPixelEvent` reads `site`, `p`, `e`, `ref` and the UTM
-tags from the query (the `Referer` header's host when `ref` is absent) and requires
-`site.PixelEnabled`. Every outcome, rate limits and pauses included, answers the same 200 GIF:
+never a user agent with a bot marker) uses `ProxyLimiter` instead of the per-client limit, skips
+the bot check and the per-visitor limit and stores no country, browser, OS or device. `pixelSite`
+requires an existing site with `PixelEnabled` (rejections log at Debug) and runs before the user
+agent is parsed, and `buildPixelEvent` reads `p`, `e`, `ref` and the UTM tags from the query (the
+`Referer` header's host when `ref` is absent). Every outcome, rate limits and pauses included, answers the same 200 GIF:
 `admit` and `record` report failures through a callback, which the pixel answers with the image.
 
 **Sessions (visits)** are assigned on insert (`store.InsertEvent`). The visitor's latest

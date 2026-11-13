@@ -66,11 +66,15 @@ answers). The rest differs, because an image request has no body and no `Origin`
   as a real view, with nothing stored. A prober learns nothing, and a page never shows a broken
   image.
 - **Image proxies pass the bot check.** GitHub's Camo (exactly `github-camo (<hex>)`), Gmail's
-  `GoogleImageProxy` and Yahoo's `YahooMailProxy` are not bots for the pixel, and skip the per-visitor limit, because every
-  reader behind them shares one visitor id. A user agent that also carries a bot marker
-  (`curl/8 github-camo (1)`) is never treated as a proxy. A client can still send a proxy's exact
-  user agent; it then gets the same address limits and stores views without country or device,
-  which is no more than rotating user agents already gives.
+  `GoogleImageProxy` and Yahoo's `YahooMailProxy` are not bots for the pixel. They skip the
+  per-visitor limit and get a higher per-address limit (100/s, burst 1000, instead of 10/s,
+  burst 30), because many readers reach the server through a few proxy addresses. A user agent
+  that also carries a bot marker (`curl/8 github-camo (1)`) is never treated as a proxy. A client
+  can still send a proxy's exact user agent; it then gets the higher address limit (the peer and
+  global limits still apply) and stores views without country or device, which is little more
+  than rotating addresses and user agents already gives.
+- **Quiet logs for stale pixels.** Requests for unknown sites or sites with the pixel off are
+  logged at Debug, not Info: a pixel left in a README keeps arriving after it is turned off.
 - **Embedding by others.** Anyone can put a site's pixel on their own busy page, and real
   browsers then load it from many addresses, so no rate limit stops it. Leaving the pixel off
   unless you need it is the main defence. When it happens, the referrer shows where: without a

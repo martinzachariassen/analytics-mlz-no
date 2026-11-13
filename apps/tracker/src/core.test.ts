@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type Config, dataProps, init } from "./core";
+import { type Config, cleanUrl, dataProps, init } from "./core";
 
 // Provided by the happy-dom test environment.
 declare global {
@@ -55,6 +55,16 @@ afterEach(() => {
   Object.defineProperty(navigator, "doNotTrack", { configurable: true, value: null });
 });
 
+describe("cleanUrl", () => {
+  it("keeps origin, path, hash and UTM tags only", () => {
+    expect(cleanUrl("https://a.example/p?x=1&utm_source=nl&y=2#/route")).toBe(
+      "https://a.example/p?utm_source=nl#/route"
+    );
+    expect(cleanUrl("https://a.example/p?session=abc")).toBe("https://a.example/p");
+    expect(cleanUrl("https://a.example/")).toBe("https://a.example/");
+  });
+});
+
 describe("page views", () => {
   it("sends an initial page view without the hash", () => {
     start(base);
@@ -64,11 +74,17 @@ describe("page views", () => {
     expect(navigator.sendBeacon).toHaveBeenCalledWith(base.endpoint, expect.any(String));
   });
 
-  it("sends the referrer with the first page view only", () => {
-    vi.spyOn(document, "referrer", "get").mockReturnValue("https://news.example.org/");
+  it("sends the referrer's origin with the first page view only", () => {
+    vi.spyOn(document, "referrer", "get").mockReturnValue("https://news.example.org/item?id=1&auth=secret");
     start(base);
     history.pushState({}, "", "/a");
-    expect(sent.map((p) => p.referrer)).toEqual(["https://news.example.org/", undefined]);
+    expect(sent.map((p) => p.referrer)).toEqual(["https://news.example.org", undefined]);
+  });
+
+  it("sends no query parameters except UTM tags", () => {
+    window.happyDOM.setURL("https://www.example.com/reset?token=secret&utm_campaign=launch&email=a%40b.no");
+    start(base);
+    expect(sent[0]!.url).toBe("https://www.example.com/reset?utm_campaign=launch");
   });
 
   it("tracks SPA navigation via pushState and popstate, ignoring duplicates", () => {

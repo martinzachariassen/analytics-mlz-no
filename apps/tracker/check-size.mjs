@@ -1,9 +1,9 @@
 // Fails when the built tracking script exceeds its gzipped size budget. The budget is what the
-// README promises ("about 0.9 KB gzipped"); raise it on purpose, not by accident.
+// README promises ("about 1.1 KB gzipped"); raise it on purpose, not by accident.
 import { readFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 
-const budget = 1024;
+const budget = 1100;
 const script = readFileSync(new URL("../server/internal/script/script.js", import.meta.url));
 const gz = gzipSync(script, { level: 9 }).length;
 console.log(`script.js: ${script.length} B minified, ${gz} B gzipped (budget ${budget} B)`);

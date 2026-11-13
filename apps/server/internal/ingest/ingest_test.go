@@ -261,10 +261,10 @@ func TestOutboundLinkIsStrippedToOriginAndPath(t *testing.T) {
 
 func TestHashRoutesAreKeptInPath(t *testing.T) {
 	h, rec, site := setup(t)
-	for _, u := range []string{"https://example.com/app#/docs/intro", "https://example.com/app#!/old", "https://example.com/page#section-2"} {
+	for _, u := range []string{"https://example.com/app#/docs/intro", "https://example.com/app#!/old", "https://example.com/page#section-2", "https://example.com/app#/reset?token=secret"} {
 		post(h, `{"site":"`+site.ID+`","url":"`+u+`"}`, chromeUA, "")
 	}
-	want := []string{"/app#/docs/intro", "/app#!/old", "/page"}
+	want := []string{"/app#/docs/intro", "/app#!/old", "/page", "/app#/reset"}
 	for i, w := range want {
 		if rec.events[i].Path != w {
 			t.Errorf("path %d = %q, want %q", i, rec.events[i].Path, w)
@@ -345,13 +345,15 @@ func TestPreflight(t *testing.T) {
 	}
 }
 
-func TestNullOriginAllowed(t *testing.T) {
+// A sandboxed iframe on any page sends Origin: null, so accepting it would let any site post
+// events for every other site from its visitors' browsers.
+func TestNullOriginRejected(t *testing.T) {
 	h, rec, site := setup(t)
-	if w := post(h, `{"site":"`+site.ID+`","url":"https://example.com/"}`, chromeUA, "null"); w.Code != http.StatusAccepted {
-		t.Fatalf("status = %d", w.Code)
+	if w := post(h, `{"site":"`+site.ID+`","url":"https://example.com/"}`, chromeUA, "null"); w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", w.Code)
 	}
-	if len(rec.events) != 1 {
-		t.Fatal("event not stored")
+	if len(rec.events) != 0 {
+		t.Fatal("event stored")
 	}
 }
 

@@ -243,18 +243,16 @@ func (h *Handler) buildEvent(ctx context.Context, r *http.Request, p Payload, ip
 	if !validHostname(host) || !hostMatches(host, site.Domain) {
 		return store.Event{}, invalid("page url does not match the site's domain")
 	}
-	// Browsers always send Origin on POST, including sendBeacon. "null" comes from
-	// sandboxed or privacy-restricted contexts and is allowed. This does not stop a
-	// deliberate script, but it drops naive replays from curl and similar tools.
-	switch origin := r.Header.Get("Origin"); origin {
-	case "":
+	// Browsers always send Origin on POST, including sendBeacon. "null" (a sandboxed
+	// iframe, a data: URL) is rejected: any page anywhere can create one, so it would let a
+	// third party post events for every site from its visitors' browsers. This does not stop
+	// a deliberate script, but it drops naive replays from curl and similar tools.
+	origin := r.Header.Get("Origin")
+	if origin == "" {
 		return store.Event{}, invalid("missing origin")
-	case "null":
-	default:
-		o, err := url.Parse(origin)
-		if err != nil || !hostMatches(normalizeHost(o.Hostname()), site.Domain) {
-			return store.Event{}, invalid("origin does not match the site's domain")
-		}
+	}
+	if o, err := url.Parse(origin); err != nil || !hostMatches(normalizeHost(o.Hostname()), site.Domain) {
+		return store.Event{}, invalid("origin does not match the site's domain")
 	}
 
 	ev := store.Event{
@@ -369,9 +367,11 @@ func stripURL(raw string) string {
 }
 
 // pagePath is the stored path: the URL path, plus the fragment when it names a route in a
-// hash-based router ("#/docs" or "#!/docs"). Other fragments (in-page anchors) are dropped.
+// hash-based router ("#/docs" or "#!/docs"). Other fragments (in-page anchors) are dropped,
+// and so is a query string inside the route ("#/reset?token=…"), which can carry tokens.
 func pagePath(u *url.URL) string {
 	if f := u.Fragment; strings.HasPrefix(f, "/") || strings.HasPrefix(f, "!") {
+		f, _, _ = strings.Cut(f, "?")
 		return u.Path + "#" + f
 	}
 	return u.Path

@@ -16,6 +16,7 @@ const waiting: Site = {
   name: "Blog",
   domain: "blog.example",
   created_at: "2026-11-12T10:00:00Z",
+  pixel_enabled: false,
   first_event_at: null,
   last_event_at: null,
 }

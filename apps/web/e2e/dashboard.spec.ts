@@ -224,3 +224,45 @@ test("a new site waits for its first event, then moves on by itself", async ({
   })
   await expect(page.getByText("Visitors").first()).toBeVisible()
 })
+
+test("the tracking pixel can be turned on and records a proxied view", async ({
+  page,
+}, testInfo) => {
+  const domain = `pixel-${testInfo.project.name}-${Date.now()}.example`
+  await page.goto("/sites")
+  await page.getByRole("button", { name: "Add site" }).first().click()
+  await page.getByLabel("Domain").fill(domain)
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Add site" })
+    .click()
+  await expect(page).toHaveURL(/\/settings\?new=1$/)
+  const siteId = new URL(page.url()).pathname.split("/")[2]!
+
+  const pixel = (ua: string) =>
+    page.request.get(
+      `http://localhost:18080/api/pixel.gif?site=${siteId}&p=/readme`,
+      { headers: { "User-Agent": ua } }
+    )
+  // Off by default: still an image, but nothing is stored.
+  const off = await pixel("github-camo (e2e)")
+  expect(off.status()).toBe(200)
+  expect(off.headers()["content-type"]).toBe("image/gif")
+
+  const toggle = page.getByRole("switch", {
+    name: "Accept events from the pixel",
+  })
+  await expect(toggle).not.toBeChecked()
+  await toggle.click()
+  await expect(toggle).toBeChecked()
+  await expect(page.locator("pre").filter({ hasText: "![](" })).toContainText(
+    `/api/pixel.gif?site=${siteId}&p=%2Freadme`
+  )
+  await expectAccessible(page)
+
+  expect((await pixel("github-camo (e2e)")).status()).toBe(200)
+  // Settings polls the site while it waits and shows when the first event arrived.
+  await expect(
+    page.getByRole("status").filter({ hasText: "Receiving data" })
+  ).toBeVisible({ timeout: 15_000 })
+})

@@ -81,6 +81,12 @@ describe("page views", () => {
     expect(sent.map((p) => p.referrer)).toEqual(["https://news.example.org", undefined]);
   });
 
+  it("keeps the host of an app referrer, whose URL origin is opaque", () => {
+    vi.spyOn(document, "referrer", "get").mockReturnValue("android-app://com.google.android.gm/path");
+    start(base);
+    expect(sent[0]!.referrer).toBe("android-app://com.google.android.gm");
+  });
+
   it("sends no query parameters except UTM tags", () => {
     window.happyDOM.setURL("https://www.example.com/reset?token=secret&utm_campaign=launch&email=a%40b.no");
     start(base);

@@ -272,6 +272,21 @@ func TestSiteCacheInvalidation(t *testing.T) {
 	if got, _ := st.GetSite(ctx, site.ID); got.Domain != "b.example" {
 		t.Fatalf("stale cache after update: %q", got.Domain)
 	}
+	if got, _ := st.GetSite(ctx, site.ID); got.PixelEnabled {
+		t.Fatal("pixel enabled by default")
+	}
+	if got, err := st.SetSitePixel(ctx, site.ID, true); err != nil || !got.PixelEnabled || got.Name != "A" {
+		t.Fatalf("SetSitePixel = %+v, %v", got, err)
+	}
+	if got, _ := st.GetSite(ctx, site.ID); !got.PixelEnabled {
+		t.Fatal("stale cache after SetSitePixel")
+	}
+	if sites, _ := st.ListSites(ctx); len(sites) != 1 || !sites[0].PixelEnabled {
+		t.Fatalf("ListSites = %+v", sites)
+	}
+	if _, err := st.SetSitePixel(ctx, "missing", true); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("SetSitePixel(missing) err = %v", err)
+	}
 	if err := st.DeleteSite(ctx, site.ID); err != nil {
 		t.Fatal(err)
 	}

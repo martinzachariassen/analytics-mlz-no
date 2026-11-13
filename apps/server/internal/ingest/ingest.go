@@ -1,4 +1,5 @@
-// Package ingest implements the public event collection endpoint (POST /api/event).
+// Package ingest implements the public event collection endpoints: POST /api/event for the
+// tracking script and GET /api/pixel.gif for places that cannot run it.
 package ingest
 
 import (
@@ -53,7 +54,7 @@ type VisitorHasher interface {
 	ID(ctx context.Context, siteID, ip, userAgent string) (int64, error)
 }
 
-// Handler serves POST /api/event.
+// Handler serves POST /api/event (ServeHTTP) and GET /api/pixel.gif (Pixel).
 //
 // Abuse protection, in request order (every limiter is optional):
 //   - Limiter: per client IP. Rejected with 429.
@@ -88,30 +89,18 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-
-	// The peer limit runs first: its key cannot be forged, so a flood of forged client
-	// addresses is cut off before each one gets its own limiter entry.
-	ip := httpx.ClientIP(r, h.ProxyHops)
-	if h.PeerLimiter != nil {
-		if peer := httpx.PeerIP(r, h.ProxyHops); peer != ip && !h.PeerLimiter.Allow(peer) {
-			h.reject(r, slog.LevelDebug, "rate limit (upstream address)", http.StatusTooManyRequests, "")
-			http.Error(w, "too many requests", http.StatusTooManyRequests)
-			return
+	fail := func(status int) {
+		switch status {
+		case http.StatusServiceUnavailable:
+			unavailable(w)
+		case http.StatusTooManyRequests:
+			http.Error(w, "too many requests", status)
+		default:
+			http.Error(w, "internal error", status)
 		}
 	}
-	if h.Limiter != nil && !h.Limiter.Allow(ip) {
-		h.reject(r, slog.LevelDebug, "rate limit (client)", http.StatusTooManyRequests, "")
-		http.Error(w, "too many requests", http.StatusTooManyRequests)
-		return
-	}
-	if h.Global != nil && !h.Global.Allow() {
-		h.reject(r, slog.LevelDebug, "global rate limit", http.StatusServiceUnavailable, "")
-		unavailable(w)
-		return
-	}
-	if h.Paused != nil && h.Paused() {
-		h.reject(r, slog.LevelDebug, "ingestion paused (database size)", http.StatusServiceUnavailable, "")
-		unavailable(w)
+	ip, ok := h.admit(r, fail)
+	if !ok {
 		return
 	}
 
@@ -150,12 +139,50 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	if h.VisitorLimiter != nil && !h.VisitorLimiter.Allow(ev.SiteID+":"+strconv.FormatInt(ev.VisitorID, 10)) {
+	h.record(r, ev, true, func() { w.WriteHeader(http.StatusAccepted) }, fail)
+}
+
+// admit applies the address limits, the global limit and the pause switch, in that order.
+// When the request must stop it calls fail with the status (429 or 503) and reports false.
+func (h *Handler) admit(r *http.Request, fail func(status int)) (ip string, ok bool) {
+	// The peer limit runs first: its key cannot be forged, so a flood of forged client
+	// addresses is cut off before each one gets its own limiter entry.
+	ip = httpx.ClientIP(r, h.ProxyHops)
+	if h.PeerLimiter != nil {
+		if peer := httpx.PeerIP(r, h.ProxyHops); peer != ip && !h.PeerLimiter.Allow(peer) {
+			h.reject(r, slog.LevelDebug, "rate limit (upstream address)", http.StatusTooManyRequests, "")
+			fail(http.StatusTooManyRequests)
+			return "", false
+		}
+	}
+	if h.Limiter != nil && !h.Limiter.Allow(ip) {
+		h.reject(r, slog.LevelDebug, "rate limit (client)", http.StatusTooManyRequests, "")
+		fail(http.StatusTooManyRequests)
+		return "", false
+	}
+	if h.Global != nil && !h.Global.Allow() {
+		h.reject(r, slog.LevelDebug, "global rate limit", http.StatusServiceUnavailable, "")
+		fail(http.StatusServiceUnavailable)
+		return "", false
+	}
+	if h.Paused != nil && h.Paused() {
+		h.reject(r, slog.LevelDebug, "ingestion paused (database size)", http.StatusServiceUnavailable, "")
+		fail(http.StatusServiceUnavailable)
+		return "", false
+	}
+	return ip, true
+}
+
+// record stores ev and calls done, which writes the success response. An event over the
+// per-visitor limit (checked when limitVisitor is set) is dropped but still answered with
+// done, so a replaying script gets no signal. A full write queue calls fail with 503, a
+// failed insert with 500.
+func (h *Handler) record(r *http.Request, ev store.Event, limitVisitor bool, done func(), fail func(status int)) {
+	if limitVisitor && h.VisitorLimiter != nil && !h.VisitorLimiter.Allow(ev.SiteID+":"+strconv.FormatInt(ev.VisitorID, 10)) {
 		h.reject(r, slog.LevelDebug, "rate limit (visitor)", http.StatusAccepted, ev.SiteID)
-		w.WriteHeader(http.StatusAccepted)
+		done()
 		return
 	}
-
 	if h.WriteSlots != nil {
 		t := time.NewTimer(writeWait)
 		select {
@@ -164,7 +191,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			defer func() { <-h.WriteSlots }()
 		case <-t.C:
 			h.reject(r, slog.LevelDebug, "write queue full", http.StatusServiceUnavailable, ev.SiteID)
-			unavailable(w)
+			fail(http.StatusServiceUnavailable)
 			return
 		case <-r.Context().Done():
 			t.Stop()
@@ -173,10 +200,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := h.Store.InsertEvent(r.Context(), ev); err != nil {
 		h.Log.Error("insert event", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		fail(http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusAccepted)
+	done()
 }
 
 func unavailable(w http.ResponseWriter) {
@@ -280,10 +307,7 @@ func (h *Handler) buildEvent(ctx context.Context, r *http.Request, p Payload, ip
 
 	if p.Referrer != "" {
 		if ref, err := url.Parse(p.Referrer); err == nil {
-			refHost := normalizeHost(ref.Hostname())
-			if validHostname(refHost) && strings.Contains(refHost, ".") && !hostMatches(refHost, site.Domain) {
-				ev.ReferrerHost = refHost
-			}
+			ev.ReferrerHost = referrerHost(ref.Hostname(), site.Domain)
 		}
 	}
 
@@ -377,6 +401,16 @@ func pagePath(u *url.URL) string {
 	return u.Path
 }
 
+// referrerHost is host as a stored referrer: normalised, a plausible public DNS name, and
+// not the site itself (internal navigation is not a source). Otherwise "".
+func referrerHost(host, domain string) string {
+	host = normalizeHost(host)
+	if !validHostname(host) || !strings.Contains(host, ".") || hostMatches(host, domain) {
+		return ""
+	}
+	return host
+}
+
 func normalizeHost(h string) string {
 	return strings.TrimPrefix(strings.TrimSuffix(strings.ToLower(h), "."), "www.")
 }
@@ -434,7 +468,11 @@ func isBot(raw string, ua useragent.UserAgent) bool {
 	if raw == "" || ua.Bot {
 		return true
 	}
-	l := strings.ToLower(raw)
+	return hasBotMarker(strings.ToLower(raw))
+}
+
+// hasBotMarker reports whether a lowercased user agent contains one of botMarkers.
+func hasBotMarker(l string) bool {
 	for _, m := range botMarkers {
 		if strings.Contains(l, m) {
 			return true

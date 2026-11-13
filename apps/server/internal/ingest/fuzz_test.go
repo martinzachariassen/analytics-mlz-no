@@ -1,8 +1,10 @@
 package ingest
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"unicode"
@@ -54,6 +56,44 @@ func FuzzEvent(f *testing.F) {
 				checkText(t, "prop key", k, maxPropKeyLen)
 				checkText(t, "prop value", v, maxPropValLen)
 			}
+		}
+	})
+}
+
+// FuzzPixel sends arbitrary query parameters to the pixel and checks the same invariants.
+func FuzzPixel(f *testing.F) {
+	f.Add("/readme?x=1#y", "", "news.ycombinator.com", "GitHub", chromeUA)
+	f.Add("readme", "email-open", "", "", camoUA)
+	f.Add("\u202e\x00/a", "\n", "example.com", "\x1b", "Mozilla/5.0 (via ggpht.com GoogleImageProxy)")
+	f.Add("//evil.com/x", "x", "javascript:alert(1)", "", chromeUA)
+
+	h, rec, site := setup(f)
+	if _, err := rec.SetSitePixel(context.Background(), site.ID, true); err != nil {
+		f.Fatal(err)
+	}
+	px := h.Pixel()
+	f.Fuzz(func(t *testing.T, path, name, ref, utm, ua string) {
+		q := url.Values{"site": {site.ID}, "p": {path}, "ref": {ref}, "utm_source": {utm}}
+		if name != "" {
+			q.Set("e", name)
+		}
+		rec.events = rec.events[:0]
+		if w := pixel(px, http.MethodGet, q.Encode(), ua); w.Code != http.StatusOK || w.Header().Get("Content-Type") != "image/gif" {
+			t.Fatalf("status %d for %s", w.Code, q.Encode())
+		}
+		for _, e := range rec.events {
+			if e.Hostname != site.Domain {
+				t.Fatalf("stored hostname %q", e.Hostname)
+			}
+			if e.ReferrerHost != "" && (!validHostname(e.ReferrerHost) || hostMatches(e.ReferrerHost, site.Domain)) {
+				t.Fatalf("stored referrer %q", e.ReferrerHost)
+			}
+			if e.Path == "" || e.Path[0] != '/' {
+				t.Fatalf("stored path %q", e.Path)
+			}
+			checkText(t, "path", e.Path, maxPathLen)
+			checkText(t, "name", e.Name, maxNameLen)
+			checkText(t, "utm", e.UTMSource, maxPropValLen)
 		}
 	})
 }

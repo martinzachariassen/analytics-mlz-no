@@ -369,6 +369,25 @@ func TestIngestIsWired(t *testing.T) {
 	}
 }
 
+func TestPixelIsWired(t *testing.T) {
+	h, c, st := setupWithStore(t)
+	site, _ := st.CreateSite(context.Background(), "", "mlz.no")
+	if _, err := st.SetSitePixel(context.Background(), site.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/pixel.gif?site="+site.ID+"&p=/readme", nil)
+	req.Header.Set("User-Agent", "github-camo (876de43e)")
+	req.Header.Set("Sec-Fetch-Site", "cross-site")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || w.Header().Get("Content-Type") != "image/gif" {
+		t.Fatalf("pixel = %d %q", w.Code, w.Header().Get("Content-Type"))
+	}
+	if r := call(h, "GET", "/api/sites/"+site.ID+"/realtime", "", c, ""); !strings.Contains(r.Body.String(), `"visitors":1`) {
+		t.Fatalf("realtime = %s", r.Body)
+	}
+}
+
 func TestGoalEndpoints(t *testing.T) {
 	h, c := setup(t)
 	js := "application/json"

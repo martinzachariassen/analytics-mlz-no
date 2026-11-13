@@ -47,7 +47,16 @@ export function init(cfg: Config): Api & { stop?(): void } {
     try {
       // A string body is sent as text/plain, a CORS-safelisted type: no preflight request is needed.
       // undefined fields (name, referrer, props) are dropped by JSON.stringify.
-      const body = JSON.stringify({ site: cfg.site, ...p });
+      // Only what the server stores leaves the browser: no query string beyond UTM tags (it can
+      // carry tokens), and the referrer's scheme and host only. Not URL.origin: that is "null"
+      // for app referrers such as android-app://com.google.android.gm/. document.referrer is a
+      // serialized URL without credentials, so everything after the third "/" is path and query.
+      const body = JSON.stringify({
+        site: cfg.site,
+        ...p,
+        url: cleanUrl(p.url),
+        referrer: p.referrer?.split("/", 3).join("/"),
+      });
       if (!navigator.sendBeacon?.(cfg.endpoint, body)) {
         fetch(cfg.endpoint, { method: "POST", body, keepalive: true }).catch(() => {});
       }
@@ -142,6 +151,16 @@ export function init(cfg: Config): Api & { stop?(): void } {
         },
       }
     : { track, pageview };
+}
+
+/**
+ * The page URL as sent: query parameters other than utm_* are dropped. A query inside a hash
+ * route is dropped by the server; stripping it here too would not fit the size budget.
+ */
+export function cleanUrl(href: string): string {
+  const u = new URL(href);
+  u.search = `${new URLSearchParams([...u.searchParams].filter(([k]) => /^utm_/.test(k)))}`;
+  return u.href;
 }
 
 /** Collects data-mlz-event-* attributes as props: data-mlz-event-plan="pro" -> { plan: "pro" }. */

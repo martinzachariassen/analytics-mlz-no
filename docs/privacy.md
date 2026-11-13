@@ -25,8 +25,8 @@ uses one session cookie, `__session`, for signed-in users only.
 | Field | Content |
 |---|---|
 | time | When the event arrived |
-| hostname, path | Of the page. The **query string is not stored**. The fragment is dropped too, unless it names a route in a hash-based router (`#/docs`, `#!/docs`), which is kept as part of the path |
-| referrer | The referrer's **hostname only**, and only when it is another site |
+| hostname, path | Of the page. The **query string is not stored**, and the tracker does not even send it, except the `utm_*` tags. The fragment is dropped too, unless it names a route in a hash-based router (`#/docs`, `#!/docs`), which is kept as part of the path without any query inside it (`#/reset?token=…` is stored as `#/reset`) |
+| referrer | The referrer's **hostname only**, and only when it is another site. The tracker sends only the referrer's scheme and host |
 | `utm_source`, `utm_medium`, `utm_campaign` | Read from the page URL |
 | country | Two-letter code from a local DB-IP Lite database. No city or region |
 | browser, OS, device type | Derived from the user agent, e.g. "Firefox", "macOS", "mobile" |
@@ -78,6 +78,25 @@ Requests from known crawlers and automation are dropped before anything is store
 
 Event properties are stored as sent. Do not put personal data (email addresses, names, user ids)
 in event names or properties.
+
+## Tracking pixel
+
+`GET /api/pixel.gif` stores the same fields as the script, or fewer
+(`apps/server/internal/ingest/pixel.go`). The path, event name, referrer host and UTM tags come
+from the image URL, which you write. There are no event properties. Without a `ref` parameter,
+the referrer is the hostname from the browser's `Referer` header, the page that embeds the image.
+
+**Keep personal data out of pixel URLs.** The pixel makes it tempting to track emails per
+recipient, for example `?p=/newsletter/ola@example.com` or `utm_campaign=user-1234`. That stores
+personal data and identifies people, which this tool is built not to do, and the server cannot
+tell such values apart from ordinary ones. Use one URL per campaign, not per recipient. Whether
+tracking that an email was opened needs the recipient's consent depends on the ePrivacy rules
+where you send it; in the EU and EEA it usually does.
+
+When the request comes through an image proxy (GitHub's Camo, the image proxies of Gmail and Yahoo Mail), the address
+and user agent belong to the proxy. No country, browser, OS or device is stored for those
+events, and the visitor id is a hash of the proxy's address and user agent, not the reader's. The only new
+stored field is the per-site setting `pixel_enabled`.
 
 ## Exports
 

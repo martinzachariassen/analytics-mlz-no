@@ -34,6 +34,8 @@ type Site struct {
 	Name      string
 	Domain    string
 	CreatedAt time.Time
+	// PixelEnabled lets the site receive events through GET /api/pixel.gif.
+	PixelEnabled bool
 }
 
 // NormalizeDomain turns user input like "https://www.Example.com/" or "ærø.no" into the
@@ -166,8 +168,8 @@ func (s *Store) getSite(ctx context.Context, id string) (Site, error) {
 	var site Site
 	var created int64
 	err := s.rdb.QueryRowContext(ctx,
-		`SELECT id, name, domain, created_at FROM sites WHERE id = ?`, id).
-		Scan(&site.ID, &site.Name, &site.Domain, &created)
+		`SELECT id, name, domain, created_at, pixel_enabled FROM sites WHERE id = ?`, id).
+		Scan(&site.ID, &site.Name, &site.Domain, &created, &site.PixelEnabled)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Site{}, ErrNotFound
 	}
@@ -181,7 +183,7 @@ func (s *Store) getSite(ctx context.Context, id string) (Site, error) {
 // ListSites returns all sites ordered by name.
 func (s *Store) ListSites(ctx context.Context) ([]Site, error) {
 	rows, err := s.rdb.QueryContext(ctx,
-		`SELECT id, name, domain, created_at FROM sites ORDER BY name`)
+		`SELECT id, name, domain, created_at, pixel_enabled FROM sites ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +193,7 @@ func (s *Store) ListSites(ctx context.Context) ([]Site, error) {
 	for rows.Next() {
 		var site Site
 		var created int64
-		if err := rows.Scan(&site.ID, &site.Name, &site.Domain, &created); err != nil {
+		if err := rows.Scan(&site.ID, &site.Name, &site.Domain, &created, &site.PixelEnabled); err != nil {
 			return nil, err
 		}
 		site.CreatedAt = time.UnixMilli(created).UTC()
@@ -285,9 +287,9 @@ func newID(n int) string {
 	return string(out)
 }
 
-// UpdateSite changes a site's name and domain. An empty domain keeps the current one; an
-// empty name defaults to the domain.
-func (s *Store) UpdateSite(ctx context.Context, id, name, domain string) (Site, error) {
+// UpdateSite changes a site's name and domain, and its pixel setting when pixel is not nil,
+// in one write. An empty domain keeps the current one; an empty name defaults to the domain.
+func (s *Store) UpdateSite(ctx context.Context, id, name, domain string, pixel *bool) (Site, error) {
 	if strings.TrimSpace(domain) == "" {
 		current, err := s.getSite(ctx, id)
 		if err != nil {
@@ -299,11 +301,26 @@ func (s *Store) UpdateSite(ctx context.Context, id, name, domain string) (Site, 
 	if err != nil {
 		return Site{}, err
 	}
-	res, err := s.db.ExecContext(ctx, `UPDATE sites SET name = ?, domain = ? WHERE id = ?`, name, domain, id)
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE sites SET name = ?, domain = ?, pixel_enabled = COALESCE(?, pixel_enabled) WHERE id = ?`,
+		name, domain, pixel, id)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return Site{}, ErrDomainTaken
 		}
+		return Site{}, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return Site{}, ErrNotFound
+	}
+	s.sites.clear()
+	return s.getSite(ctx, id)
+}
+
+// SetSitePixel turns GET /api/pixel.gif on or off for a site.
+func (s *Store) SetSitePixel(ctx context.Context, id string, enabled bool) (Site, error) {
+	res, err := s.db.ExecContext(ctx, `UPDATE sites SET pixel_enabled = ? WHERE id = ?`, enabled, id)
+	if err != nil {
 		return Site{}, err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {

@@ -60,7 +60,7 @@ make tracker    # if apps/tracker/src changed; commit script.js
 |---|---|
 | `lint` | `biome ci .` and `gofmt -l` |
 | `go` | `go vet`, `go test -race`, `golangci-lint run` |
-| `tracker` | Types, tests, a rebuild that fails if the committed `script.js` is stale, the 1 KB gzip budget |
+| `tracker` | Types, tests, a rebuild that fails if the committed `script.js` is stale, the 1100 B gzip budget |
 | `web` | Types, unit and component tests (vitest), production build, gzip size budgets ([details](docs/development/dashboard.md#the-basics)) |
 | `e2e` | Playwright with axe against the Go server and seeded data: desktop, mobile and the light theme ([details](docs/development/dashboard.md#tests)) |
 | `infra` | `terraform fmt`/`validate`, shellcheck, hadolint, actionlint |

@@ -31,6 +31,8 @@ func New(cfg config.Config, st *store.Store, authn *auth.Service, loc *geo.Locat
 		Geo:      loc,
 		// A real visitor sends a handful of events per page; bursts cover fast navigation.
 		Limiter: httpx.NewRateLimiter(10, 30),
+		// Pixel requests from GitHub, Gmail or Yahoo image proxies: many readers per address.
+		ProxyLimiter: httpx.NewRateLimiter(100, 1000),
 		// Behind a CDN the peer is an edge address shared by many visitors, so this is generous.
 		// It only matters when a request bypasses a proxy and forges X-Forwarded-For.
 		PeerLimiter: httpx.NewRateLimiter(50, 200),
@@ -50,6 +52,7 @@ func New(cfg config.Config, st *store.Store, authn *auth.Service, loc *geo.Locat
 	}
 	mux.Handle("POST /api/event", events)
 	mux.Handle("OPTIONS /api/event", events)
+	mux.Handle("GET /api/pixel.gif", events.Pixel())
 	mux.Handle("GET /api/script.js", script.Handler())
 
 	// Sign-in endpoints are public; limit them per client so they can't be used to hammer
@@ -81,7 +84,7 @@ func New(cfg config.Config, st *store.Store, authn *auth.Service, loc *geo.Locat
 // non-safe requests that a browser marks as cross-origin (Sec-Fetch-Site, or an Origin that
 // differs from Host), whatever their content type or body. The dashboard origin is trusted
 // explicitly because behind Firebase Hosting the Host header can be the Cloud Run address.
-// POST /api/event and the tracking script are cross-origin by design and are not wrapped.
+// POST /api/event, the pixel and the tracking script are cross-origin by design and are not wrapped.
 func crossOrigin(publicURL string, log *slog.Logger) *http.CrossOriginProtection {
 	c := http.NewCrossOriginProtection()
 	if err := c.AddTrustedOrigin(publicURL); err != nil {

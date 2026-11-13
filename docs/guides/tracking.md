@@ -8,7 +8,8 @@
 >
 > Page views (including single-page-app navigation) and outbound link clicks are tracked
 > automatically. For custom events, add `data-mlz-event="name"` to an element or call
-> `window.mlz?.track("name", { ... })`. No cookies, about 1 KB gzipped.
+> `window.mlz?.track("name", { ... })`. No cookies, about 1.1 KB gzipped. Where JavaScript cannot
+> run (a GitHub README, an email), turn on the [tracking pixel](#tracking-pixel-no-javascript).
 
 **Read this if:** you want to add analytics to a website, track custom events, or your site uses a
 Content Security Policy.
@@ -85,7 +86,8 @@ connect-src https://analytics.example.com;
 
 ## What it sends
 
-The page URL, the referrer and, for custom events, a name and properties. Clicks on links to
+The page URL without its query string (only `utm_*` tags are kept), the referrer's scheme and host and,
+for custom events, a name and properties. Clicks on links to
 other sites send an `outbound-link` event with the link's origin and path, never its query string
 or fragment. The server reduces all of this to the fields listed in [privacy.md](../privacy.md).
 The script reads and writes no cookies.
@@ -100,13 +102,111 @@ too and the fragment is sent; the server keeps it only when it looks like a rout
 
 Nothing the script does can throw into your page: a failure to send is swallowed.
 
+## Tracking pixel (no JavaScript)
+
+> **TL;DR** — Turn on **Tracking pixel** in the site's settings, then embed
+> `![](https://analytics.example.com/api/pixel.gif?site=SITE_ID&p=/readme)` in Markdown or an
+> `<img>` in HTML. Each load counts as a page view (or, with `&e=name`, a custom event). You get
+> view counts, not visitors.
+
+Some places show images but strip scripts. There the script never runs, but an image still
+loads, and the pixel counts that load. Typical uses:
+
+| Where | Snippet | Tip |
+|---|---|---|
+| GitHub and GitLab READMEs | Markdown | `p=/readme`, or one path per repository |
+| Package pages (npm, PyPI, crates.io, Docker Hub, VS Code Marketplace) | Markdown | They show the README too; give each registry its own `p` (`/npm`, `/pypi`) to see where readers are |
+| Emails and newsletters | HTML | `e=email-open` plus `utm_campaign`, one URL per campaign. See the Apple Mail caveat below |
+| RSS and Atom feeds | HTML in each item | One `p` per post; a rough count of reads in feed readers |
+| Forums, wikis, docs hosts that allow HTML or images | Markdown or HTML | Views of an announcement or a docs page |
+| Third-party "thank you" pages that take HTML but not scripts | HTML | `e=signup` or `e=purchase`, and a [goal](../concepts.md#glossary) on it |
+| AMP pages | `<amp-pixel>` | See below |
+| Your own site, for visitors without JavaScript | `<noscript>` | See below |
+
+**Where it does not work.** Many platforms download an image once and serve their own copy:
+Medium, Substack, Reddit, LinkedIn, Slack and Discord previews, Google Docs. The pixel is then
+loaded once, by the platform, and never again by readers. Check in **Realtime** that a second
+view of the page shows up before relying on it.
+
+1. In the dashboard, open the site's **Settings** and switch on **Tracking pixel**. It is off by
+   default: an image request has no `Origin`, so anyone who knows the site id could send fake
+   views to it, and the setting keeps that confined to sites that want the pixel. Use a
+   separate site for it (for example `github.example.com`) to keep its numbers apart from your
+   website's.
+2. Copy a snippet from the same card, or write one:
+
+   ```markdown
+   ![](https://analytics.example.com/api/pixel.gif?site=SITE_ID&p=/readme)
+   ```
+
+   ```html
+   <img src="https://analytics.example.com/api/pixel.gif?site=SITE_ID&p=/welcome&e=email-open&utm_campaign=launch" alt="" width="1" height="1">
+   ```
+
+3. Open the page and watch **Realtime**.
+
+Parameters: `p` (path, default `/`), `e` (event name; makes it a custom event that
+[goals](../concepts.md#glossary) can count), `ref` (referrer: a hostname or a URL, of which only the host is kept) and the three `utm_`
+tags. The full reference is in [api.md](../reference/api.md#get-apipixelgif).
+
+> **Never put personal data in the URL.** An email address, a name or a per-recipient id in `p`,
+> `e` or a `utm_` tag would turn anonymous counts into tracking of individual people, which this
+> tool is built not to do (see [privacy.md](../privacy.md#tracking-pixel)). Use one URL per
+> campaign, not per recipient. Tracking whether an email was opened may also need the
+> recipient's consent under the ePrivacy rules where you send it.
+
+**What you get, and what you don't.**
+
+| | Script | Pixel, loaded directly | Pixel, through GitHub, Gmail or Yahoo Mail |
+|---|---|---|---|
+| Page views, custom events, UTM | Yes | Yes | Yes |
+| Referrer | Automatic | `ref`, or the embedding page when the browser sends it | `github.com` / `mail.google.com` / `mail.yahoo.com`, or `ref` |
+| Country, browser, OS, device | Yes | Yes | No (shown as "Unknown") |
+| Unique visitors, bounce rate, duration | Yes | Roughly | No |
+| SPA navigation, outbound links, properties | Yes | No | No |
+
+GitHub fetches every README image through its image proxy (Camo), and Gmail and Yahoo Mail
+through their own.
+The server then sees the proxy, not the reader, so it stores no country or device for those
+views. Their visitor ids describe the proxy's addresses, not readers, so unique visitors mean
+nothing for them; the pixel is served with `no-store`, so the proxies
+fetch it again on most views, but a proxy or mail client may still cache it now and then, and
+some mail clients load images before anyone opens the email. Treat the numbers as a trend, not
+an exact count.
+
+**Apple Mail counts as opened on delivery.** With Mail Privacy Protection, Apple fetches every
+image in the background when the email arrives, through its own servers, whether or not the
+recipient opens it. Its user agent is just `Mozilla/5.0`, so the server cannot tell it apart: the
+view is counted with device "other" and a country near Apple's server. Opens are therefore
+inflated by the share of recipients on Apple Mail. Other mail services that proxy images with an
+ordinary browser user agent (HEY, for example) are counted as normal visitors with the proxy's
+country and browser.
+
+For readers of a normal website who block JavaScript, a `<noscript>` pixel next to the script
+works too, once the pixel is on:
+
+```html
+<noscript><img src="https://analytics.example.com/api/pixel.gif?site=SITE_ID&p=/pricing" alt="" width="1" height="1"></noscript>
+```
+
+On [AMP](https://amp.dev/documentation/components/amp-pixel) pages, which cannot load the script,
+use `<amp-pixel>`. AMP replaces `CANONICAL_PATH` with the page's path and `DOCUMENT_REFERRER`
+with the referring URL, of which the server keeps only the host:
+
+```html
+<amp-pixel src="https://analytics.example.com/api/pixel.gif?site=SITE_ID&p=CANONICAL_PATH&ref=DOCUMENT_REFERRER" layout="nodisplay"></amp-pixel>
+```
+
+Pages served from an AMP cache (Google's, for example) are fetched from the cache's domain, so
+`DOCUMENT_REFERRER` is the only way to see where readers came from.
+
 ## How it works
 
 <details>
 <summary>Size, browser support and caching</summary>
 
-- About 1.9 KB minified, 1 KB gzipped, no dependencies. CI fails if the gzipped script grows
-  past 1024 bytes.
+- About 2.1 KB minified, 1.1 KB gzipped, no dependencies. CI fails if the gzipped script grows
+  past 1100 bytes.
 - Served gzip-compressed when the browser accepts it (compressed once at startup).
 - Targets ES2022 (Chrome/Edge 94+, Firefox 93+, Safari 15.4+). Older browsers cannot parse it and
   are simply not counted. The page itself is unaffected.
@@ -137,3 +237,4 @@ CI fails if the committed file is out of date.
 
 - [Privacy: what is stored](../privacy.md)
 - [Event API (`POST /api/event`)](../reference/api.md#public)
+- [Pixel API (`GET /api/pixel.gif`)](../reference/api.md#get-apipixelgif)

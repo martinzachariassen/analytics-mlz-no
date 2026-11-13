@@ -1,7 +1,7 @@
 # API reference
 
-> **TL;DR** — Three public endpoints: `POST /api/event` (the tracker), `GET /api/script.js` and
-> `GET /healthz`. Everything under `/api/sites` needs the `__session` cookie from signing in. It
+> **TL;DR** — Four public endpoints: `POST /api/event` (the tracker), `GET /api/pixel.gif` (the
+> tracking pixel, for sites that turn it on), `GET /api/script.js` and `GET /healthz`. Everything under `/api/sites` needs the `__session` cookie from signing in. It
 > returns sites and statistics as JSON for a date range, a time zone and optional filters.
 > Errors are `{"error": "message"}`. Changes from another origin are rejected with `403`
 > (CSRF protection), and requests with a body must send `Content-Type: application/json`.
@@ -11,7 +11,7 @@ status code means. The dashboard's typed client is `apps/web/src/lib/api.ts`.
 
 | Section | Endpoints |
 |---|---|
-| [Public](#public) | `/api/event`, `/api/script.js`, `/healthz` |
+| [Public](#public) | `/api/event`, `/api/pixel.gif`, `/api/script.js`, `/healthz` |
 | [Authentication](#authentication) | `/api/auth/*` |
 | [Sites](#sites) | `/api/sites`, `/api/sites/{id}` |
 | [Cleaning up spam](#cleaning-up-spam) | `/api/sites/{id}/purge` |
@@ -66,6 +66,7 @@ direct Cloud Run URL and self-hosted instances get them without a proxy.
 |---|---|---|
 | `POST` | `/api/event` | Collect an event (used by `script.js`) |
 | `OPTIONS` | `/api/event` | CORS preflight: allows any origin, `POST`, `Content-Type` |
+| `GET` | `/api/pixel.gif` | Collect a page view or event as a 1×1 image, for pages that cannot run the script. See [below](#get-apipixelgif) |
 | `GET` | `/api/script.js` | Tracking script (gzip, `ETag`, cached for an hour) |
 | `GET` | `/healthz` | Health check: `200 {"status":"ok"}`, or `503` when the database does not answer within 2 seconds |
 
@@ -90,19 +91,60 @@ status code. `200` body:
 ```
 
 Requests must carry an `Origin` header (browsers always send it on `POST`, including
-`sendBeacon`) whose host is the site's domain or a subdomain; `null` is accepted. The `url` must
-be `http(s)` and its host must match too. Unknown fields are ignored. Responses:
+`sendBeacon`) whose host is the site's domain or a subdomain; `null` is rejected, since any page
+can send it from a sandboxed iframe. The `url` must be `http(s)` and its host must match too.
+Only the path (with a hash route, minus any query inside it), the UTM tags and the referrer's
+host are kept; the tracker already sends nothing else. Unknown fields are ignored. Responses:
 
 | Status | Meaning |
 |---|---|
 | `202` | Accepted. Also returned, without storing anything, for bots and for a visitor over its own rate limit, so scripts get no signal. |
-| `400` | Unknown site, foreign host or origin, missing `Origin`, invalid payload. |
+| `400` | Unknown site, foreign host or origin, missing or `null` `Origin`, invalid payload. |
 | `413` | Body over 8 KB. |
 | `429` | Too many requests from one client IP (10/s, burst 30), or from one upstream address. |
 | `503` | Server is shedding load: over `INGEST_RATE_LIMIT`, write queue full, or the database is over `MAX_DATABASE_MB`. Sent with `Retry-After`. The tracker does not retry. |
 
 Control characters and bidi overrides are stripped from stored text, and referrers that are not
 plain DNS hostnames are dropped. `/api/auth/*` is rate limited per IP (5/s, burst 30).
+
+### `GET /api/pixel.gif`
+
+The tracking pixel: an image tag that records an event when it loads. Use it where JavaScript
+does not run (a GitHub README, an email); the [tracking guide](../guides/tracking.md#tracking-pixel-no-javascript)
+explains when and how. It only stores events for sites with `pixel_enabled` on (see
+[Sites](#sites)), because a `GET` has no `Origin` to check against the site's domain.
+
+```text
+GET /api/pixel.gif?site=SITE_ID&p=/readme
+GET /api/pixel.gif?site=SITE_ID&e=email-open&utm_source=newsletter&utm_campaign=launch
+```
+
+| Parameter | Meaning |
+|---|---|
+| `site` | Site id. Required |
+| `p` | Path to record. Query string and fragment are dropped, a leading `/` is added. Default `/` |
+| `e` | Event name. Present: a custom event instead of a page view. Present but empty: nothing is stored |
+| `ref` | Referrer: a hostname (`news.ycombinator.com`) or an `http(s)` URL, of which only the host is kept (`https://news.ycombinator.com/item?id=1`, as AMP's `DOCUMENT_REFERRER` fills it in). Dropped when it is neither, or is the site's own domain. Without it, the host of the request's `Referer` header (the page embedding the image) is used, under the same rules |
+| `utm_source`, `utm_medium`, `utm_campaign` | Campaign tags, cleaned like the tracker's |
+
+The stored hostname is the site's domain. There are no event properties. Never put an email
+address, a name or a per-recipient id in `p`, `e` or a UTM tag: it would be stored as is.
+
+Responses:
+
+| Status | Meaning |
+|---|---|
+| `200` | A 1×1 transparent GIF with `Cache-Control: no-cache, no-store, must-revalidate, max-age=0`. The only answer: sent whether or not an event was stored, for bots, unknown sites, sites with the pixel off, requests over any rate limit (the per-address limits, with a higher per-address limit for image proxies, and load shedding it shares with `POST /api/event`) and while ingestion is paused. A broken image would show on the page, and a prober learns nothing. `HEAD` gets the same headers and stores nothing |
+
+**Image proxies.** GitHub (Camo, user agent exactly `github-camo (<hex>)`), Gmail (a user
+agent containing `GoogleImageProxy`) and Yahoo Mail (starting with `YahooMailProxy`) fetch images on their readers' behalf, so the request
+carries the proxy's address and user agent. A user agent with a bot marker (`curl/`,
+`python-requests`, …) is never treated as a proxy. For proxies the server stores no country,
+browser, OS or device, sets the referrer to `github.com`, `mail.google.com` or `mail.yahoo.com` unless `ref` is
+given (their `Referer` describes the proxy, so it is ignored), skips the per-visitor limit and
+applies a higher per-address limit (100/s, burst 1000, instead of 10/s, burst 30), because a
+proxy carries many readers from a few addresses. Its visitor ids describe the proxy's addresses,
+so unique visitors are not meaningful for proxied views; page views are.
 
 ## Authentication
 
@@ -132,7 +174,7 @@ removed from `ALLOWED_GITHUB_USERS` gets `401` and their sessions are deleted.
 | `GET` | `/api/sites` | | List sites |
 | `POST` | `/api/sites` | `{"name", "domain"}` | Create (201; 409 if the domain exists; 400 if the domain is not a hostname). `name` defaults to the domain |
 | `GET` | `/api/sites/{id}` | | Get one |
-| `PATCH` | `/api/sites/{id}` | `{"name", "domain"}` | Update the fields given. An absent or empty `domain` keeps the current one; an absent or empty `name` resets it to the domain |
+| `PATCH` | `/api/sites/{id}` | `{"name", "domain", "pixel_enabled"}` | Update the fields given. An absent or empty `domain` keeps the current one; an absent or empty `name` resets it to the domain. A body with only `pixel_enabled` changes that and leaves name and domain alone |
 | `DELETE` | `/api/sites/{id}` | | Delete the site **and all its events** (204). Same-origin only (`403`) |
 
 `domain` is normalised: scheme, path, port and a leading `www.` are removed, and
@@ -149,10 +191,14 @@ Every site object (list, get, create, update) has this shape:
   "name": "mlz.no",
   "domain": "mlz.no",
   "created_at": "2026-11-01T09:00:00Z",
+  "pixel_enabled": false,
   "first_event_at": "2026-11-01T09:04:12.345Z",
   "last_event_at": "2026-11-12T17:58:03.120Z"
 }
 ```
+
+`pixel_enabled` is whether [`GET /api/pixel.gif`](#get-apipixelgif) stores events for the site.
+It is off for new sites. Turning it on is logged with the signed-in user.
 
 `first_event_at` and `last_event_at` are the oldest and newest **stored** events, and both are
 `null` until the first event arrives. The dashboard shows onboarding instead of charts while

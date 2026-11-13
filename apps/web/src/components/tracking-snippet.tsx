@@ -3,13 +3,21 @@ import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
 
-/** Origin that serves /api/script.js. Same as the dashboard unless VITE_TRACKER_ORIGIN is set. */
+/** Origin that serves /api/script.js and /api/pixel.gif. Same as the dashboard unless VITE_TRACKER_ORIGIN is set. */
 const trackerOrigin =
   (import.meta.env.VITE_TRACKER_ORIGIN as string | undefined) ||
   window.location.origin
 
 export function snippetFor(siteId: string): string {
   return `<script defer src="${trackerOrigin}/api/script.js" data-site="${siteId}"></script>`
+}
+
+export function pixelUrlFor(
+  siteId: string,
+  params: Record<string, string> = {}
+): string {
+  const q = new URLSearchParams({ site: siteId, ...params })
+  return `${trackerOrigin}/api/pixel.gif?${q}`
 }
 
 export function CodeBlock({ code }: { code: string }) {

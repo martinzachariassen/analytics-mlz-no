@@ -47,6 +47,8 @@ export type Site = {
   name: string
   domain: string
   created_at: string
+  /** Whether GET /api/pixel.gif accepts events for this site. */
+  pixel_enabled: boolean
   /** Oldest and newest stored events; null until the first event arrives. */
   first_event_at: string | null
   last_event_at: string | null
@@ -181,7 +183,10 @@ export const api = {
   site: (id: string) => request<Site>(site(id)),
   createSite: (body: { name: string; domain: string }) =>
     request<Site>("/api/sites", { method: "POST", body: JSON.stringify(body) }),
-  updateSite: (id: string, body: { name: string; domain: string }) =>
+  updateSite: (
+    id: string,
+    body: { name?: string; domain?: string; pixel_enabled?: boolean }
+  ) =>
     request<Site>(site(id), {
       method: "PATCH",
       body: JSON.stringify(body),

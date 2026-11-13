@@ -7,6 +7,7 @@ import { toast } from "sonner"
 
 import { ErrorNote } from "@/components/error-note"
 import { GoalsSettings } from "@/components/goals-settings"
+import { PixelSettings } from "@/components/pixel-settings"
 import { TrackingSnippet } from "@/components/tracking-snippet"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
@@ -65,6 +66,8 @@ export function SettingsPage() {
           <TrackingSnippet siteId={site.data?.id ?? id} />
         </CardContent>
       </Card>
+
+      {site.data && <PixelSettings site={site.data} />}
 
       {site.data ? (
         <GeneralForm key={site.data.id} site={site.data} />

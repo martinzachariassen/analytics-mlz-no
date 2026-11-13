@@ -1,6 +1,6 @@
 # Architecture
 
-> **TL;DR** — There are three programs. A **tracking script** (TypeScript, ~1 KB) runs on your
+> **TL;DR** — There are three programs. A **tracking script** (TypeScript, ~1.1 KB) runs on your
 > site and posts events. A **Go server** filters them, hashes the visitor anonymously and writes
 > them to **SQLite**, then answers stats queries. A **React dashboard** shows the results. The Go
 > binary embeds the script and the database migrations, so one binary plus one database file is
@@ -17,8 +17,9 @@ flowchart LR
   subgraph site[Your website]
     tracker["script.js<br/>(apps/tracker)"]
   end
+  img["README / email<br/>&lt;img&gt; pixel"]
   subgraph server["Go server (apps/server)"]
-    ingest["ingest<br/>POST /api/event"]
+    ingest["ingest<br/>POST /api/event<br/>GET /api/pixel.gif"]
     api["api<br/>/api/sites/..."]
     auth["auth<br/>/api/auth/..."]
     store[("store<br/>SQLite")]
@@ -26,6 +27,7 @@ flowchart LR
   dash["Dashboard<br/>(apps/web)"]
 
   tracker -- "JSON via sendBeacon" --> ingest
+  img -- "image request" --> ingest
   ingest -- "filtered, hashed event" --> store
   dash -- "fetch, __session cookie" --> api
   dash --> auth
@@ -37,6 +39,8 @@ flowchart LR
 view or custom event. The server checks rate limits, drops bots, validates that the site, URL and
 `Origin` belong together, strips the URL to host and path, looks up the country, computes the
 daily visitor hash, and inserts one row. The IP address and user agent are used only in memory.
+Where scripts cannot run, an `<img>` of `GET /api/pixel.gif` takes the same path for sites that
+have `pixel_enabled` on, with the site id and path in the query string instead of a body.
 
 **Read path.** The dashboard asks for `/api/sites/{id}/stats`, `/breakdown`, `/heatmap` and
 `/realtime`. These run aggregate SQL over the `events` table. Visits, bounces and durations are
@@ -108,7 +112,7 @@ What the server defends against, and what it does not, is in the
 | `cmd/loadtest` | Ingest load generator |
 | `internal/config` | `Load()` reads every environment variable. The single source of configuration |
 | `internal/server` | `New()` wires all routes and middleware. Start reading here. `sizeguard.go` pauses ingestion when `MAX_DATABASE_MB` is exceeded |
-| `internal/ingest` | `Handler` for `POST /api/event`. The abuse checks in order, `isBot`, `buildEvent` (validation and normalisation), `cleanText`, prop parsing |
+| `internal/ingest` | `Handler` for `POST /api/event` and `GET /api/pixel.gif` (`pixel.go`, image proxies in `proxy.go`). The abuse checks in order (`admit`, `record`), `isBot`, `buildEvent` (validation and normalisation), `cleanText`, prop parsing |
 | `internal/visitor` | `Hasher.ID`: SHA-256 of daily salt, site id, IP and user agent, truncated to 63 bits |
 | `internal/geo` | `Locator.Country`: local MaxMind/DB-IP lookup. Returns `""` without a database |
 | `internal/httpx` | `ClientIP` and `PeerIP` (`X-Forwarded-For` with `PROXY_HOPS`), `RateLimiter`, `ReadJSON` and `WriteJSON` |
@@ -178,7 +182,7 @@ These must stay true. Each one is enforced in one place, so changing it is a con
   rejects non-safe requests a browser marks as cross-origin (`Sec-Fetch-Site`, or an `Origin`
   that is neither `Host` nor `PUBLIC_URL`). Endpoints with a body also require
   `Content-Type: application/json` (`httpx.ReadJSON`) as a second layer. There are no CSRF
-  tokens. `POST /api/event` and the script are cross-origin by design and are not wrapped.
+  tokens. `POST /api/event`, the pixel and the script are cross-origin by design and are not wrapped.
 - **Rate limiters key on parsed IP addresses** (`httpx.ClientIP`, `httpx.PeerIP`), never on raw
   header text, and the peer limiter runs before the client limiter.
 - **The session cookie is called `__session`.** Firebase Hosting forwards no other cookie.
@@ -204,6 +208,7 @@ net/http server (timeouts, 16 KB header cap)
     └── jsonErrors(): 404/405 as JSON, Allow header kept
         └── ServeMux
             ├── POST /api/event          ingest.Handler (limits → bot → payload → site → store)
+            ├── GET  /api/pixel.gif      ingest.Handler.Pixel (same limits → proxy/bot → query → site with pixel on → store; always a GIF)
             ├── GET  /api/script.js      script.Handler (gzip, ETag, CDN cache headers)
             ├── /api/auth/*              limit() → auth.Service (config, login, callback, me, logout)
             ├── /api/sites/*             auth.Require → api.API (sites, goals, stats, breakdown, heatmap, realtime, export, purge)
@@ -219,6 +224,16 @@ guard (503) → bot check (202, dropped) → body ≤ 8 KB (413) → JSON → `b
 and existence, `http(s)` URL, URL host and `Origin` match the domain (400), text cleanup and
 `outbound-link` URL stripped to origin and path → per-visitor limit (202, dropped) → write slot
 (503 after 2 s) → `InsertEvent`. Limiter keys are parsed IP addresses, never raw header text.
+
+**`GET /api/pixel.gif`** (`ingest.Handler.Pixel`) shares `admit` (the address, global and size
+checks) and `record` (per-visitor limit, write slot, insert) with `ServeHTTP`. In between:
+`HEAD` stops early, a known image proxy (`proxy.go`: GitHub Camo by its exact user agent, Gmail, Yahoo Mail,
+never a user agent with a bot marker) uses `ProxyLimiter` instead of the per-client limit, skips
+the bot check and the per-visitor limit and stores no country, browser, OS or device. `pixelSite`
+requires an existing site with `PixelEnabled` (rejections log at Debug) and runs before the user
+agent is parsed, and `buildPixelEvent` reads `p`, `e`, `ref` and the UTM tags from the query (the
+`Referer` header's host when `ref` is absent). Every outcome, rate limits and pauses included, answers the same 200 GIF:
+`admit` and `record` report failures through a callback, which the pixel answers with the image.
 
 **Sessions (visits)** are assigned on insert (`store.InsertEvent`). The visitor's latest
 `session_id` is reused if its last event was within 30 minutes (`SessionTimeout`). Otherwise a new

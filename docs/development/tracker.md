@@ -3,7 +3,7 @@
 > **TL;DR** — The tracking script is under 200 lines of TypeScript in `apps/tracker/src`.
 > `core.ts` has the logic and `index.ts` reads the `<script>` tag. `make tracker` bundles it
 > with esbuild into `apps/server/internal/script/script.js`. That file is committed and embedded
-> in the Go binary, and CI fails if it is out of date. Keep it under 1 KB gzipped.
+> in the Go binary, and CI fails if it is out of date. Keep it under 1100 B gzipped.
 
 **Read this if:** you are going to change what the script collects or how it behaves on a page.
 To *use* the script, read [guides/tracking.md](../guides/tracking.md) instead.
@@ -15,7 +15,7 @@ bun install                  # once, at the repository root (Bun workspace)
 cd apps/tracker
 bun run test                 # vitest with happy-dom
 bun run typecheck
-bun run size                 # build, then check the gzipped size (fails above 1024 bytes)
+bun run size                 # build, then check the gzipped size (fails above 1100 bytes)
 bun run check-size           # the same check without rebuilding
 cd ../.. && make tracker     # build script.js (same as bun run build)
 ./scripts/verify.sh tracker  # everything CI checks for the tracker
@@ -32,7 +32,7 @@ After `make tracker`, restart the server (it embeds the file at build time) and 
 | `src/core.ts` | `init(cfg)` returns `{ track, pageview }`. Contains everything else |
 | `src/core.test.ts` | Tests for `init` in a fake DOM (happy-dom) |
 | `src/index.test.ts` | Tests for the entry point: attribute parsing, the endpoint taken from `script.src`, `data-api`, the double-load guard |
-| `check-size.mjs` | Fails if the gzipped `script.js` is larger than 1024 bytes |
+| `check-size.mjs` | Fails if the gzipped `script.js` is larger than 1100 bytes |
 
 What `init` does:
 
@@ -41,7 +41,7 @@ What `init` does:
    under WebDriver, not with Do Not Track if `data-respect-dnt` is set, not when
    `localStorage.mlz_ignore` is `"true"`.
 2. **Sends a page view** on load, except for prerendered pages, which wait until they are shown.
-   The referrer is sent with the first page view only.
+   The referrer is sent with the first page view only, as its scheme and host (`https://news.example.org`, or `android-app://com.google.android.gm` for an app, whose URL origin would be `null`).
 3. **Follows single-page apps** by wrapping `history.pushState` and `history.replaceState` and
    listening for `popstate` (and `hashchange` with `data-hash`). A page restored from the
    back-forward cache (`pageshow` with `persisted`) counts again. The same URL twice in a row is
@@ -55,9 +55,12 @@ What `init` does:
    wrapped in `try`/`catch`, so a CSP-blocked beacon or unserialisable props never reach the host
    page's click handler or router.
 
-The payload is `{ site, type, url, name?, referrer?, props? }`. The server does all the
-normalisation (path, referrer host, UTM, user agent parsing). The script sends the full URL and
-lets the server keep only what it needs.
+The payload is `{ site, type, url, name?, referrer?, props? }`. Before sending, `cleanUrl` drops
+every query parameter except `utm_*`, so tokens in a URL (`?token=…`, `?email=…`) never leave the
+browser, and the referrer is reduced to its scheme and host. A query inside a hash route
+(`#/reset?token=…`) is dropped by the server instead: stripping it in the script too would not
+fit the size budget. The server does the rest of the normalisation (path, referrer host, UTM,
+user agent parsing).
 
 ## Rules
 

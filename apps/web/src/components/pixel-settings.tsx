@@ -76,6 +76,21 @@ export function PixelSettings({ site }: { site: Site }) {
             </div>
             <div className="flex flex-col gap-2">
               <p>
+                On your own site, for visitors without JavaScript (next to the
+                script):
+              </p>
+              <CodeBlock
+                code={`<noscript><img src="${pixelUrlFor(site.id, { p: "/pricing" })}" alt="" width="1" height="1"></noscript>`}
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <p>AMP pages (AMP fills in the path and referrer):</p>
+              <CodeBlock
+                code={`<amp-pixel src="${pixelUrlFor(site.id, { p: "CANONICAL_PATH", ref: "DOCUMENT_REFERRER" })}" layout="nodisplay"></amp-pixel>`}
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <p>
                 A custom event instead of a page view, with{" "}
                 <code className="font-mono text-xs">e</code>:
               </p>

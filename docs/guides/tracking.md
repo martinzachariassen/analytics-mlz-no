@@ -109,9 +109,24 @@ Nothing the script does can throw into your page: a failure to send is swallowed
 > `<img>` in HTML. Each load counts as a page view (or, with `&e=name`, a custom event). You get
 > view counts, not visitors.
 
-Some places show images but strip scripts: GitHub and GitLab READMEs, package registry pages,
-emails and newsletters, forums. There the script never runs, but an image still loads, and the
-pixel counts that load.
+Some places show images but strip scripts. There the script never runs, but an image still
+loads, and the pixel counts that load. Typical uses:
+
+| Where | Snippet | Tip |
+|---|---|---|
+| GitHub and GitLab READMEs | Markdown | `p=/readme`, or one path per repository |
+| Package pages (npm, PyPI, crates.io, Docker Hub, VS Code Marketplace) | Markdown | They show the README too; give each registry its own `p` (`/npm`, `/pypi`) to see where readers are |
+| Emails and newsletters | HTML | `e=email-open` plus `utm_campaign`, one URL per campaign. See the Apple Mail caveat below |
+| RSS and Atom feeds | HTML in each item | One `p` per post; a rough count of reads in feed readers |
+| Forums, wikis, docs hosts that allow HTML or images | Markdown or HTML | Views of an announcement or a docs page |
+| Third-party "thank you" pages that take HTML but not scripts | HTML | `e=signup` or `e=purchase`, and a [goal](../concepts.md#glossary) on it |
+| AMP pages | `<amp-pixel>` | See below |
+| Your own site, for visitors without JavaScript | `<noscript>` | See below |
+
+**Where it does not work.** Many platforms download an image once and serve their own copy:
+Medium, Substack, Reddit, LinkedIn, Slack and Discord previews, Google Docs. The pixel is then
+loaded once, by the platform, and never again by readers. Check in **Realtime** that a second
+view of the page shows up before relying on it.
 
 1. In the dashboard, open the site's **Settings** and switch on **Tracking pixel**. It is off by
    default: an image request has no `Origin`, so anyone who knows the site id could send fake
@@ -131,7 +146,7 @@ pixel counts that load.
 3. Open the page and watch **Realtime**.
 
 Parameters: `p` (path, default `/`), `e` (event name; makes it a custom event that
-[goals](../concepts.md#glossary) can count), `ref` (referrer hostname) and the three `utm_`
+[goals](../concepts.md#glossary) can count), `ref` (referrer: a hostname or a URL, of which only the host is kept) and the three `utm_`
 tags. The full reference is in [api.md](../reference/api.md#get-apipixelgif).
 
 > **Never put personal data in the URL.** An email address, a name or a per-recipient id in `p`,
@@ -173,6 +188,17 @@ works too, once the pixel is on:
 ```html
 <noscript><img src="https://analytics.example.com/api/pixel.gif?site=SITE_ID&p=/pricing" alt="" width="1" height="1"></noscript>
 ```
+
+On [AMP](https://amp.dev/documentation/components/amp-pixel) pages, which cannot load the script,
+use `<amp-pixel>`. AMP replaces `CANONICAL_PATH` with the page's path and `DOCUMENT_REFERRER`
+with the referring URL, of which the server keeps only the host:
+
+```html
+<amp-pixel src="https://analytics.example.com/api/pixel.gif?site=SITE_ID&p=CANONICAL_PATH&ref=DOCUMENT_REFERRER" layout="nodisplay"></amp-pixel>
+```
+
+Pages served from an AMP cache (Google's, for example) are fetched from the cache's domain, so
+`DOCUMENT_REFERRER` is the only way to see where readers came from.
 
 ## How it works
 

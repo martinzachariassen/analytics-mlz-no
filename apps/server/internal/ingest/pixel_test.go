@@ -263,6 +263,10 @@ func TestPixelReferer(t *testing.T) {
 		{q, chromeUA + " b", "https://blog.example.com/post", ""},
 		{q, chromeUA + " x", "not a url", ""},
 		{q, camoUA, "https://forum.example.org/", "github.com"},
+		{q + "&ref=" + url.QueryEscape("https://www.Google.com/search?q=x"), chromeUA + " c", "", "google.com"},
+		{q + "&ref=" + url.QueryEscape("https://blog.example.com/a"), chromeUA + " d", "", ""},
+		{q + "&ref=" + url.QueryEscape("javascript://evil.example/"), chromeUA + " e", "https://forum.example.org/", "forum.example.org"},
+		{q + "&ref=", chromeUA + " f", "https://forum.example.org/", "forum.example.org"},
 	} {
 		before := len(rec.events)
 		assertGIF(t, pixelWithReferer(h, http.MethodGet, c.query, c.ua, c.referer))
@@ -271,6 +275,22 @@ func TestPixelReferer(t *testing.T) {
 		}
 		if got := rec.events[len(rec.events)-1].ReferrerHost; got != c.want {
 			t.Errorf("Referer %q with %q: referrer = %q, want %q", c.referer, c.query, got, c.want)
+		}
+	}
+}
+
+func TestRefHost(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{"news.ycombinator.com", "news.ycombinator.com"},
+		{" news.ycombinator.com ", "news.ycombinator.com"},
+		{"https://news.ycombinator.com/item?id=1", "news.ycombinator.com"},
+		{"http://user:pw@forum.example.org:8080/x", "forum.example.org"},
+		{"ftp://files.example.org/", ""},
+		{"https://%zz", ""},
+		{"", ""},
+	} {
+		if got := refHost(c.in); got != c.want {
+			t.Errorf("refHost(%q) = %q, want %q", c.in, got, c.want)
 		}
 	}
 }

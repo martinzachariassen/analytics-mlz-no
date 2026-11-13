@@ -124,7 +124,7 @@ GET /api/pixel.gif?site=SITE_ID&e=email-open&utm_source=newsletter&utm_campaign=
 | `site` | Site id. Required |
 | `p` | Path to record. Query string and fragment are dropped, a leading `/` is added. Default `/` |
 | `e` | Event name. Present: a custom event instead of a page view. Present but empty: nothing is stored |
-| `ref` | Referrer hostname, e.g. `news.ycombinator.com`. Dropped when it is not a plain hostname or is the site's own domain. Without it, the host of the request's `Referer` header (the page embedding the image) is used, under the same rules |
+| `ref` | Referrer: a hostname (`news.ycombinator.com`) or an `http(s)` URL, of which only the host is kept (`https://news.ycombinator.com/item?id=1`, as AMP's `DOCUMENT_REFERRER` fills it in). Dropped when it is neither, or is the site's own domain. Without it, the host of the request's `Referer` header (the page embedding the image) is used, under the same rules |
 | `utm_source`, `utm_medium`, `utm_campaign` | Campaign tags, cleaned like the tracker's |
 
 The stored hostname is the site's domain. There are no event properties. Never put an email

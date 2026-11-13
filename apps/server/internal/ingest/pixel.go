@@ -138,7 +138,7 @@ func (h *Handler) buildPixelEvent(ctx context.Context, site store.Site, q url.Va
 	// The ref parameter wins. Otherwise a browser loading the image sends the embedding
 	// page as Referer, which also shows a site owner where an unexpected copy of their pixel
 	// is embedded. Behind a proxy the Referer describes the proxy, so the proxy's site is used.
-	ev.ReferrerHost = referrerHost(strings.TrimSpace(q.Get("ref")), site.Domain)
+	ev.ReferrerHost = referrerHost(refHost(q.Get("ref")), site.Domain)
 	if ev.ReferrerHost == "" {
 		if viaProxy {
 			ev.ReferrerHost = proxy.source
@@ -160,6 +160,20 @@ func (h *Handler) buildPixelEvent(ctx context.Context, site store.Site, q url.Va
 		return store.Event{}, err
 	}
 	return ev, nil
+}
+
+// refHost is the hostname the ref parameter names: a bare hostname as is, or the host of an
+// http(s) URL, which is what AMP's DOCUMENT_REFERRER and many email templates fill in.
+func refHost(ref string) string {
+	ref = strings.TrimSpace(ref)
+	if !strings.Contains(ref, "://") {
+		return ref
+	}
+	u, err := url.Parse(ref)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return ""
+	}
+	return u.Hostname()
 }
 
 // pixelPath is the p parameter as a stored path: query string and fragment dropped, a

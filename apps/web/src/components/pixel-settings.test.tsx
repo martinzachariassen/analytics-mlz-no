@@ -47,5 +47,13 @@ describe("PixelSettings", () => {
       )
     ).toBeTruthy()
     expect(screen.getByText(/e=email-open/)).toBeTruthy()
+    expect(
+      screen.getByText(/^<noscript><img src=".*p=%2Fpricing"/)
+    ).toBeTruthy()
+    expect(
+      screen.getByText(
+        /^<amp-pixel src=".*\?site=abc&p=CANONICAL_PATH&ref=DOCUMENT_REFERRER" layout="nodisplay"><\/amp-pixel>$/
+      )
+    ).toBeTruthy()
   })
 })

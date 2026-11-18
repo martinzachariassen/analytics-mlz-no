@@ -22,7 +22,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 FROM litestream/litestream:0.5.18@sha256:513bff62a88fc0c86c73d27333c41c54c89fe890a7c32a551600adff9309b11b AS litestream
 
-FROM --platform=$BUILDPLATFORM alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS assets
+FROM --platform=$BUILDPLATFORM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS assets
 SHELL ["/bin/ash", "-o", "pipefail", "-c"]
 # DB-IP Lite Country (CC BY 4.0, https://db-ip.com), published monthly as YYYY-MM. Empty = this
 # month, falling back to last month early in the month. Set it for a reproducible release build.
@@ -38,7 +38,7 @@ RUN mkdir -p /geoip && \
     test -s /geoip/dbip-country-lite.mmdb && \
     sha256sum /geoip/dbip-country-lite.mmdb && cat /geoip/VERSION
 
-FROM alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
+FROM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
 ARG VERSION=dev
 LABEL org.opencontainers.image.title="analytics-mlz-no" \
       org.opencontainers.image.description="Lightweight, privacy-friendly, self-hostable web analytics" \

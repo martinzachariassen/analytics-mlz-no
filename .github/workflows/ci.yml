@@ -27,7 +27,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install the pinned tools (mise)
-        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
+        uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
       - name: Install JavaScript packages
         run: bun install --frozen-lockfile
       - name: Biome, gofmt and golangci-lint
@@ -43,7 +43,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install the pinned tools (mise)
-        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
+        uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
       - name: Vet, test with the race detector and build the server
         run: ./scripts/verify.sh go
 
@@ -73,7 +73,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install the pinned tools (mise)
-        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
+        uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
       - name: Install JavaScript packages
         run: bun install --frozen-lockfile
       - name: Types, tests, committed script.js is fresh, 1 KB gzip budget
@@ -89,7 +89,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install the pinned tools (mise)
-        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
+        uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
       - name: Install JavaScript packages
         run: bun install --frozen-lockfile
       - name: Types, unit and component tests, build, size budgets
@@ -105,7 +105,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install the pinned tools (mise)
-        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
+        uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
       - name: Install JavaScript packages
         run: bun install --frozen-lockfile
       - name: Install Chromium for Playwright
@@ -130,7 +130,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install the pinned tools (mise)
-        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
+        uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
       - name: Terraform fmt and validate, shellcheck, hadolint, actionlint
         run: ./scripts/verify.sh infra
 
@@ -189,7 +189,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install the pinned tools (mise)
-        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
+        uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
       - name: Known vulnerabilities in Go dependencies and the standard library
         working-directory: apps/server
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...

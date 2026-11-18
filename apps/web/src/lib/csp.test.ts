@@ -16,7 +16,7 @@ describe("Content-Security-Policy", () => {
     const csp =
       headers.find((h) => h.key === "Content-Security-Policy")?.value ?? ""
     const scripts = [
-      ...indexHtml.matchAll(/<script>([\s\S]*?)<\/script>/g),
+      ...indexHtml.matchAll(/<script>([\s\S]*?)<\/script>/gi),
     ].map((m) => m[1])
     expect(scripts.length).toBeGreaterThan(0)
     for (const script of scripts) {

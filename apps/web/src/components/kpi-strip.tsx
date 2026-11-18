@@ -58,7 +58,7 @@ export function KpiStrip({
             <span
               aria-hidden
               className={cn(
-                "absolute inset-x-0 top-0 h-0.5 bg-accent transition-opacity",
+                "absolute inset-x-0 top-0 h-0.5 bg-violet transition-opacity",
                 active ? "opacity-100" : "opacity-0"
               )}
             />

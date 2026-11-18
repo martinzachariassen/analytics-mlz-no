@@ -113,6 +113,7 @@ style is described in [docs/README.md](docs/README.md#how-these-docs-are-written
 | Bot filtering or rate limits | [docs/operations/bots.md](docs/operations/bots.md) |
 | Deployment (`Makefile` deploy targets, `.github/workflows/deploy.yml`, `infra/terraform/main/deploy.tf`), alerts, backups | [docs/guides/deploy-gcp.md](docs/guides/deploy-gcp.md) and [docs/operations/runbook.md](docs/operations/runbook.md) |
 | A package, invariant or data flow | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| A colour token, or what a colour is used for | [docs/development/colours.md](docs/development/colours.md) (tables and `palette.svg`) |
 | A metric's meaning | [docs/concepts.md](docs/concepts.md) and `apps/web/src/lib/metrics.ts` |
 | An architectural decision | [docs/decisions.md](docs/decisions.md) |
 | A CI job that runs on pull requests, or a GitHub repository setting | `scripts/github-settings.sh` (required checks), then run it; [docs/development/releasing.md](docs/development/releasing.md#repository-settings) |

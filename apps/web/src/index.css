@@ -9,10 +9,12 @@
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
 
-/* Design tokens. A neutral, slightly cool grey scale with one accent (violet,
-   the link back to mlz), dark first. shadcn/ui components read the names in
-   @theme; note that shadcn's "accent" is a neutral hover tint, the violet is
-   `violet` (fills) and `accent-deep` (text, lines). */
+/* Design tokens, dark first. The UI is greyscale (mlz.no's hue 265); colour
+   means data. The one accent, mlz violet, is the main data colour and the
+   brand, so it also marks focus, selection and the wordmark, never other UI
+   states. Roles and rules: docs/development/colours.md. shadcn/ui components
+   read the names in @theme; note that shadcn's "accent" is a neutral hover
+   tint, the violet is `violet` (fills) and `accent-deep` (text, lines). */
 @theme inline {
   --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-sans);
@@ -31,7 +33,6 @@
   --color-series-3: var(--series-3);
   --color-series-4: var(--series-4);
   --color-series-5: var(--series-5);
-  --color-series-6: var(--series-6);
 
   --color-sidebar-ring: var(--ring);
   --color-sidebar-border: var(--border);
@@ -77,29 +78,28 @@
 
 /* Light. */
 :root {
-  --bg: oklch(0.985 0.002 270);
+  --bg: oklch(0.985 0.003 265);
   --surface: oklch(1 0 0);
-  --surface-2: oklch(0.967 0.003 270);
-  --fg: oklch(0.2 0.006 270);
-  --fg-secondary: oklch(0.42 0.008 270);
+  --surface-2: oklch(0.965 0.004 265);
+  --fg: oklch(0.2 0.008 265);
+  --fg-secondary: oklch(0.42 0.01 265);
   /* Muted text, deltas and their 12% tints must reach WCAG AA (4.5:1) on the
      accent-tinted list bars too; the e2e axe checks (apps/web/e2e) enforce it. */
-  --fg-muted: oklch(0.5 0.01 270);
-  --border: oklch(0.92 0.004 270);
-  --border-strong: oklch(0.86 0.006 270);
-  --accent: #6250d6;
-  --accent-deep: #5443c4;
+  --fg-muted: oklch(0.5 0.012 265);
+  --border: oklch(0.915 0.005 265);
+  --border-strong: oklch(0.86 0.007 265);
+  --accent: #6b62bf;
+  --accent-deep: #4d4496;
   --positive: oklch(0.48 0.13 152);
-  --negative: oklch(0.5 0.18 25);
-  /* Categorical series, fixed order, validated (dataviz skill) on white. Three
-     of them are under 3:1 on white, so charts with them carry a legend and a
-     table. */
-  --series-1: #6250d6;
-  --series-2: #eb6834;
-  --series-3: #1baf7a;
-  --series-4: #eda100;
-  --series-5: #e87ba4;
-  --series-6: #2a78d6;
+  --negative: oklch(0.52 0.15 25);
+  /* Categorical series: violet, gold, teal, coral, sky. Fixed order, validated
+     for colour vision deficiency on white (docs/development/colours.md). Gold
+     is under 3:1 on white, so charts with it carry a legend and a table. */
+  --series-1: var(--accent);
+  --series-2: #dca443;
+  --series-3: #309d8b;
+  --series-4: #d3694f;
+  --series-5: #3d98c7;
   --shadow-pop:
     0 1px 2px oklch(0 0 0 / 0.06), 0 8px 24px -6px oklch(0 0 0 / 0.12);
   color-scheme: light;
@@ -107,25 +107,25 @@
 
 /* Dark: the default (see theme-provider). Validated on --surface. */
 [data-theme="dark"] {
-  --bg: oklch(0.145 0.004 270);
-  --surface: oklch(0.178 0.005 270);
-  --surface-2: oklch(0.215 0.006 270);
-  --fg: oklch(0.965 0.003 270);
-  --fg-secondary: oklch(0.79 0.006 270);
-  /* 0.65, not lower: muted labels also sit on the accent-tinted bars of lists (WCAG AA 4.5:1). */
-  --fg-muted: oklch(0.65 0.01 270);
-  --border: oklch(0.255 0.006 270);
-  --border-strong: oklch(0.33 0.008 270);
-  --accent: #9085e9;
-  --accent-deep: #a59cf0;
-  --positive: oklch(0.76 0.15 152);
-  --negative: oklch(0.7 0.16 25);
-  --series-1: #9085e9;
-  --series-2: #d95926;
-  --series-3: #199e70;
-  --series-4: #c98500;
-  --series-5: #d55181;
-  --series-6: #3987e5;
+  /* Lifted off black and with text a touch below white, so nothing glows. */
+  --bg: oklch(0.16 0.006 265);
+  --surface: oklch(0.195 0.007 265);
+  --surface-2: oklch(0.232 0.008 265);
+  --fg: oklch(0.95 0.004 265);
+  --fg-secondary: oklch(0.8 0.008 265);
+  /* Muted labels also sit on the accent-tinted bars of lists (WCAG AA 4.5:1). */
+  --fg-muted: oklch(0.68 0.012 265);
+  --border: oklch(0.275 0.009 265);
+  --border-strong: oklch(0.35 0.01 265);
+  --accent: #8c84eb;
+  --accent-deep: #b0adfb;
+  --positive: oklch(0.76 0.13 155);
+  --negative: oklch(0.72 0.13 25);
+  --series-1: var(--accent);
+  --series-2: #b7852a;
+  --series-3: #1ea28f;
+  --series-4: #d37158;
+  --series-5: #439ccc;
   --shadow-pop:
     0 0 0 1px oklch(1 0 0 / 0.04), 0 12px 32px -8px oklch(0 0 0 / 0.6);
   color-scheme: dark;

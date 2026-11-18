@@ -5,12 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev:demo": "vite --mode demo",
+    "build": "tsc -b && vite build && vite build --mode demo",
     "typecheck": "tsc -b --noEmit",
     "preview": "vite preview",
+    "preview:demo": "vite preview --mode demo",
     "test": "vitest run",
     "e2e": "playwright test",
-    "check-size": "node check-size.mjs"
+    "check-size": "node check-size.mjs && node check-size.mjs dist/demo",
+    "demo:fixture": "bun scripts/demo-fixture.ts"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",

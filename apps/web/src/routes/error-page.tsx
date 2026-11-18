@@ -60,7 +60,7 @@ export function ErrorPage() {
           <div className="flex gap-2">
             <Button onClick={() => window.location.reload()}>Reload</Button>
             <Button variant="outline" asChild>
-              <a href="/sites">All sites</a>
+              <a href={`${import.meta.env.BASE_URL}sites`}>All sites</a>
             </Button>
           </div>
         </>

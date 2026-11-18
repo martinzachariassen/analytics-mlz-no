@@ -128,6 +128,10 @@ export function HomePage() {
             </a>
           </Button>
         )}
+        {/* The public demo is a separate build under /demo/ (docs/development/demo.md). */}
+        <Button asChild size="lg" variant="outline">
+          <a href="/demo/">Try the live demo</a>
+        </Button>
       </div>
       {dev && (
         <p className="max-w-[52ch] text-xs leading-relaxed text-fg-muted">

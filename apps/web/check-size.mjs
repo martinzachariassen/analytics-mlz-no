@@ -13,7 +13,8 @@ const budgets = {
   total: 450 * KB, // all JS together
 }
 
-const dist = new URL("./dist/", import.meta.url)
+// The production build by default; `node check-size.mjs dist/demo` checks the demo build.
+const dist = new URL(`./${(process.argv[2] ?? "dist").replace(/\/?$/, "/")}`, import.meta.url)
 const fail = (msg) => {
   console.error(`check-size: ${msg}`)
   process.exit(1)
@@ -31,7 +32,10 @@ const files = new Map()
 const walk = (dir) => {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     const url = new URL(e.name + (e.isDirectory() ? "/" : ""), dir)
-    if (e.isDirectory()) walk(url)
+    // dist/demo is a separate build with its own check.
+    if (e.isDirectory()) {
+      if (!(dir.href === dist.href && e.name === "demo")) walk(url)
+    }
     else if (/\.(js|css)$/.test(e.name))
       files.set(e.name, gzipSync(readFileSync(url), { level: 9 }).length)
   }

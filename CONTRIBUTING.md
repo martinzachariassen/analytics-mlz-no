@@ -106,7 +106,7 @@ style is described in [docs/README.md](docs/README.md#how-these-docs-are-written
 | If you change… | Update |
 |---|---|
 | An environment variable or Terraform variable | [docs/reference/configuration.md](docs/reference/configuration.md) |
-| An API endpoint, parameter, response or status code | [docs/reference/api.md](docs/reference/api.md) and `apps/web/src/lib/api.ts` |
+| An API endpoint, parameter, response or status code | [docs/reference/api.md](docs/reference/api.md), `apps/web/src/lib/api.ts`, and the demo's copy (`apps/web/src/demo/engine.ts`, golden test: [demo.md](docs/development/demo.md#same-answers-as-the-server)) |
 | A CLI command or flag | [docs/reference/cli.md](docs/reference/cli.md) |
 | What is stored or logged | [docs/privacy.md](docs/privacy.md) |
 | Tracker options or behaviour | [docs/guides/tracking.md](docs/guides/tracking.md) |

@@ -43,6 +43,7 @@ export function AppLayout() {
   }
 
   const dev = me.data.provider === "dev"
+  const demo = me.data.provider === "demo"
   return (
     <SidebarProvider>
       <AppSidebar user={me.data} onSearch={() => setSearch(true)} />
@@ -50,6 +51,18 @@ export function AppLayout() {
         {dev && (
           <div className="border-b py-1 text-center text-[11px] text-fg-muted">
             Local development · demo data, automatic sign-in
+          </div>
+        )}
+        {demo && (
+          <div className="border-b px-4 py-1.5 text-center text-xs text-fg-secondary">
+            Live demo with made-up traffic for Lumen, a fictional company ·
+            read-only, nothing leaves your browser ·{" "}
+            <a
+              href="https://github.com/martinzachariassen/analytics-mlz-no"
+              className="text-accent-deep underline"
+            >
+              Self-host it
+            </a>
           </div>
         )}
         <Suspense fallback={<Skeleton className="m-6 h-96" />}>

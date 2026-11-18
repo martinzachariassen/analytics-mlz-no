@@ -49,7 +49,9 @@ The workflow then:
    SBOM and a signed build provenance attestation; the GeoIP month is pinned to the release month,
 3. builds the dashboard and cross-compiles static binaries with it embedded for Linux and macOS
    (amd64, arm64) with `checksums.txt` and a
-   provenance attestation (`gh attestation verify <file> --owner martinzachariassen`),
+   provenance attestation (`gh attestation verify <file> --owner martinzachariassen`), whose
+   signed bundle is also attached as `analytics_<tag>.intoto.jsonl` (verify with `--bundle`
+   without GitHub's attestation API; Scorecard's Signed-Releases check looks for it),
 4. creates the GitHub release with generated notes. A tag containing `-` is marked as a pre-release.
 
 Edit the generated notes afterwards if needed, copying the relevant part of the changelog.

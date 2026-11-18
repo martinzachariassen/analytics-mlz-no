@@ -181,3 +181,21 @@ func TestWriteJSON(t *testing.T) {
 		t.Fatalf("got %d %v %q", w.Code, w.Header(), w.Body)
 	}
 }
+
+func TestAcceptsGzip(t *testing.T) {
+	for header, want := range map[string]bool{
+		"":                        false,
+		"gzip":                    true,
+		"GZIP":                    true,
+		"br, gzip;q=0.8":          true,
+		"deflate, gzip ; q=1.0":   true,
+		"gzip;q=0":                false,
+		"gzip; q=0.000, identity": false,
+		"x-gzip, br":              false,
+		"*":                       false,
+	} {
+		if got := AcceptsGzip(header); got != want {
+			t.Errorf("AcceptsGzip(%q) = %v, want %v", header, got, want)
+		}
+	}
+}

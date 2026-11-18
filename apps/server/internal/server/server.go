@@ -19,6 +19,7 @@ import (
 	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/script"
 	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/store"
 	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/visitor"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/web"
 )
 
 // New returns the root HTTP handler.
@@ -77,7 +78,7 @@ func New(cfg config.Config, st *store.Store, authn *auth.Service, loc *geo.Locat
 		httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
-	return secure(cfg, jsonErrors(mux))
+	return secure(cfg, fallback(mux, web.Handler(web.Files)))
 }
 
 // crossOrigin is the CSRF protection for the dashboard and sign-in routes. It rejects
@@ -99,7 +100,8 @@ func crossOrigin(publicURL string, log *slog.Logger) *http.CrossOriginProtection
 
 // secure adds the response headers every response gets, whether or not a CDN in front
 // adds its own. The API serves JSON and a script, never HTML, so the policy is "nothing":
-// no embedding, no scripts, no referrer. HSTS is sent when the dashboard is served over https.
+// no embedding, no scripts, no referrer. The embedded dashboard replaces these with its own
+// (package web). HSTS is sent when the dashboard is served over https.
 func secure(cfg config.Config, next http.Handler) http.Handler {
 	hsts := strings.HasPrefix(cfg.PublicURL, "https://")
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -116,12 +118,18 @@ func secure(cfg config.Config, next http.Handler) http.Handler {
 	})
 }
 
-// jsonErrors turns the mux's own text 404 and 405 responses into the API's JSON shape,
-// keeping the Allow header the mux sets on a 405.
-func jsonErrors(mux *http.ServeMux) http.Handler {
+// fallback answers requests no route matches. GET and HEAD outside /api go to the embedded
+// dashboard when the binary has one (nil otherwise). Everything else gets the API's JSON 404
+// or 405 instead of the mux's text ones, keeping the Allow header the mux sets on a 405.
+func fallback(mux *http.ServeMux, dashboard http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, pattern := mux.Handler(r); pattern != "" {
 			mux.ServeHTTP(w, r)
+			return
+		}
+		if dashboard != nil && (r.Method == http.MethodGet || r.Method == http.MethodHead) &&
+			r.URL.Path != "/api" && !strings.HasPrefix(r.URL.Path, "/api/") {
+			dashboard.ServeHTTP(w, r)
 			return
 		}
 		probe := &headerOnly{header: http.Header{}}

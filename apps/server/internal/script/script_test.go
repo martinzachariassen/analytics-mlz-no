@@ -74,21 +74,3 @@ func TestHandlerGzip(t *testing.T) {
 		t.Fatalf("revalidation status = %d, want 304", w2.Code)
 	}
 }
-
-func TestAcceptsGzip(t *testing.T) {
-	for header, want := range map[string]bool{
-		"":                        false,
-		"gzip":                    true,
-		"GZIP":                    true,
-		"br, gzip;q=0.8":          true,
-		"deflate, gzip ; q=1.0":   true,
-		"gzip;q=0":                false,
-		"gzip; q=0.000, identity": false,
-		"x-gzip, br":              false,
-		"*":                       false,
-	} {
-		if got := acceptsGzip(header); got != want {
-			t.Errorf("acceptsGzip(%q) = %v, want %v", header, got, want)
-		}
-	}
-}

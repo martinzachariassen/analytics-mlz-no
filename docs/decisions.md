@@ -17,7 +17,7 @@ This page records the architectural decisions, open items, what comes next and w
 | Go module | `github.com/martinzachariassen/analytics-mlz-no/apps/server` (go.mod in `apps/server`; a root `go.work` lets `go run ./apps/server/...` work from the repo root) |
 | Database | SQLite (`modernc.org/sqlite`, pure Go, no CGO). WAL mode. |
 | Durability on Cloud Run | Litestream replicates SQLite to a GCS bucket; restores on start. `max-instances=1`. |
-| Hosting | GCP Cloud Run in `europe-north1`; dashboard on Firebase Hosting with `/api/**` rewritten to Cloud Run (same origin). Self-hosters use `docker compose`. |
+| Hosting | GCP Cloud Run in `europe-north1`; dashboard on Firebase Hosting with `/api/**` rewritten to Cloud Run (same origin). Self-hosters use `docker compose`; the image serves the dashboard itself (embedded). |
 | Auth | **GitHub OAuth only** (no passwords). `ALLOWED_GITHUB_USERS` allowlist; username bound to the stable GitHub account id on first sign-in. Provider interface so Google/OIDC can be added later. Session cookie **must** be named `__session` (the only cookie Firebase Hosting forwards); it also carries the OAuth state during sign-in. |
 | Privacy | No cookies, no stored IPs or raw user agents. Visitor id = hash(daily salt + site id + IP + UA). Salt rotates daily (UTC) and old salts are deleted. |
 | Events (v1) | Page views, SPA navigation (pushState/popstate), outbound links (auto), custom events via `data-mlz-event` attributes and `window.mlz.track(name, props)`. |
@@ -59,9 +59,10 @@ The product roadmap after the quality base, in order. Each is one pull request w
    and rate per goal on the overview, management in settings.
 3. ✅ **CSV export**: breakdowns and time series with the same period and filter parameters,
    formula-escaped cells.
-4. **Dashboard in the binary**: embed `apps/web/dist` in the Go binary and serve it from the
-   same origin as the API, so `docker compose` gives self-hosters a working dashboard (see
-   [Before 1.0](#before-10)). Firebase Hosting keeps serving it in production.
+4. ✅ **Dashboard in the binary**: `apps/web/dist` is embedded in the image and the release
+   binaries (`internal/web`) and served from the same origin as the API, so `docker compose`
+   gives self-hosters a working dashboard. Firebase Hosting keeps serving it in production; the
+   embedded copy mirrors `firebase.json` (headers, rewrites), held together by a test.
 
 Dropped: **shareable read-only links** (a public `/api/share/{token}/…`). Every reader today is a
 signed-in, allowlisted user, so a token-based read path would add an unauthenticated surface
@@ -74,12 +75,13 @@ filters, and `utm_term`/`utm_content`.
 
 ## Before 1.0
 
-- **Dashboard for self-hosters.** The Docker image contains the API only. The dashboard (`apps/web/`) is
-  deployed to Firebase Hosting and reaches the API through a same-origin rewrite, so someone running
-  `docker compose` has a working collector but no dashboard unless they serve `apps/web/dist`
-  themselves behind the same origin. Decide whether to embed `apps/web/dist` in the Go
-  binary (simplest for self-hosting) or document a reverse-proxy recipe. Chosen: embed it,
-  item 4 under [Next](#next).
+- ✅ **Dashboard for self-hosters.** The dashboard (`apps/web/`) is deployed to Firebase Hosting
+  and reaches the API through a same-origin rewrite, so the Docker image used to give someone
+  running `docker compose` a working collector but no dashboard. The options were to embed
+  `apps/web/dist` in the Go binary (simplest for self-hosting) or document a reverse-proxy recipe.
+  Settled: the image and release binaries embed it (item 4 under [Next](#next)), with the
+  headers and rewrites of `firebase.json`. Production keeps Firebase Hosting in front for the CDN;
+  the embedded copy is unused there.
 - **Site ownership.** The dashboard is single-tenant: every allowlisted user can read and change
   every site. Fine for one person or one team; more would need a `site_users` table.
 - **A second identity provider.** The `auth.Provider` interface is there; OIDC (Google, Keycloak)

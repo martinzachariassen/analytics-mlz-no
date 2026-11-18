@@ -8,22 +8,30 @@
 **Read this if:** you want to run the server on your own machine or VM. To deploy to Google
 Cloud, see [deploy-gcp.md](deploy-gcp.md).
 
-> [!IMPORTANT]
-> **The dashboard is not in the server image yet.** The image serves the API, the tracking script
-> and event collection. The dashboard in `apps/web/` is a static single-page app, and it must be
-> served from the **same origin** as `/api` (production uses Firebase Hosting with a rewrite).
-> If you serve `apps/web/dist` yourself, send headers equivalent to those in
-> `apps/web/firebase.json`: the server sets its own security headers for `/api`, but the
-> dashboard's Content-Security-Policy comes from whatever serves the static files.
-> This will be settled before 1.0 (see [decisions.md](../decisions.md#before-10)).
+The image and the release binaries contain everything: the API, event collection, the tracking
+script and the dashboard. Open `PUBLIC_URL` in a browser to sign in. The server sends the
+dashboard with the same security headers (Content-Security-Policy included) and caching that
+production gets from Firebase Hosting, so a reverse proxy only needs to add TLS.
+
+<details>
+<summary>Serving the dashboard from somewhere else</summary>
+
+The dashboard must be served from the **same origin** as `/api`, or the session cookie and the
+CSRF check fail. To put it on a CDN, as production does with Firebase Hosting, serve
+`apps/web/dist` (`make web`) with the headers and rewrites in `apps/web/firebase.json` and send
+`/api/*` to the server. Requests for files never reach the server then; the embedded copy just
+goes unused. A binary built from source with plain `go build` (or `make run`) has no dashboard
+and says so at startup; `make build` embeds it.
+
+</details>
 
 ## 1. Install
 
 | Option | How |
 |---|---|
 | **Docker image** (linux/amd64, linux/arm64) | `docker pull ghcr.io/martinzachariassen/analytics-mlz-no:latest`, or pin a version such as `:0.1.0` |
-| **Static binary** (Linux and macOS, amd64 and arm64) | From the [releases page](https://github.com/martinzachariassen/analytics-mlz-no/releases). Verify it with `checksums.txt`. The binary has no GeoIP database: set `GEOIP_DB_PATH` to a DB-IP Lite country `.mmdb` file to record countries |
-| **From source** | `make run` (see [CONTRIBUTING.md](../../CONTRIBUTING.md)) |
+| **Static binary** (Linux and macOS, amd64 and arm64) | From the [releases page](https://github.com/martinzachariassen/analytics-mlz-no/releases), dashboard included. Verify it with `checksums.txt`. The binary has no GeoIP database: set `GEOIP_DB_PATH` to a DB-IP Lite country `.mmdb` file to record countries |
+| **From source** | `make build` for `bin/analytics` with the dashboard (needs Bun), or `make dev` for a local test environment (see [CONTRIBUTING.md](../../CONTRIBUTING.md)) |
 
 ## 2. Start it and add a site
 

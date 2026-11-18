@@ -1,5 +1,6 @@
-# Only apps/server and infra/docker are copied into the image; keep the rest out of the build
-# context so a build never ships a database, a secret or a node_modules tree.
+# Only apps/server, apps/web (built in its own stage), the workspace manifests and infra/docker
+# are used by the build; keep the rest out of the build context so a build never ships a
+# database, a secret or a node_modules tree.
 .git
 .github
 .githooks
@@ -18,7 +19,13 @@ scripts
 **/*.mmdb
 **/*.log
 infra/terraform
-apps/web
-apps/tracker
+apps/web/e2e/.auth
+apps/web/test-results
+apps/web/playwright-report
+# The workspace lockfile lists the tracker, so its manifest is needed; nothing else of it.
+apps/tracker/*
+!apps/tracker/package.json
+# A local `make embed-web` copy; the image embeds its own fresh build.
+apps/server/internal/web/static/*
 apps/demo
 gha-creds-*.json

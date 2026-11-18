@@ -1,6 +1,9 @@
 # Build context: repository root.
 #   docker build -f infra/docker/Dockerfile -t analytics-mlz-no .
 #
+# The dashboard (apps/web) is built here and embedded in the binary, so the image serves it on
+# the same origin as /api. Production still serves it from Firebase Hosting in front.
+#
 # Base images are pinned by digest (Dependabot keeps them current). Litestream comes from its
 # official image, so its binary is verified by digest too. The DB-IP database is the one thing
 # fetched over the network at build time; DBIP_MONTH pins which monthly file, and the build log
@@ -8,6 +11,19 @@
 
 # Build stages run on the host platform and cross-compile (pure Go, no CGO). Running the Go
 # toolchain under amd64 emulation on Apple Silicon crashes, and native builds are much faster.
+# The dashboard build is the same for every target platform, so it runs once, natively.
+FROM --platform=$BUILDPLATFORM oven/bun:1.4.2-alpine@sha256:d888c0ae6c86d7866ff10c5aafdd9077b36aee6455b33dd270fb93c0dd5cef6f AS web
+# Host for the tracking snippet on the dashboard's "Tracking code" page; empty = the dashboard's own origin.
+ARG TRACKER_ORIGIN=""
+WORKDIR /src
+COPY package.json bun.lock ./
+COPY apps/web/package.json apps/web/
+COPY apps/tracker/package.json apps/tracker/
+RUN --mount=type=cache,target=/root/.bun/install/cache bun install --frozen-lockfile --filter web
+COPY apps/web apps/web
+WORKDIR /src/apps/web
+RUN VITE_TRACKER_ORIGIN="$TRACKER_ORIGIN" bun run build
+
 FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine@sha256:0a5f7fe796599ff487605987432e7619ae45beeb2fba4c2ce0b907879932aebf AS build
 ARG TARGETOS TARGETARCH
 ARG VERSION=dev
@@ -15,6 +31,7 @@ WORKDIR /src/apps/server
 COPY apps/server/go.mod apps/server/go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY apps/server ./
+COPY --from=web /src/apps/web/dist ./internal/web/static/
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} \

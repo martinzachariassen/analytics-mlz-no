@@ -48,7 +48,9 @@ computed at query time from `session_id`. Nothing is pre-aggregated.
 
 **Deployment shape.** The dashboard is static files. It must be served from the same origin as
 `/api`, so the session cookie and CSRF model work. In production, Firebase Hosting serves the
-dashboard and rewrites `/api/**` to one Cloud Run instance. Litestream streams the SQLite file to
+dashboard and rewrites `/api/**` to one Cloud Run instance. The image and release binaries also
+embed the dashboard (`internal/web`) and serve it themselves, with the same routes and headers,
+so a self-hosted install needs nothing in front but TLS. Litestream streams the SQLite file to
 GCS. See [docs/guides/deploy-gcp.md](docs/guides/deploy-gcp.md).
 
 ### A page view, end to end
@@ -115,12 +117,13 @@ What the server defends against, and what it does not, is in the
 | `internal/ingest` | `Handler` for `POST /api/event` and `GET /api/pixel.gif` (`pixel.go`, image proxies in `proxy.go`). The abuse checks in order (`admit`, `record`), `isBot`, `buildEvent` (validation and normalisation), `cleanText`, prop parsing |
 | `internal/visitor` | `Hasher.ID`: SHA-256 of daily salt, site id, IP and user agent, truncated to 63 bits |
 | `internal/geo` | `Locator.Country`: local MaxMind/DB-IP lookup. Returns `""` without a database |
-| `internal/httpx` | `ClientIP` and `PeerIP` (`X-Forwarded-For` with `PROXY_HOPS`), `RateLimiter`, `ReadJSON` and `WriteJSON` |
+| `internal/httpx` | `ClientIP` and `PeerIP` (`X-Forwarded-For` with `PROXY_HOPS`), `RateLimiter`, `ReadJSON`, `WriteJSON` and `AcceptsGzip` |
 | `internal/auth` | `Service`: GitHub OAuth (`github.go`), sessions, `Require` middleware, the `DEV_LOGIN` shortcut (`dev.go`). A `Provider` interface leaves room for more identity providers |
 | `internal/api` | `API.Register`: sites CRUD, purge (`api.go`), goals and goal stats (`goals.go`), CSV export (`export.go`), and stats, breakdown, heatmap and realtime handlers with query parsing (`stats.go`) |
 | `internal/store` | All SQL. `store.go` opens SQLite (WAL) and runs `migrations/*.sql`. `events.go` inserts events and assigns sessions. `stats.go` holds `Summary`, `Timeseries`, `Breakdown` and `Dimensions`. `filter.go` turns `Filters` into SQL. `goals.go` holds goal CRUD and `GoalStats`. `sites.go` (with `sitecache.go`), `users.go` |
 | `internal/text` | `Clean` and `Truncate`: how ingest cleans browser strings before storing them, shared with goals so a goal typed as sent matches |
 | `internal/script` | Embeds `script.js` (built from `apps/tracker`) and serves it gzipped with an `ETag` |
+| `internal/web` | Embeds the dashboard build (`static/`, copied from `apps/web/dist` by `make embed-web` and the Dockerfile; only a placeholder is committed) and serves it with the rewrites and headers of `apps/web/firebase.json`, which `TestMatchesFirebaseHosting` holds it to. Without a build, `Handler` returns nil and the binary has no dashboard |
 | `internal/devdata` | Synthetic traffic profiles for `analytics seed`: history (`Seed`) and visits as they happen (`Live`, for `seed -live`) |
 
 ### `apps/tracker`: tracking script
@@ -146,7 +149,7 @@ TypeScript copy of the read API, held to the Go API's answers by a golden test. 
 | Path | What |
 |---|---|
 | `apps/demo` | Static demo site for `make dev` |
-| `infra/docker` | `Dockerfile` (static binary, DB-IP database, Litestream), `entrypoint.sh` (Litestream restore and replicate, `REQUIRE_REPLICA`), `docker-compose.yml` (hardened; settings from `.env`, template `.env.example`), `backup.sh` (the standalone backup job), `test-restore.sh`, `test-backup.sh` |
+| `infra/docker` | `Dockerfile` (dashboard build, static binary with it embedded, DB-IP database, Litestream), `entrypoint.sh` (Litestream restore and replicate, `REQUIRE_REPLICA`), `docker-compose.yml` (hardened; settings from `.env`, template `.env.example`), `backup.sh` (the standalone backup job), `test-restore.sh`, `test-backup.sh` |
 | `infra/terraform/bootstrap` | GCP project, APIs, state bucket, budget |
 | `infra/terraform/main` | Cloud Run service and backup job, buckets, Secret Manager, Firebase Hosting, monitoring dashboard and alerts, Workload Identity Federation for the Deploy workflow (`deploy.tf`) |
 | `.github/workflows` | `ci.yml` (one job per `scripts/verify.sh` group, plus docs links, Docker, security) `codeql.yml` (CodeQL for Go, TypeScript and the workflows), `scorecard.yml` (OpenSSF Scorecard), `release.yml` (images with SBOM and provenance attestations, binaries on tag) and `deploy.yml` (deploys `main` to Cloud Run and Firebase Hosting after CI passes, through the `make deploy-*` targets) |
@@ -201,6 +204,9 @@ These must stay true. Each one is enforced in one place, so changing it is a con
 - **Pure Go, no CGO** (`modernc.org/sqlite`), standard library routing (`http.ServeMux` patterns).
 - **The tracker script is generated.** Never edit `internal/script/script.js` by hand. CI checks
   that it matches `apps/tracker/src`.
+- **The embedded dashboard answers like Firebase Hosting.** Headers and rewrites in
+  `internal/web` mirror `apps/web/firebase.json`; change both, or `TestMatchesFirebaseHosting`
+  fails. `/api` never falls through to the dashboard.
 - **Bots and over-limit visitors get `202`**, the same as real events, so probes learn nothing.
 
 ## Cross-cutting concerns
@@ -210,7 +216,8 @@ These must stay true. Each one is enforced in one place, so changing it is a con
 ```
 net/http server (timeouts, 16 KB header cap)
 └── secure(): X-Robots-Tag, nosniff, Referrer-Policy, CSP, X-Frame-Options, HSTS
-    └── jsonErrors(): 404/405 as JSON, Allow header kept
+    └── fallback(): no route matched → GET/HEAD outside /api to web.Handler (embedded dashboard,
+        │           when built in); otherwise 404/405 as JSON, Allow header kept
         └── ServeMux
             ├── POST /api/event          ingest.Handler (limits → bot → payload → site → store)
             ├── GET  /api/pixel.gif      ingest.Handler.Pixel (same limits → proxy/bot → query → site with pixel on → store; always a GIF)

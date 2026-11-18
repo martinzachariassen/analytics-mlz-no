@@ -37,6 +37,7 @@ in [docs/reference/configuration.md](docs/reference/configuration.md) and run `m
 | `make lint` | Biome (format + lint), gofmt and golangci-lint |
 | `make format` | Fix formatting (Biome and gofmt) |
 | `make tracker` | Rebuild `apps/server/internal/script/script.js` from `apps/tracker/src` |
+| `make build` | `bin/analytics` with the dashboard embedded (runs `make embed-web`, which builds `apps/web` and copies it into `apps/server/internal/web/static`) |
 | `docker compose -f infra/docker/docker-compose.yml up --build` | Production image locally |
 | `infra/docker/test-restore.sh` | Check Litestream backup and restore |
 | `scripts/check-replica.sh <gs://bucket/path>` | Check a Litestream replica for overlapping or missing LTX files (read-only) |
@@ -113,6 +114,7 @@ style is described in [docs/README.md](docs/README.md#how-these-docs-are-written
 | Bot filtering or rate limits | [docs/operations/bots.md](docs/operations/bots.md) |
 | Deployment (`Makefile` deploy targets, `.github/workflows/deploy.yml`, `infra/terraform/main/deploy.tf`), alerts, backups | [docs/guides/deploy-gcp.md](docs/guides/deploy-gcp.md) and [docs/operations/runbook.md](docs/operations/runbook.md) |
 | A package, invariant or data flow | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| Dashboard hosting headers or rewrites (`apps/web/firebase.json`) | `apps/server/internal/web/web.go` to match (`TestMatchesFirebaseHosting`), and [dashboard.md](docs/development/dashboard.md#building-and-hosting) |
 | A colour token, or what a colour is used for | [docs/development/colours.md](docs/development/colours.md) (tables and `palette.svg`) and the tokens copied into `apps/demo/index.html` |
 | A metric's meaning | [docs/concepts.md](docs/concepts.md) and `apps/web/src/lib/metrics.ts` |
 | An architectural decision | [docs/decisions.md](docs/decisions.md) |

@@ -31,6 +31,7 @@ import (
 	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/geo"
 	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/server"
 	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/store"
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/web"
 )
 
 // version is set at release time with -ldflags "-X main.version=v1.2.3".
@@ -168,6 +169,10 @@ func serve(cfg config.Config, log *slog.Logger) error {
 		log.Info("github sign-in enabled", "allowed", cfg.AllowedGitHubUsers, "callback", cfg.PublicURL+"/api/auth/github/callback")
 	default:
 		log.Warn("GITHUB_CLIENT_ID not set; dashboard sign-in is disabled")
+	}
+
+	if !web.Embedded() {
+		log.Info("dashboard not built into this binary; serve apps/web/dist on the same origin as /api, or build with `make embed-web`")
 	}
 
 	go maintenanceLoop(ctx, st, cfg.RetentionDays, log)

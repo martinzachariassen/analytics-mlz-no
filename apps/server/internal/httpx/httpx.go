@@ -1,10 +1,12 @@
-// Package httpx contains small HTTP helpers: client IP extraction, JSON and per-IP rate limiting.
+// Package httpx contains small HTTP helpers: client IP extraction, JSON, per-IP rate limiting
+// and Accept-Encoding negotiation.
 package httpx
 
 import (
 	"net"
 	"net/http"
 	"net/netip"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -156,4 +158,23 @@ func (rl *RateLimiter) Len() int {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 	return len(rl.limiters)
+}
+
+// AcceptsGzip reports whether an Accept-Encoding header allows gzip (and doesn't refuse it with q=0).
+func AcceptsGzip(header string) bool {
+	for _, part := range strings.Split(header, ",") {
+		coding, params, _ := strings.Cut(part, ";")
+		if !strings.EqualFold(strings.TrimSpace(coding), "gzip") {
+			continue
+		}
+		for _, p := range strings.Split(params, ";") {
+			k, v, _ := strings.Cut(strings.TrimSpace(p), "=")
+			if strings.EqualFold(k, "q") {
+				q, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
+				return err == nil && q > 0
+			}
+		}
+		return true
+	}
+	return false
 }

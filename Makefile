@@ -1,6 +1,6 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
-.PHONY: run verify test lint format build docker tracker web dev-web dev dev-api dev-demo dev-live dev-reset deploy deploy-server deploy-web
+.PHONY: run verify test lint format build docker tracker web embed-web dev-web dev dev-api dev-demo dev-live dev-reset deploy deploy-server deploy-web
 
 run:
 	go run ./apps/server/cmd/analytics serve
@@ -19,7 +19,8 @@ lint:
 format:
 	bun run format
 
-build:
+# A self-contained binary: the dashboard is built and embedded first (needs Bun).
+build: embed-web
 	CGO_ENABLED=0 go build -trimpath -ldflags "-X main.version=$(VERSION)" -o bin/analytics ./apps/server/cmd/analytics
 
 docker:
@@ -69,6 +70,12 @@ TRACKER_ORIGIN ?=
 web:
 	cd apps/web && bun install --frozen-lockfile --silent
 	cd apps/web && VITE_TRACKER_ORIGIN=$(TRACKER_ORIGIN) bun run build
+
+# Copy the dashboard build into the server package, so the next `go build` embeds it.
+WEB_EMBED = apps/server/internal/web/static
+embed-web: web
+	find $(WEB_EMBED) -mindepth 1 ! -name .gitkeep -delete
+	cp -R apps/web/dist/. $(WEB_EMBED)/
 
 # ---------------------------------------------------------------- production (see infra/terraform)
 

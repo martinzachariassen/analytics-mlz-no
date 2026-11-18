@@ -5,7 +5,7 @@
 //	analytics sites list
 //	analytics events purge -site ID -from 2026-11-01 -to 2026-11-02 [-path /x]   delete spam
 //	analytics sessions revoke [-user LOGIN]   sign a user (or everyone) out everywhere
-//	analytics seed [-days 730] [-scale 1] [-reset]   demo sites with synthetic data for local development
+//	analytics seed [-days 730] [-scale 1] [-reset] [-live]   demo sites with synthetic data for local development
 //	analytics version                         print the version
 package main
 
@@ -327,23 +327,26 @@ var demoSites = []struct {
 	profile      *devdata.Profile
 	goals        [][2]string // kind, value
 }{
-	{"Demo blog", "localhost", 80, devdata.Blog, [][2]string{{"event", "newsletter-signup"}, {"event", "contact-submit"}, {"path", "/contact"}}},
-	{"Demo docs", "docs.localhost", 35, devdata.Docs, [][2]string{{"event", "copy-code"}, {"path", "/docs/*"}}},
+	{"Fjord Labs Blog (demo)", "localhost", 80, devdata.Blog, [][2]string{{"event", "newsletter-signup"}, {"event", "contact-submit"}, {"path", "/contact"}}},
+	{"Fjord Labs Docs (demo)", "docs.localhost", 35, devdata.Docs, [][2]string{{"event", "copy-code"}, {"path", "/docs/*"}}},
 }
 
 // seed fills demo sites with synthetic traffic for local development.
-// Existing demo sites are left alone unless -reset is given.
+// Existing demo sites keep their data unless -reset is given; -live then keeps new
+// visits arriving until interrupted, so Realtime has something to show.
 func seed(cfg config.Config, args []string) error {
 	fs := flag.NewFlagSet("seed", flag.ExitOnError)
 	days := fs.Int("days", 730, "days of history")
 	scale := fs.Float64("scale", 1, "multiply the amount of traffic")
 	reset := fs.Bool("reset", false, "delete the demo sites and their events first (requires DEV_LOGIN=1)")
+	live := fs.Bool("live", false, "after seeding, keep adding visits as they happen until interrupted")
 	_ = fs.Parse(args)
 	if *reset && !cfg.DevLogin {
 		return errors.New("seed -reset deletes sites and is only allowed with DEV_LOGIN=1")
 	}
 
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 	st, err := store.Open(ctx, cfg.DatabasePath)
 	if err != nil {
 		return err
@@ -354,18 +357,31 @@ func seed(cfg config.Config, args []string) error {
 	if err != nil {
 		return err
 	}
-	existing := map[string]string{} // domain -> id
+	existing := map[string]store.Site{} // by domain
 	for _, s := range list {
-		existing[s.Domain] = s.ID
+		existing[s.Domain] = s
 	}
 
-	for _, demo := range demoSites {
-		if id, ok := existing[demo.domain]; ok {
+	ids := make([]string, len(demoSites))
+	opts := make([]devdata.Options, len(demoSites))
+	for i, demo := range demoSites {
+		opts[i] = devdata.Options{
+			Days: *days, DailyVisits: int(float64(demo.visits) * *scale), Hostname: demo.domain, Profile: demo.profile,
+		}
+		if old, ok := existing[demo.domain]; ok {
 			if !*reset {
-				fmt.Printf("%s (%s) already has data in %s; run with -reset to regenerate.\n", demo.name, id, cfg.DatabasePath)
+				ids[i] = old.ID
+				if old.Name != demo.name {
+					if _, err := st.UpdateSite(ctx, old.ID, demo.name, "", nil); err != nil {
+						return err
+					}
+				}
+				if !*live {
+					fmt.Printf("%s (%s) already has data in %s; run with -reset to regenerate.\n", demo.name, old.ID, cfg.DatabasePath)
+				}
 				continue
 			}
-			if err := st.DeleteSite(ctx, id); err != nil {
+			if err := st.DeleteSite(ctx, old.ID); err != nil {
 				return err
 			}
 		}
@@ -373,20 +389,34 @@ func seed(cfg config.Config, args []string) error {
 		if err != nil {
 			return err
 		}
+		ids[i] = site.ID
 		for _, g := range demo.goals {
 			if _, err := st.CreateGoal(ctx, site.ID, g[0], g[1]); err != nil {
 				return err
 			}
 		}
 		start := time.Now()
-		n, err := devdata.Seed(ctx, st, site.ID, devdata.Options{
-			Days: *days, DailyVisits: int(float64(demo.visits) * *scale), Hostname: demo.domain, Profile: demo.profile,
-		})
+		n, err := devdata.Seed(ctx, st, site.ID, opts[i])
 		if err != nil {
 			return err
 		}
 		fmt.Printf("Seeded %s (%s, %s) with %d events over %d days in %.1fs.\n",
 			demo.name, site.ID, demo.domain, n, *days, time.Since(start).Seconds())
+	}
+	if !*live {
+		return nil
+	}
+
+	fmt.Println("Sending live visits to the demo sites; press Ctrl+C to stop.")
+	errs := make(chan error, len(demoSites))
+	for i := range demoSites {
+		go func() { errs <- devdata.Live(ctx, st, ids[i], opts[i]) }()
+	}
+	for range demoSites {
+		if err := <-errs; err != nil {
+			stop()
+			return err
+		}
 	}
 	return nil
 }

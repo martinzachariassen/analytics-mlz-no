@@ -17,7 +17,7 @@ pinned in [`mise.toml`](mise.toml), so one command installs them all. You also n
 ```sh
 mise install    # the pinned tools
 bun install     # JavaScript packages (workspaces apps/web and apps/tracker); also wires up the pre-commit hook
-make dev        # API :8080, dashboard :5173, demo site :8081, synthetic data, one-click sign-in
+make dev        # API :8080, dashboard :5173, demo site :8081, synthetic and live data, one-click sign-in
 make dev-reset  # start over with fresh data
 ```
 

@@ -15,7 +15,7 @@
 | `analytics sites list` | Lists all sites |
 | `analytics events purge -site ID -from T -to T [-path P]` | Deletes events in a time window |
 | `analytics sessions revoke [-user LOGIN]` | Signs one dashboard user, or everyone, out everywhere |
-| `analytics seed [-days N] [-scale X] [-reset]` | Creates the two demo sites with synthetic traffic |
+| `analytics seed [-days N] [-scale X] [-reset] [-live]` | Creates the two demo sites with synthetic traffic |
 | `analytics version` | Prints the version, without reading any configuration |
 
 Every command except `version` reads the same environment variables as the server (see
@@ -146,16 +146,22 @@ DEV_LOGIN=1 analytics seed -reset     # regenerate the demo data
 analytics seed -days 90 -scale 0.2
 ```
 
-Creates "Demo blog" (`localhost`) and "Demo docs" (`docs.localhost`) and fills them with
+Creates "Fjord Labs Blog (demo)" (`localhost`) and "Fjord Labs Docs (demo)" (`docs.localhost`) and fills them with
 synthetic traffic from `internal/devdata`, plus a few goals (newsletter sign-ups and `/contact` on
 the blog, `copy-code` and `/docs/*` on the docs). A demo site that already exists is left alone unless
-you pass `-reset`, which deletes it and its events first.
+you pass `-reset`, which deletes it and its events first (an older name is updated, though).
+
+With `-live` it then keeps going until <kbd>Ctrl+C</kbd>: new visits arrive at the rate the
+seeded traffic has for the current hour, at least one a minute per site, and each event is
+written when its time comes, so **Realtime** always has visitors. `make dev` runs it as its own
+process next to the server.
 
 | Flag | Default | Meaning |
 |---|---|---|
 | `-days` | `730` | Days of history |
 | `-scale` | `1` | Multiplies the amount of traffic |
 | `-reset` | off | Delete and recreate the demo sites. Refused unless `DEV_LOGIN=1`, so it cannot wipe a production database by accident |
+| `-live` | off | After seeding, keep sending synthetic visits as they happen until interrupted |
 
 Only use it on a development database. `make dev` runs it with `DATABASE_PATH=data/dev.db`.
 

@@ -30,17 +30,18 @@ make dev
 
 This does three things:
 
-1. `analytics seed` creates `data/dev.db` with two demo sites, "Demo blog" (`localhost`) and
-   "Demo docs" (`docs.localhost`), filled with two years of synthetic traffic: growth, weekends,
-   seasonal dips, spikes, returning visitors and custom events. On later runs, existing demo
-   data is kept.
+1. `analytics seed` creates `data/dev.db` with two demo sites, "Fjord Labs Blog (demo)"
+   (`localhost`) and "Fjord Labs Docs (demo)" (`docs.localhost`), filled with two years of
+   synthetic traffic: growth, weekends, seasonal dips, spikes, returning visitors and custom
+   events. On later runs, existing demo data is kept.
 2. It prints the links:
    ```
      Dashboard:  http://localhost:5173
      Demo site:  http://localhost:8081/?site=<id>
    ```
-3. It starts three processes: the API on `:8080` (with `DEV_LOGIN=1`, so sign-in is one click),
-   the dashboard dev server on `:5173` (which proxies `/api` to `:8080`) and the demo site on `:8081`.
+3. It starts four processes: the API on `:8080` (with `DEV_LOGIN=1`, so sign-in is one click),
+   the dashboard dev server on `:5173` (which proxies `/api` to `:8080`), the demo site on `:8081`,
+   and `analytics seed -live`, which keeps synthetic visitors arriving so **Realtime** is never empty.
 
 ## 3. Tour of the dashboard
 

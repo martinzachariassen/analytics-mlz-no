@@ -1,6 +1,6 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
-.PHONY: run verify test lint format build docker tracker web dev-web dev dev-api dev-demo dev-reset deploy deploy-server deploy-web
+.PHONY: run verify test lint format build docker tracker web dev-web dev dev-api dev-demo dev-live dev-reset deploy deploy-server deploy-web
 
 run:
 	go run ./apps/server/cmd/analytics serve
@@ -36,7 +36,8 @@ dev-web:
 # ---------------------------------------------------------------- local test environment
 
 # Everything for trying the dashboard locally: a separate database with synthetic data,
-# automatic sign-in (DEV_LOGIN, localhost only) and a demo site that sends real events.
+# automatic sign-in (DEV_LOGIN, localhost only), a demo site that sends real events and a
+# steady trickle of synthetic visits so Realtime moves.
 #   dashboard  http://localhost:5173
 #   demo site  http://localhost:8081/?site=<id>   (printed below)
 DEV_ENV = DATABASE_PATH=data/dev.db PUBLIC_URL=http://localhost:5173 DEV_LOGIN=1 GITHUB_CLIENT_ID= GITHUB_CLIENT_SECRET=
@@ -47,13 +48,16 @@ dev:
 	@echo "  Dashboard:  http://localhost:5173"
 	@echo "  Demo site:  http://localhost:8081/?site=$$($(DEV_ENV) go run ./apps/server/cmd/analytics sites list | awk '$$NF != "CREATED" && $$(NF-1) == "localhost" {print $$1}')"
 	@echo
-	@$(MAKE) --no-print-directory -j3 dev-api dev-web dev-demo
+	@$(MAKE) --no-print-directory -j4 dev-api dev-web dev-demo dev-live
 
 dev-api:
 	$(DEV_ENV) go run ./apps/server/cmd/analytics serve
 
 dev-demo:
 	python3 -m http.server 8081 --bind 127.0.0.1 --directory apps/demo
+
+dev-live:
+	$(DEV_ENV) go run ./apps/server/cmd/analytics seed -live
 
 # Start over with fresh synthetic data on the next `make dev`.
 dev-reset:

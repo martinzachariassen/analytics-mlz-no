@@ -140,11 +140,19 @@ type visitor struct {
 	client  client
 }
 
+var hourTotal = func() float64 {
+	var t float64
+	for _, w := range hourly {
+		t += w
+	}
+	return t
+}()
+
 // returnRate is the share of visits made by someone who already visited that day.
 const returnRate = 0.25
 
-// Seed inserts synthetic events for siteID and returns how many were written.
-func Seed(ctx context.Context, st *store.Store, siteID string, o Options) (int, error) {
+// withDefaults fills in the options left at their zero value.
+func withDefaults(o Options) Options {
 	if o.Days <= 0 {
 		o.Days = 730
 	}
@@ -160,14 +168,15 @@ func Seed(ctx context.Context, st *store.Store, siteID string, o Options) (int, 
 	if o.Location == nil {
 		o.Location = time.Local
 	}
+	return o
+}
+
+// Seed inserts synthetic events for siteID and returns how many were written.
+func Seed(ctx context.Context, st *store.Store, siteID string, o Options) (int, error) {
+	o = withDefaults(o)
 	r := o.Rand
 	if r == nil {
 		r = rand.New(rand.NewPCG(1, 2)) //nolint:gosec // synthetic test data, not security-sensitive
-	}
-
-	var hourTotal float64
-	for _, w := range hourly {
-		hourTotal += w
 	}
 
 	// A big spike (e.g. a post on Hacker News) three weeks ago, so it shows in "Last 30 days"
@@ -263,12 +272,27 @@ func newVisitor(r *rand.Rand) visitor {
 	return visitor{id: r.Int64(), country: pick(r, countries), client: pick(r, clients)}
 }
 
-// visit writes one session: an entry page view, maybe more page views,
-// and occasionally custom or outbound-link events.
+// visit writes the part of one session that has happened by o.Now.
 func visit(ctx context.Context, st *store.Store, r *rand.Rand, siteID string, o Options, v visitor, start time.Time, src source) (int, error) {
+	n := 0
+	for _, ev := range visitEvents(r, siteID, o.Hostname, o.Profile, v, start, src) {
+		if ev.Time.After(o.Now) {
+			continue
+		}
+		if err := st.InsertEvent(ctx, ev); err != nil {
+			return n, err
+		}
+		n++
+	}
+	return n, nil
+}
+
+// visitEvents builds one session: an entry page view, maybe more page views,
+// and occasionally custom or outbound-link events.
+func visitEvents(r *rand.Rand, siteID, hostname string, p *Profile, v visitor, start time.Time, src source) []store.Event {
 	base := store.Event{
 		SiteID:    siteID,
-		Hostname:  o.Hostname,
+		Hostname:  hostname,
 		Country:   v.country,
 		Browser:   v.client.browser,
 		OS:        v.client.os,
@@ -282,34 +306,81 @@ func visit(ctx context.Context, st *store.Store, r *rand.Rand, siteID string, o 
 		pages += 1 + r.IntN(4)
 	}
 
-	n := 0
+	var events []store.Event
 	t := start
-	path := pick(r, o.Profile.entryPages)
+	path := pick(r, p.entryPages)
 	for i := range pages {
-		if t.After(o.Now) {
-			break
-		}
 		ev := base
 		ev.Time, ev.Type, ev.Path = t, "pageview", path
 		if i == 0 {
 			ev.ReferrerHost, ev.UTMSource, ev.UTMMedium, ev.UTMCampaign = src.ref, src.utmSource, src.utmMedium, src.utmCampaign
 		}
-		if err := st.InsertEvent(ctx, ev); err != nil {
-			return n, err
+		events = append(events, ev)
+		if ev2, ok := maybeEvent(r, base, path, t); ok {
+			events = append(events, ev2)
 		}
-		n++
-
-		if ev2, ok := maybeEvent(r, base, path, t); ok && !ev2.Time.After(o.Now) {
-			if err := st.InsertEvent(ctx, ev2); err != nil {
-				return n, err
-			}
-			n++
-		}
-
 		t = t.Add(time.Duration(10+r.IntN(170)) * time.Second)
-		path = pick(r, o.Profile.nextPages)
+		path = pick(r, p.nextPages)
 	}
-	return n, nil
+	return events
+}
+
+// Live keeps visits arriving for siteID until ctx is done, at the rate Seed would give
+// the current hour, but at least liveFloor a minute so Realtime always has something to
+// show. Each event is written when its time comes, not ahead of time.
+func Live(ctx context.Context, st *store.Store, siteID string, o Options) error {
+	o = withDefaults(o)
+	r := o.Rand
+	if r == nil {
+		r = rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 3)) //nolint:gosec // synthetic test data, not security-sensitive
+	}
+	tick := time.NewTicker(time.Second)
+	defer tick.Stop()
+	var queue []store.Event
+	last := time.Now()
+	for {
+		var now time.Time
+		select {
+		case <-ctx.Done():
+			return nil
+		case now = <-tick.C:
+		}
+		for k := poisson(r, liveRate(o, now)*now.Sub(last).Minutes()); k > 0; k-- {
+			queue = append(queue, visitEvents(r, siteID, o.Hostname, o.Profile, newVisitor(r), now, pick(r, o.Profile.sources))...)
+		}
+		last = now
+		slices.SortFunc(queue, func(a, b store.Event) int { return a.Time.Compare(b.Time) })
+		i := 0
+		for ; i < len(queue) && !queue[i].Time.After(now); i++ {
+			if err := st.InsertEvent(ctx, queue[i]); err != nil {
+				if ctx.Err() != nil {
+					return nil
+				}
+				return err
+			}
+		}
+		queue = queue[i:]
+	}
+}
+
+// liveFloor is the fewest new visits a minute Live sends.
+const liveFloor = 1.0
+
+// liveRate is the expected number of new visits a minute at t.
+func liveRate(o Options, t time.Time) float64 {
+	local := t.In(o.Location)
+	perDay := float64(o.DailyVisits) * dayFactor(local, 0, o.Days)
+	return math.Max(liveFloor, perDay*hourly[local.Hour()]/hourTotal/60)
+}
+
+// poisson draws how many visits start in an interval where mean are expected.
+func poisson(r *rand.Rand, mean float64) int {
+	limit, p, k := math.Exp(-mean), r.Float64(), 0
+	for p > limit {
+		p *= r.Float64()
+		k++
+	}
+	return k
 }
 
 func maybeEvent(r *rand.Rand, base store.Event, path string, t time.Time) (store.Event, bool) {

@@ -46,15 +46,15 @@ test.describe("signed out", () => {
 
 test("the site list shows the demo sites", async ({ page }) => {
   await page.goto("/sites")
-  await expect(page.getByRole("link", { name: /Demo blog/ })).toBeVisible()
-  await expect(page.getByRole("link", { name: /Demo docs/ })).toBeVisible()
+  await expect(page.getByRole("link", { name: /Fjord Labs Blog/ })).toBeVisible()
+  await expect(page.getByRole("link", { name: /Fjord Labs Docs/ })).toBeVisible()
   await expectAccessible(page)
 })
 
 test("overview shows numbers and survives a filter round trip", async ({
   page,
 }) => {
-  await openSite(page, "Demo blog")
+  await openSite(page, "Fjord Labs Blog")
   await expect(page.getByText("Visitors").first()).toBeVisible()
   await expectAccessible(page)
 
@@ -70,7 +70,7 @@ test("overview shows numbers and survives a filter round trip", async ({
 test("a report row opens the detail sheet, which can filter the dashboard", async ({
   page,
 }) => {
-  const base = await openSite(page, "Demo blog")
+  const base = await openSite(page, "Fjord Labs Blog")
   await page.goto(`${base}/pages`)
   await expect(page.getByRole("row").nth(1)).toBeVisible()
   await expectAccessible(page)
@@ -90,7 +90,7 @@ for (const view of ["realtime", "sources", "locations", "devices", "events"]) {
   test(`the ${view} view renders and is accessible`, async ({ page }) => {
     const errors: string[] = []
     page.on("pageerror", (e) => errors.push(e.message))
-    const base = await openSite(page, "Demo docs")
+    const base = await openSite(page, "Fjord Labs Docs")
     await page.goto(`${base}/${view}`)
     await expect(page.locator("main")).toBeVisible()
     await page.waitForLoadState("networkidle")
@@ -101,7 +101,7 @@ for (const view of ["realtime", "sources", "locations", "devices", "events"]) {
 }
 
 test("settings shows the tracking code", async ({ page }) => {
-  const base = await openSite(page, "Demo docs")
+  const base = await openSite(page, "Fjord Labs Docs")
   await page.goto(`${base}/settings`)
   await expect(page.getByText("Tracking code")).toBeVisible()
   await expect(page.locator("pre").first()).toContainText("data-site")
@@ -111,7 +111,7 @@ test("settings shows the tracking code", async ({ page }) => {
 test("the overview shows conversions for the seeded goals", async ({
   page,
 }) => {
-  await openSite(page, "Demo blog")
+  await openSite(page, "Fjord Labs Blog")
   const goals = page.getByTitle("Filter by this goal").filter({
     hasText: "newsletter-signup",
   })
@@ -124,7 +124,7 @@ test("the overview shows conversions for the seeded goals", async ({
 })
 
 test("goals can be added and removed in settings", async ({ page }) => {
-  const base = await openSite(page, "Demo docs")
+  const base = await openSite(page, "Fjord Labs Docs")
   await page.goto(`${base}/settings#goals`)
   await page.getByRole("combobox", { name: "Goal type" }).click()
   await page.getByRole("option", { name: "Page" }).click()
@@ -141,7 +141,7 @@ test("goals can be added and removed in settings", async ({ page }) => {
 })
 
 test("a report table exports the filtered rows as CSV", async ({ page }) => {
-  const base = await openSite(page, "Demo blog")
+  const base = await openSite(page, "Fjord Labs Blog")
   await page.goto(`${base}/pages?f=device%3Ais%3Adesktop`)
   const download = page.waitForEvent("download")
   await page.getByRole("link", { name: "Export pages as CSV" }).click()
@@ -168,7 +168,7 @@ test("a failed panel says so and recovers with Try again", async ({ page }) => {
         })
       : route.fallback()
   )
-  await openSite(page, "Demo docs")
+  await openSite(page, "Fjord Labs Docs")
   const alert = page.getByRole("alert")
   // The query retries 5xx twice with backoff before giving up.
   await expect(alert).toContainText("database is locked", { timeout: 15_000 })

@@ -8,9 +8,9 @@ import (
 	_ "embed"
 	"encoding/hex"
 	"net/http"
-	"strconv"
-	"strings"
 	"time"
+
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/httpx"
 )
 
 //go:embed script.js
@@ -47,30 +47,11 @@ func Handler() http.Handler {
 		h.Add("Vary", "Accept-Encoding")
 
 		body, tag := script, etag
-		if acceptsGzip(r.Header.Get("Accept-Encoding")) {
+		if httpx.AcceptsGzip(r.Header.Get("Accept-Encoding")) {
 			body, tag = scriptGz, etagGz
 			h.Set("Content-Encoding", "gzip")
 		}
 		h.Set("ETag", tag)
 		http.ServeContent(w, r, "script.js", time.Time{}, bytes.NewReader(body))
 	})
-}
-
-// acceptsGzip reports whether an Accept-Encoding header allows gzip (and doesn't refuse it with q=0).
-func acceptsGzip(header string) bool {
-	for _, part := range strings.Split(header, ",") {
-		coding, params, _ := strings.Cut(part, ";")
-		if !strings.EqualFold(strings.TrimSpace(coding), "gzip") {
-			continue
-		}
-		for _, p := range strings.Split(params, ";") {
-			k, v, _ := strings.Cut(strings.TrimSpace(p), "=")
-			if strings.EqualFold(k, "q") {
-				q, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
-				return err == nil && q > 0
-			}
-		}
-		return true
-	}
-	return false
 }

@@ -363,3 +363,19 @@ func TestFailedCallbackKeepsExistingSession(t *testing.T) {
 		t.Fatalf("me = %d, want 200", me.Code)
 	}
 }
+
+func TestCrossSiteLoginKeepsExistingSession(t *testing.T) {
+	h := newHarness(t)
+	c := sessionCookie(h.signIn("martin"))
+	w := h.do("GET", "/api/auth/github/login", c, "Sec-Fetch-Site", "cross-site")
+	if w.Code != http.StatusFound || w.Header().Get("Location") != "https://stats.example.com/" || sessionCookie(w) != nil {
+		t.Fatalf("cross-site login: status %d, location %q, cookie %v", w.Code, w.Header().Get("Location"), sessionCookie(w))
+	}
+	if me := h.do("GET", "/api/auth/me", c); me.Code != http.StatusOK {
+		t.Fatalf("me = %d, want 200", me.Code)
+	}
+	// Without a session, a link from elsewhere (a bookmark page, GitHub) still starts sign-in.
+	if w := h.do("GET", "/api/auth/github/login", nil, "Sec-Fetch-Site", "cross-site"); w.Code != http.StatusFound || sessionCookie(w) == nil {
+		t.Fatalf("cross-site login without session: status %d", w.Code)
+	}
+}

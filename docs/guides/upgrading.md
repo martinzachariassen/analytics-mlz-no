@@ -33,8 +33,9 @@ docker compose -f infra/docker/docker-compose.yml exec analytics analytics versi
 
 Download the archive for your platform from the GitHub release, verify it against
 `checksums.txt` (`sha256sum -c checksums.txt`, or `shasum -a 256 -c checksums.txt` on macOS) or
-its provenance (`gh attestation verify <file> --owner martinzachariassen`), replace the old
-binary and restart.
+its provenance (`gh attestation verify <file> --owner martinzachariassen`, or with
+`--bundle analytics_<tag>.intoto.jsonl` from the same release to skip GitHub's attestation
+API), replace the old binary and restart.
 
 ## What happens on start
 

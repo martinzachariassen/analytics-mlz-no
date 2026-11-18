@@ -117,14 +117,22 @@ jobs:
           done
           cd dist && sha256sum ./*.tar.gz > checksums.txt
       - name: Attest the binaries' build provenance
+        id: provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
         with:
           subject-path: dist/*.tar.gz
+      # The same signed bundle as a release asset, for verifying without GitHub's attestation
+      # API (`gh attestation verify --bundle`) and for tools that look for *.intoto.jsonl, such as
+      # OpenSSF Scorecard's Signed-Releases check.
+      - name: Attach the provenance bundle
+        env:
+          BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+        run: cp "$BUNDLE" "dist/analytics_${GITHUB_REF_NAME}.intoto.jsonl"
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           flags=""
           case "$GITHUB_REF_NAME" in *-*) flags="--prerelease" ;; esac
-          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/checksums.txt \
+          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/checksums.txt dist/*.intoto.jsonl \
             --title "$GITHUB_REF_NAME" --generate-notes $flags

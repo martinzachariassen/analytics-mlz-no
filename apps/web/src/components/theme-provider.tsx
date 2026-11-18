@@ -19,8 +19,8 @@ const COLOR_SCHEME_QUERY = "(prefers-color-scheme: dark)"
 const THEME_VALUES: Theme[] = ["dark", "light", "system"]
 // Must match the <meta name="theme-color"> values in index.html.
 const THEME_COLOR: Record<ResolvedTheme, string> = {
-  dark: "#0c0c0f",
-  light: "#fbfbfc",
+  dark: "#0c0d10",
+  light: "#f9fafc",
 }
 
 // localStorage throws in some private windows and sandboxed frames; the theme still works then.

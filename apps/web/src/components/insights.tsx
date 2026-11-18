@@ -65,7 +65,7 @@ export function Insights({ stats }: { stats?: Stats }) {
 
   return (
     <p className="flex items-start gap-2 text-[13px] text-pretty text-fg-secondary">
-      <Sparkles className="mt-0.5 size-3.5 shrink-0 text-accent" />
+      <Sparkles className="mt-0.5 size-3.5 shrink-0 text-fg-muted" />
       <span>
         {items.map((it, i) => (
           <span key={i}>

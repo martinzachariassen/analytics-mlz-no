@@ -60,7 +60,7 @@ export function Panel({
   )
 }
 
-/** Text tabs: the active one underlined in the accent. */
+/** Text tabs: the active one underlined in the text colour. */
 export function TextTabs<T extends string>({
   value,
   onChange,
@@ -90,7 +90,7 @@ export function TextTabs<T extends string>({
             className={cn(
               "shrink-0 border-b-2 pb-2 text-xs font-medium whitespace-nowrap transition-colors",
               active
-                ? "border-accent text-fg"
+                ? "border-fg text-fg"
                 : "border-transparent text-fg-muted hover:text-fg"
             )}
           >

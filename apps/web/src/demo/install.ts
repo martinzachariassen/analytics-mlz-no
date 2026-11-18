@@ -41,17 +41,18 @@ const latency = () =>
 export function installDemo(): void {
   let backend: Backend | undefined
   const ready = new Promise<Backend>((resolve) => {
-    const now = Date.now()
     const worker = new Worker(new URL("./worker.ts", import.meta.url), {
       type: "module",
     })
-    worker.onmessage = (e: MessageEvent<Snapshot[]>) => {
+    worker.onmessage = (
+      e: MessageEvent<{ now: number; tables: Snapshot[] }>
+    ) => {
       worker.terminate()
-      backend = backendFrom(e.data.map(Table.from), now)
+      const { now, tables } = e.data
+      backend = backendFrom(tables.map(Table.from), now)
       trickle(backend.sites, liveGenerators(now), now)
       resolve(backend)
     }
-    worker.postMessage({ now })
   })
 
   const realFetch = window.fetch.bind(window)

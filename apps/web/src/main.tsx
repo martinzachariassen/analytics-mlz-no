@@ -18,6 +18,10 @@ import { ErrorPage } from "@/routes/error-page"
 import { HomePage } from "@/routes/home"
 import { SitesPage } from "@/routes/sites"
 
+// The public demo answers /api in the browser; the import is dropped from other builds.
+const DEMO = import.meta.env.MODE === "demo"
+if (DEMO) (await import("@/demo/install")).installDemo()
+
 // Charts (Recharts) are the bulk of the bundle; load them only when needed.
 const SiteLayout = lazy(() =>
   import("@/routes/site/layout").then((m) => ({ default: m.SiteLayout }))
@@ -65,42 +69,54 @@ const queryClient: QueryClient = new QueryClient({
   },
 })
 
-const router = createBrowserRouter([
-  // Public: what this is, and sign-in. Signed-in visitors go on to /sites.
-  { path: "/", element: <HomePage />, errorElement: <ErrorPage /> },
-  { path: "/login", element: <Navigate to="/" replace /> },
-  {
-    element: <AppLayout />,
-    errorElement: <ErrorPage />,
-    children: [
-      { path: "/sites", element: <SitesPage /> },
-      {
-        path: "/sites/:id",
-        element: <SiteLayout />,
-        children: [
-          { index: true, element: <OverviewPage /> },
-          { path: "realtime", element: <RealtimePage /> },
-          { path: "pages", element: <ReportPage key="pages" report="pages" /> },
-          {
-            path: "sources",
-            element: <ReportPage key="sources" report="sources" />,
-          },
-          {
-            path: "locations",
-            element: <ReportPage key="locations" report="locations" />,
-          },
-          {
-            path: "devices",
-            element: <ReportPage key="devices" report="devices" />,
-          },
-          { path: "events", element: <EventsPage /> },
-          { path: "settings", element: <SettingsPage /> },
-        ],
-      },
-      { path: "*", element: <Navigate to="/sites" replace /> },
-    ],
-  },
-])
+const router = createBrowserRouter(
+  [
+    // Public: what this is, and sign-in. Signed-in visitors go on to /sites. The demo
+    // starts on its main site instead.
+    {
+      path: "/",
+      element: DEMO ? <Navigate to="/sites/lumen" replace /> : <HomePage />,
+      errorElement: <ErrorPage />,
+    },
+    { path: "/login", element: <Navigate to="/" replace /> },
+    {
+      element: <AppLayout />,
+      errorElement: <ErrorPage />,
+      children: [
+        { path: "/sites", element: <SitesPage /> },
+        {
+          path: "/sites/:id",
+          element: <SiteLayout />,
+          children: [
+            { index: true, element: <OverviewPage /> },
+            { path: "realtime", element: <RealtimePage /> },
+            {
+              path: "pages",
+              element: <ReportPage key="pages" report="pages" />,
+            },
+            {
+              path: "sources",
+              element: <ReportPage key="sources" report="sources" />,
+            },
+            {
+              path: "locations",
+              element: <ReportPage key="locations" report="locations" />,
+            },
+            {
+              path: "devices",
+              element: <ReportPage key="devices" report="devices" />,
+            },
+            { path: "events", element: <EventsPage /> },
+            { path: "settings", element: <SettingsPage /> },
+          ],
+        },
+        { path: "*", element: <Navigate to="/sites" replace /> },
+      ],
+    },
+  ],
+  // "/demo" for the demo build, "" (the root) otherwise.
+  { basename: import.meta.env.BASE_URL.replace(/\/$/, "") || "/" }
+)
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

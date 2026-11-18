@@ -260,6 +260,9 @@ the right page. If the dimension is new to the API, start in [backend.md](backen
 | `Cache-Control` | `firebase.json` | `no-cache` for every path (so `/` and deep links always get the latest `index.html`), and `immutable` for the hashed files under `/assets/**` and `/fonts/**`. Firebase matches header rules on the request path and the last match wins |
 | Security headers | `firebase.json` | CSP (`img-src 'self' data:`, so no third-party images such as GitHub avatars; the menu shows initials), HSTS, `X-Frame-Options`, `Permissions-Policy` |
 
+`bun run build` also builds the [public demo](demo.md) into `dist/demo`, served at `/demo/`: the
+same app with `/api` answered in the browser from generated data.
+
 The Vite dev server uses `strictPort`, so it fails instead of moving to another port when 5173
 is taken (the server's `PUBLIC_URL` points at 5173).
 
@@ -271,6 +274,7 @@ There are three layers. Each one catches what the one before cannot.
 |---|---|---|---|
 | Unit | `src/lib/*.test.ts` | `bun run test` (vitest, Node) | The API client (error mapping, retry policy, headers, id encoding, query strings), URL state parsing and the `hasOwn` guards, period maths, metrics, dimensions, formatting, and the CSP hash of the theme script |
 | Component | `src/components/*.test.tsx`, `src/routes/**/*.test.tsx` | `bun run test` (vitest, happy-dom, Testing Library) | Filter bar, date range picker and its shortcuts, detail sheet, goals (the overview card, adding and removing in settings), `ErrorNote` (retry, focus, no flip on background refetches) and onboarding in the site layout (polling until the first event, then the dashboard), against a mocked `fetch`, with the URL as the observable state |
+| Demo engine | `src/demo/golden.test.ts` | `bun run test` | The demo's in-browser API gives the Go API's answers to about 80 requests (`TestDemoGolden` writes them; see [demo.md](demo.md#same-answers-as-the-server)) |
 | End to end | `e2e/*.spec.ts` | `bun run e2e` (Playwright) | The real Go server with seeded data and the production build: sign-in, every view of a site, filters, the detail sheet, settings, goals (conversions on the overview, adding and removing in settings), a CSV download with a filter, a failed request recovering with "Try again", and a new site waiting for its first event and switching to the dashboard when one is sent, with an axe scan on every page |
 
 - **Unit tests:** put logic in `lib/` as plain functions when you can, so it is easy to test. If
@@ -290,7 +294,8 @@ There are three layers. Each one catches what the one before cannot.
   `web` group has just built it.
   - A setup project signs in once and shares the session, because the auth endpoints are rate
     limited.
-  - Every test runs three times: desktop, mobile (Pixel 7) and the light theme.
+  - Every test runs three times: desktop, mobile (Pixel 7) and the light theme. `demo.spec.ts`
+    runs on its own against the demo build (`dist/demo` on :4174), on desktop and mobile.
   - `expectAccessible` fails on serious or critical WCAG 2.1 AA violations. Fix the cause (a
     token in `src/index.css`, a role, a label); don't exclude the rule.
   - To test a failure, fail the request with `page.route(…)` and `route.fulfill({ status: 500 })`;
@@ -300,6 +305,7 @@ There are three layers. Each one catches what the one before cannot.
 
 ## Next steps
 
+- [Public demo](demo.md): the `/demo/` build and its in-browser API.
 - [API reference](../reference/api.md): what each endpoint returns
 - [Backend development](backend.md)
 - [Concepts](../concepts.md): what each number means

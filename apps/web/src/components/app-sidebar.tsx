@@ -281,7 +281,11 @@ function UserMenu({ user }: { user: User }) {
                   {user.login}
                 </span>
                 <span className="truncate text-xs text-fg-muted">
-                  {github ? "GitHub" : "Local demo"}
+                  {github
+                    ? "GitHub"
+                    : user.provider === "demo"
+                      ? "Read-only demo"
+                      : "Local demo"}
                 </span>
               </span>
               <ChevronsUpDown className="ml-auto text-fg-muted" />

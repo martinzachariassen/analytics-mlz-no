@@ -167,3 +167,5 @@ automated, so run them by hand when you change a series colour.
 
 - [Dashboard development](dashboard.md): app primitives and where the charts live.
 - `apps/web/src/index.css`: the tokens themselves.
+- `apps/demo/index.html` (`make dev`, <http://localhost:8081>): the palette and sample charts in
+  both themes. It copies the tokens, so update it when you change one.

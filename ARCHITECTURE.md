@@ -121,7 +121,7 @@ What the server defends against, and what it does not, is in the
 | `internal/store` | All SQL. `store.go` opens SQLite (WAL) and runs `migrations/*.sql`. `events.go` inserts events and assigns sessions. `stats.go` holds `Summary`, `Timeseries`, `Breakdown` and `Dimensions`. `filter.go` turns `Filters` into SQL. `goals.go` holds goal CRUD and `GoalStats`. `sites.go` (with `sitecache.go`), `users.go` |
 | `internal/text` | `Clean` and `Truncate`: how ingest cleans browser strings before storing them, shared with goals so a goal typed as sent matches |
 | `internal/script` | Embeds `script.js` (built from `apps/tracker`) and serves it gzipped with an `ETag` |
-| `internal/devdata` | Synthetic traffic profiles for `analytics seed` |
+| `internal/devdata` | Synthetic traffic profiles for `analytics seed`: history (`Seed`) and visits as they happen (`Live`, for `seed -live`) |
 
 ### `apps/tracker`: tracking script
 
@@ -135,6 +135,11 @@ attributes and exposes `window.mlz`. esbuild bundles it into
 React 19, Vite, Tailwind v4, shadcn/ui, TanStack Query and React Router. `src/main.tsx` holds the
 routes, `src/lib/api.ts` the typed API client, and `src/lib/use-scope.ts` the URL-held view state.
 See [docs/development/dashboard.md](docs/development/dashboard.md).
+
+`src/demo/` is only in the public demo build (`vite build --mode demo`, served at `/demo/`): it
+generates traffic for a fictional company in a Web Worker and answers `/api` in the browser with a
+TypeScript copy of the read API, held to the Go API's answers by a golden test. See
+[docs/development/demo.md](docs/development/demo.md).
 
 ### Everything else
 

@@ -17,7 +17,7 @@ pinned in [`mise.toml`](mise.toml), so one command installs them all. You also n
 ```sh
 mise install    # the pinned tools
 bun install     # JavaScript packages (workspaces apps/web and apps/tracker); also wires up the pre-commit hook
-make dev        # API :8080, dashboard :5173, demo site :8081, synthetic data, one-click sign-in
+make dev        # API :8080, dashboard :5173, demo site :8081, synthetic and live data, one-click sign-in
 make dev-reset  # start over with fresh data
 ```
 
@@ -106,14 +106,14 @@ style is described in [docs/README.md](docs/README.md#how-these-docs-are-written
 | If you change… | Update |
 |---|---|
 | An environment variable or Terraform variable | [docs/reference/configuration.md](docs/reference/configuration.md) |
-| An API endpoint, parameter, response or status code | [docs/reference/api.md](docs/reference/api.md) and `apps/web/src/lib/api.ts` |
+| An API endpoint, parameter, response or status code | [docs/reference/api.md](docs/reference/api.md), `apps/web/src/lib/api.ts`, and the demo's copy (`apps/web/src/demo/engine.ts`, golden test: [demo.md](docs/development/demo.md#same-answers-as-the-server)) |
 | A CLI command or flag | [docs/reference/cli.md](docs/reference/cli.md) |
 | What is stored or logged | [docs/privacy.md](docs/privacy.md) |
 | Tracker options or behaviour | [docs/guides/tracking.md](docs/guides/tracking.md) |
 | Bot filtering or rate limits | [docs/operations/bots.md](docs/operations/bots.md) |
 | Deployment (`Makefile` deploy targets, `.github/workflows/deploy.yml`, `infra/terraform/main/deploy.tf`), alerts, backups | [docs/guides/deploy-gcp.md](docs/guides/deploy-gcp.md) and [docs/operations/runbook.md](docs/operations/runbook.md) |
 | A package, invariant or data flow | [ARCHITECTURE.md](ARCHITECTURE.md) |
-| A colour token, or what a colour is used for | [docs/development/colours.md](docs/development/colours.md) (tables and `palette.svg`) |
+| A colour token, or what a colour is used for | [docs/development/colours.md](docs/development/colours.md) (tables and `palette.svg`) and the tokens copied into `apps/demo/index.html` |
 | A metric's meaning | [docs/concepts.md](docs/concepts.md) and `apps/web/src/lib/metrics.ts` |
 | An architectural decision | [docs/decisions.md](docs/decisions.md) |
 | A CI job that runs on pull requests, or a GitHub repository setting | `scripts/github-settings.sh` (required checks), then run it; [docs/development/releasing.md](docs/development/releasing.md#repository-settings) |

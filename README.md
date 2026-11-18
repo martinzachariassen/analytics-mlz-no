@@ -18,6 +18,9 @@ Lightweight, privacy-friendly, self-hostable web analytics written in Go.
 
 ## Try it in one command
 
+Or click through the [live demo](https://analytics.mlz.no/demo/), with made-up traffic for a
+fictional company. It runs entirely in your browser.
+
 ```sh
 mise install && bun install   # tools pinned in mise.toml, JavaScript packages
 make dev

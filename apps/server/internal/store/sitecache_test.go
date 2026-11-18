@@ -9,8 +9,8 @@ func TestSiteCacheExpiresAndBounds(t *testing.T) {
 	var c siteCache
 	t0 := time.Date(2026, 11, 4, 12, 0, 0, 0, time.UTC)
 
-	c.put("a", Site{ID: "a"}, true, t0)
-	c.put("missing", Site{}, false, t0)
+	c.put("a", Site{ID: "a"}, true, t0, c.generation())
+	c.put("missing", Site{}, false, t0, c.generation())
 	if s, found, ok := c.get("a", t0.Add(time.Second)); !ok || !found || s.ID != "a" {
 		t.Fatalf("get a = %+v, %v, %v", s, found, ok)
 	}
@@ -26,18 +26,34 @@ func TestSiteCacheExpiresAndBounds(t *testing.T) {
 
 	c = siteCache{}
 	for i := range siteCacheMax {
-		c.put(itoa(i), Site{}, false, t0)
+		c.put(itoa(i), Site{}, false, t0, c.generation())
 	}
 	if len(c.entries) != siteCacheMax {
 		t.Fatalf("len = %d, want %d", len(c.entries), siteCacheMax)
 	}
-	c.put("one more", Site{}, false, t0)
+	c.put("one more", Site{}, false, t0, c.generation())
 	if len(c.entries) != 1 {
 		t.Fatalf("len after overflow = %d, want 1 (reset)", len(c.entries))
 	}
 	c.clear()
 	if _, _, ok := c.get("one more", t0); ok {
 		t.Fatal("clear did not clear")
+	}
+}
+
+// A lookup that read the row before a change must not cache the old value after it.
+func TestSiteCacheDropsLookupsThatStartedBeforeAClear(t *testing.T) {
+	var c siteCache
+	t0 := time.Date(2026, 11, 4, 12, 0, 0, 0, time.UTC)
+	gen := c.generation()
+	c.clear()
+	c.put("a", Site{ID: "a", Name: "old"}, true, t0, gen)
+	if _, _, ok := c.get("a", t0); ok {
+		t.Fatal("stale lookup was cached")
+	}
+	c.put("a", Site{ID: "a", Name: "new"}, true, t0, c.generation())
+	if s, _, ok := c.get("a", t0); !ok || s.Name != "new" {
+		t.Fatalf("get a = %+v, %v", s, ok)
 	}
 }
 

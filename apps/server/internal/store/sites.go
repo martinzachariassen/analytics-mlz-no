@@ -154,12 +154,13 @@ func (s *Store) GetSite(ctx context.Context, id string) (Site, error) {
 		}
 		return site, nil
 	}
+	gen := s.sites.generation()
 	site, err := s.getSite(ctx, id)
 	switch {
 	case err == nil:
-		s.sites.put(id, site, true, now)
+		s.sites.put(id, site, true, now, gen)
 	case errors.Is(err, ErrNotFound):
-		s.sites.put(id, Site{}, false, now)
+		s.sites.put(id, Site{}, false, now, gen)
 	}
 	return site, err
 }

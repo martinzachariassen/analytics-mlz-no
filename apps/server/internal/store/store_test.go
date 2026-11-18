@@ -126,6 +126,34 @@ func TestSites(t *testing.T) {
 	}
 }
 
+func TestDeleteSiteRemovesItsData(t *testing.T) {
+	ctx := context.Background()
+	st := openTemp(t)
+	site, _ := st.CreateSite(ctx, "", "mlz.no")
+	other, _ := st.CreateSite(ctx, "", "other.example")
+	for _, id := range []string{site.ID, other.ID} {
+		if err := st.InsertEvent(ctx, Event{SiteID: id, Time: time.Now(), Type: "event", Name: "signup",
+			VisitorID: 1, Props: map[string]string{"plan": "pro"}}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.CreateGoal(ctx, id, "event", "signup"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := st.DeleteSite(ctx, site.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.DeleteSite(ctx, site.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("second delete = %v, want ErrNotFound", err)
+	}
+	for table, want := range map[string]int{"events": 1, "event_props": 1, "goals": 1} {
+		var n int
+		if err := st.db.QueryRow(`SELECT COUNT(*) FROM ` + table).Scan(&n); err != nil || n != want {
+			t.Errorf("%s rows = %d, %v; want %d (the other site's)", table, n, err, want)
+		}
+	}
+}
+
 func TestSiteActivity(t *testing.T) {
 	ctx := context.Background()
 	st := openTemp(t)

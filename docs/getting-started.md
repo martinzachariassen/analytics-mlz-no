@@ -65,8 +65,31 @@ Open <http://localhost:5173> and click **Open demo dashboard**.
 ## 4. Send real events
 
 Open the **Demo site** link that `make dev` printed, and click around. Each page view and each
-button with `data-mlz-event` is sent through the real tracking script to `POST /api/event`. Within
-a few seconds it shows up in **Realtime**.
+button is sent through the real tracking script to `POST /api/event`. Within a few seconds it
+shows up in **Realtime**.
+
+The demo site has one card per tracker feature, each saying where its data appears in the
+dashboard:
+
+| Card | Sends | Look in |
+|---|---|---|
+| Page views | `history.pushState` navigation | Overview, Pages |
+| Custom event from an attribute | `data-mlz-event="newsletter-signup"` with a property | Events, Goals |
+| Custom event from JavaScript | `mlz.track("plan-selected", { plan, seats })` | Events (open it for properties) |
+| Outbound links | `outbound-link` | Events |
+| Campaigns | Page views with `utm_*` tags | Sources |
+| Goals | `/contact` and the `contact-submit` form event | Overview → Goals |
+| Tracking pixel | `GET /api/pixel.gif` (switch on **Tracking pixel** in Settings first) | Realtime, Pages, Events |
+
+Below the cards are a count and log of what this tab sent, an illustration of the dashboard with
+sample data (a period picker; KPIs with sparklines; the traffic chart; tabbed top lists; sources over
+time; devices; active hours; realtime; goals; countries; browsers and systems; events with their
+properties; new and returning visitors; a sortable pages table), and the colour palette (see [colours.md](development/colours.md)), with a light and
+dark switch.
+
+> [!NOTE]
+> The script does not track browsers driven by automation (`navigator.webdriver`), so clicks
+> from Playwright or similar tools show up in the demo's log but not in the dashboard.
 
 Or send one by hand. Find the site id with `sites list`, then post an event:
 

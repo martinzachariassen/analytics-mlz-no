@@ -290,7 +290,8 @@ func TestAuthRateLimitCannotBeForged(t *testing.T) {
 
 func TestSecurityHeaders(t *testing.T) {
 	h, c := setup(t)
-	for _, path := range []string{"/api/script.js", "/api/auth/me", "/healthz", "/does-not-exist", "/api/sites"} {
+	// A 404 under /api: outside it, a build with the dashboard embedded answers with its own headers.
+	for _, path := range []string{"/api/script.js", "/api/auth/me", "/healthz", "/api/does-not-exist", "/api/sites"} {
 		hdr := call(h, "GET", path, "", c, "").Header()
 		want := map[string]string{
 			"X-Robots-Tag":              "noindex, nofollow",
@@ -319,13 +320,44 @@ func TestSecurityHeaders(t *testing.T) {
 
 func TestErrorsAreJSON(t *testing.T) {
 	h, _ := setup(t)
-	w := call(h, "GET", "/nope", "", nil, "")
+	// Under /api, so the answer is the same whether or not the dashboard is embedded.
+	w := call(h, "GET", "/api/nope", "", nil, "")
 	if w.Code != http.StatusNotFound || w.Header().Get("Content-Type") != "application/json" || !strings.Contains(w.Body.String(), `"not found"`) {
 		t.Fatalf("404 = %d %q %q", w.Code, w.Header().Get("Content-Type"), w.Body)
 	}
 	w = call(h, "GET", "/api/event", "", nil, "")
 	if w.Code != http.StatusMethodNotAllowed || !strings.Contains(w.Header().Get("Allow"), "POST") || !strings.Contains(w.Body.String(), `"error"`) {
 		t.Fatalf("405 = %d allow=%q %q", w.Code, w.Header().Get("Allow"), w.Body)
+	}
+}
+
+func TestDashboardFallback(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/event", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusAccepted) })
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+	dashboard := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusTeapot) })
+	h := fallback(mux, dashboard)
+	for _, tc := range []struct {
+		method, path string
+		want         int
+	}{
+		{"GET", "/", http.StatusTeapot},
+		{"GET", "/sites/abc/pages", http.StatusTeapot},
+		{"HEAD", "/assets/app.js", http.StatusTeapot},
+		{"GET", "/demo/", http.StatusTeapot},
+		{"GET", "/healthz", http.StatusOK},
+		{"POST", "/api/event", http.StatusAccepted},
+		{"GET", "/api", http.StatusNotFound},
+		{"GET", "/api/nope", http.StatusNotFound},
+		{"GET", "/api/event", http.StatusMethodNotAllowed},
+		{"POST", "/", http.StatusNotFound},
+		{"POST", "/healthz", http.StatusMethodNotAllowed},
+	} {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest(tc.method, tc.path, nil))
+		if w.Code != tc.want {
+			t.Errorf("%s %s = %d, want %d", tc.method, tc.path, w.Code, tc.want)
+		}
 	}
 }
 

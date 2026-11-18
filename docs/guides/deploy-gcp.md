@@ -21,7 +21,9 @@ flowchart LR
 ```
 
 The dashboard runs on Firebase Hosting, and Firebase rewrites `/api/**` to a single Cloud Run
-instance, so the dashboard, API and tracking script share one origin. SQLite lives on the instance
+instance, so the dashboard, API and tracking script share one origin. The server image also
+carries the dashboard (for self-hosting without a CDN); behind Firebase it goes unused, since
+Firebase answers file requests itself. SQLite lives on the instance
 and Litestream replicates it to a GCS bucket. The reasons are in [decisions.md](../decisions.md).
 
 For personal traffic this stays inside the free tiers. The only steady cost is Litestream's writes

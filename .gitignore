@@ -14,6 +14,9 @@
 node_modules/
 dist/
 *.log
+# The dashboard build, copied in for embedding by `make embed-web` and the Dockerfile
+/apps/server/internal/web/static/*
+!/apps/server/internal/web/static/.gitkeep
 
 # Firebase CLI cache
 .firebase/

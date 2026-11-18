@@ -253,12 +253,22 @@ the right page. If the dimension is new to the API, start in [backend.md](backen
 ## Building and hosting
 
 `make web` builds into `apps/web/dist`. `make deploy-web` publishes it to Firebase Hosting.
+`make embed-web` copies the build into `apps/server/internal/web/static`, so the next `go build`
+embeds it and the server serves the dashboard itself; the Dockerfile and the release workflow do
+the same. Without that step (`make run`, `make dev`, `go test`), the binary has no dashboard and
+logs so at startup.
+
+Firebase Hosting and the embedded copy answer alike: `internal/web` sets the same headers and
+rewrites as `firebase.json`, and `TestMatchesFirebaseHosting` fails when they drift. Change a
+header or rewrite in both. HSTS is the exception on the server side: it is sent only when
+`PUBLIC_URL` is https. A missing file under `/assets/` or `/fonts/` is a `404` from the server,
+where Firebase answers with `index.html`.
 
 | Setting | Where | Effect |
 |---|---|---|
 | `TRACKER_ORIGIN` | `make web TRACKER_ORIGIN=https://t.example.com` (becomes `VITE_TRACKER_ORIGIN`) | The host the **Tracking code** snippet points at. Without it, the dashboard's own origin |
 | `Cache-Control` | `firebase.json` | `no-cache` for every path (so `/` and deep links always get the latest `index.html`), and `immutable` for the hashed files under `/assets/**` and `/fonts/**`. Firebase matches header rules on the request path and the last match wins |
-| Security headers | `firebase.json` | CSP (`img-src 'self' data:`, so no third-party images such as GitHub avatars; the menu shows initials), HSTS, `X-Frame-Options`, `Permissions-Policy` |
+| Security headers | `firebase.json` (mirrored in `apps/server/internal/web/web.go`) | CSP (`img-src 'self' data:`, so no third-party images such as GitHub avatars; the menu shows initials), HSTS, `X-Frame-Options`, `Permissions-Policy` |
 
 `bun run build` also builds the [public demo](demo.md) into `dist/demo`, served at `/demo/`: the
 same app with `/api` answered in the browser from generated data.

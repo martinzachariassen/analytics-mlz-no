@@ -47,7 +47,8 @@ The workflow then:
 2. builds and pushes `ghcr.io/martinzachariassen/analytics-mlz-no` for linux/amd64 and
    linux/arm64, tagged `0.1.0`, `0.1` and `latest` (pre-releases get only their own tag), with an
    SBOM and a signed build provenance attestation; the GeoIP month is pinned to the release month,
-3. cross-compiles static binaries for Linux and macOS (amd64, arm64) with `checksums.txt` and a
+3. builds the dashboard and cross-compiles static binaries with it embedded for Linux and macOS
+   (amd64, arm64) with `checksums.txt` and a
    provenance attestation (`gh attestation verify <file> --owner martinzachariassen`),
 4. creates the GitHub release with generated notes. A tag containing `-` is marked as a pre-release.
 

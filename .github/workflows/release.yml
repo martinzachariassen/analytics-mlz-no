@@ -97,8 +97,10 @@ jobs:
           persist-credentials: false
       - name: Install the pinned tools (mise)
         uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
-      # Static binaries (pure Go, no CGO). They contain no GeoIP database: set GEOIP_DB_PATH
-      # to a DB-IP Lite country .mmdb file to record countries.
+      - name: Build the dashboard and embed it in the binaries
+        run: make embed-web
+      # Static binaries (pure Go, no CGO) with the dashboard. They contain no GeoIP database:
+      # set GEOIP_DB_PATH to a DB-IP Lite country .mmdb file to record countries.
       - name: Build binaries
         run: |
           mkdir dist

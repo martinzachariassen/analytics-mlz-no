@@ -384,7 +384,7 @@
   <div class="tip" id="tip"></div>
 
   <script>
-    const API = "http://localhost:8080";
+    const API = `${location.protocol}//${location.hostname}:8080`;
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
@@ -566,7 +566,7 @@
       const i = Math.max(0, Math.min(D.n - 1, Math.round(((e.clientX - r.left) / r.width) * (D.n - 1))));
       const x = (i / (D.n - 1)) * 600;
       const cross = $("cross"); cross.setAttribute("x1", x); cross.setAttribute("x2", x); cross.setAttribute("visibility", "visible");
-      const [label, c, p, , f] = D.kpis[active];
+      const [label, c, p] = D.kpis[active];
       const v = (n) => (label === "Visit duration" ? dur(n) : label === "Bounce rate" ? `${Math.round(n)}%` : n.toLocaleString("en-GB"));
       showTip(e, `<strong>${dateLabel(i)}</strong><br><span class="chip" style="--c:var(--accent)"></span>${label}: ${v(c[i])}<br><span class="chip" style="--c:var(--fg-muted)"></span>Previous: ${v(p[i])}`);
     });

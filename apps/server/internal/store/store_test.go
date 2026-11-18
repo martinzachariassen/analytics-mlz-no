@@ -54,11 +54,11 @@ func TestSiteNamesAndIDs(t *testing.T) {
 	ctx := context.Background()
 	st := openTemp(t)
 	long := strings.Repeat("n", 500)
-	site, err := st.CreateSite(ctx, " My\x00 site\n "+long, "a.example")
+	site, err := st.CreateSite(ctx, " My\x00 site\n \u202e"+long, "a.example")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.ContainsAny(site.Name, "\x00\n") || len(site.Name) > maxNameLen || !strings.HasPrefix(site.Name, "My site") {
+	if strings.ContainsAny(site.Name, "\x00\n\u202e") || len(site.Name) > maxNameLen || !strings.HasPrefix(site.Name, "My site") {
 		t.Fatalf("name = %q", site.Name)
 	}
 	if !ValidSiteID(site.ID) {

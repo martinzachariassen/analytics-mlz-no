@@ -40,6 +40,7 @@
 ### Development
 - [Backend (Go)](development/backend.md)
 - [Dashboard (React)](development/dashboard.md)
+- [Colours](development/colours.md): what each colour means, the palette, and how to change it
 - [Tracking script (TypeScript)](development/tracker.md)
 - [Releasing](development/releasing.md)
 

@@ -214,11 +214,13 @@ Use these before writing new layout:
 
 - Linear/Vercel style, dark first. The theme is set before React loads (`index.html`) and
   switched by `theme-provider.tsx`.
-- All colours are tokens in `src/index.css`, defined for light (`:root`) and dark (`.dark`):
-  neutral surfaces, one violet `--accent`, `--positive`/`--negative` for deltas, and
-  `--series-1` … `--series-6` for categorical charts.
+- All colours are tokens in `src/index.css`, defined for light (`:root`) and dark
+  (`[data-theme="dark"]`). The UI is greyscale and colour means data: mlz violet (`--accent`) is
+  the main data colour and the brand, grey is the comparison, `--positive`/`--negative` are only
+  for up and down, and `--series-1` … `--series-5` are for charts that compare categories.
 - The series colours have a fixed order, checked for colour vision deficiency in both themes.
-  Do not reorder them or add colours without checking again.
+  Do not reorder them or add colours without checking again. Roles, the full palette, the rules
+  and how to change a colour: [Colours](colours.md).
 - Type is Geist and Geist Mono. `src/styles/mlz-brand.css` only provides the wordmark font.
 - shadcn components: add with `bunx shadcn@latest add <name>` (in `apps/web`). Change their look
   in `index.css` through `[data-slot="…"]` selectors, not by editing files in `components/ui/`,

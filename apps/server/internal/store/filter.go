@@ -38,11 +38,6 @@ func (fs Filters) Validate() error {
 	return nil
 }
 
-// Has reports whether fs filters on dim.
-func (fs Filters) Has(dim string) bool {
-	return slices.ContainsFunc(fs, func(f Filter) bool { return f.Dim == dim })
-}
-
 // Filter kinds decide how a filter applies to rows of the events table.
 //
 //   - visitor dims (country, browser, os, device) are constant within a visit,

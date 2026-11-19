@@ -315,10 +315,7 @@ func (h *Handler) buildEvent(ctx context.Context, r *http.Request, p Payload, ip
 		}
 	}
 
-	q := pageURL.Query()
-	ev.UTMSource = text.Truncate(strings.ToLower(text.Clean(q.Get("utm_source"))), maxPropValLen)
-	ev.UTMMedium = text.Truncate(strings.ToLower(text.Clean(q.Get("utm_medium"))), maxPropValLen)
-	ev.UTMCampaign = text.Truncate(text.Clean(q.Get("utm_campaign")), maxPropValLen)
+	setUTM(&ev, pageURL.Query())
 
 	if ev.Props, err = parseProps(p.Props); err != nil {
 		return store.Event{}, err
@@ -332,6 +329,14 @@ func (h *Handler) buildEvent(ctx context.Context, r *http.Request, p Payload, ip
 		return store.Event{}, err
 	}
 	return ev, nil
+}
+
+// setUTM copies the campaign tags. Source and medium are lowercased, so "Newsletter" and
+// "newsletter" count as one; campaign names keep their case.
+func setUTM(ev *store.Event, q url.Values) {
+	ev.UTMSource = text.Truncate(strings.ToLower(text.Clean(q.Get("utm_source"))), maxPropValLen)
+	ev.UTMMedium = text.Truncate(strings.ToLower(text.Clean(q.Get("utm_medium"))), maxPropValLen)
+	ev.UTMCampaign = text.Truncate(text.Clean(q.Get("utm_campaign")), maxPropValLen)
 }
 
 func (h *Handler) now() time.Time {

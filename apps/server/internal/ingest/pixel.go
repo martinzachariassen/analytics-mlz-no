@@ -146,9 +146,7 @@ func (h *Handler) buildPixelEvent(ctx context.Context, site store.Site, q url.Va
 			ev.ReferrerHost = referrerHost(u.Hostname(), site.Domain)
 		}
 	}
-	ev.UTMSource = text.Truncate(strings.ToLower(text.Clean(q.Get("utm_source"))), maxPropValLen)
-	ev.UTMMedium = text.Truncate(strings.ToLower(text.Clean(q.Get("utm_medium"))), maxPropValLen)
-	ev.UTMCampaign = text.Truncate(text.Clean(q.Get("utm_campaign")), maxPropValLen)
+	setUTM(&ev, q)
 
 	// Behind a proxy, the address and user agent are the proxy's: country, browser, OS and
 	// device would describe it, not the reader, so they stay empty.

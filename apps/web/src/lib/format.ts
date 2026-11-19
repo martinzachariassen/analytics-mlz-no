@@ -60,9 +60,3 @@ export function formatSignedPercent(ratio: number): string {
   const p = Math.round(ratio * 100)
   return `${p > 0 ? "+" : p < 0 ? "−" : ""}${Math.abs(p)}%`
 }
-
-/** "newsletter-signup" -> "Newsletter signup". */
-export function humanize(name: string): string {
-  const s = name.replace(/[-_]+/g, " ").trim()
-  return s.charAt(0).toUpperCase() + s.slice(1)
-}

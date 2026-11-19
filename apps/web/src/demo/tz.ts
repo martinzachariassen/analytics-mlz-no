@@ -121,12 +121,6 @@ export function date(
   return Math.max(first, second)
 }
 
-/** Local midnight that starts the day containing ts. */
-export function startOfDay(ts: number, tz: string): number {
-  const w = wall(ts, tz)
-  return date(w.y, w.m, w.d, tz)
-}
-
 /** t.AddDate(years, months, days) for a local midnight t. */
 export function addDate(
   t: number,

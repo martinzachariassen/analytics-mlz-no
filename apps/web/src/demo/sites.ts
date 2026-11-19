@@ -66,20 +66,6 @@ export function backendFrom(
   return b
 }
 
-/** Generates every site's history in this thread (tests, benchmarks). */
-export function buildBackend(now: number, days = HISTORY_DAYS, scale = 1) {
-  const tables = SPECS.map((spec) =>
-    new Generator({
-      profile: spec.profile,
-      now,
-      days,
-      seed: spec.seed,
-      scale,
-    }).run()
-  )
-  return backendFrom(tables, now, days)
-}
-
 /** Generators for the live trickle, one per site, by site id. */
 export function liveGenerators(now: number): Map<string, Generator> {
   return new Map(

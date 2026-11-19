@@ -7,6 +7,7 @@ All notable changes are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `.github/workflows/fuzz.yml` runs every Go fuzz test for five minutes each week (CI only replays their seed inputs) and keeps a failing input as an artifact.
 - Releases attach the binaries' signed provenance bundle as `analytics_<tag>.intoto.jsonl`, so `gh attestation verify --bundle` works without GitHub's attestation API.
 - The dashboard is built into the Docker image and the release binaries, so `docker compose up` gives a working dashboard on the same origin as the API, with the same security headers, rewrites and caching as Firebase Hosting (`internal/web`, kept in line with `apps/web/firebase.json` by a test). Text files are served gzipped with an `ETag`. `make build` embeds it too (`make embed-web`, needs Bun); production keeps serving the dashboard from Firebase Hosting.
 - `analytics seed -live` keeps synthetic visits arriving until interrupted, and `make dev` runs it, so **Realtime** shows visitors in the local test environment. The local demo sites are now called "Fjord Labs Blog (demo)" and "Fjord Labs Docs (demo)"; `seed` renames existing ones.
@@ -36,6 +37,7 @@ All notable changes are documented here. The format follows
 - Dashboard: gzipped size budgets for the production build (JavaScript loaded before the first render, all CSS, the largest lazy chunk, all JavaScript), checked by `bun run check-size` in the `web` verify group. TypeScript also checks `noUncheckedIndexedAccess`.
 
 ### Security
+- Development dependencies: `uuid` raised to 11 (from `firebase-tools`) and `@ts-morph/common`'s `minimatch` to 11 (from the shadcn CLI) with `overrides`. The advisories that remain are in `firebase-tools`' dependencies only and listed with the reason in `SECURITY.md`.
 - `POST /api/event` rejects `Origin: null` with `400`. Any page can open a sandboxed iframe that sends it, so it let third parties post events for every site from their visitors' browsers. Pages that run in an opaque origin (a site's own sandboxed iframes, `file://` previews) are no longer counted.
 - The tracking script no longer sends query parameters other than `utm_*`, and sends only the referrer's scheme and host (so app referrers such as `android-app://` keep their source), so tokens in a URL never leave the browser. The server also drops a query string inside a hash route (`#/reset?token=…`). The script's size budget is 1100 B gzipped (was 1024 B).
 - CSRF protection moved into the router: every dashboard and sign-in route is wrapped in Go's `http.CrossOriginProtection`, which rejects changes a browser marks as cross-origin (`Sec-Fetch-Site`, or an `Origin` that is neither the host nor `PUBLIC_URL`) with `403`. It replaces the per-handler origin checks on `DELETE` and logout, so a new endpoint is protected without remembering to add one. The `application/json` requirement stays as a second layer.
@@ -59,6 +61,8 @@ All notable changes are documented here. The format follows
 - Tracker: nothing the script does can throw into the host page; a failure to send is swallowed.
 
 ### Fixed
+- Docker: the health check (in the image and in `docker-compose.yml`) follows `ADDR` when it is set, like the server, instead of always probing `PORT`, so a container listening on another port is no longer reported unhealthy.
+- Docker: `REQUIRE_REPLICA=1` without `LITESTREAM_REPLICA_URL` stops the container with an error instead of quietly starting an unreplicated server.
 - Dashboard: searching a report table now also finds values beyond the rows loaded so far. When the first page is full, the search asks the server too, instead of answering "No matches" for a page that exists.
 - Dashboard: the picked event and property on the Events view are kept in the URL (`?event=`, `?prop=`), so they survive a reload and a shared link, and an event missing from a newly chosen period falls back to the top one instead of staying selected.
 - Ingestion no longer drops events with `503` while the dashboard loads a long period: statistics run on a separate read-only SQLite connection pool, and writes have a connection of their own. Health checks use the read pool, so a busy writer does not fail them.

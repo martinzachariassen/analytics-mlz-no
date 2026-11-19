@@ -87,12 +87,16 @@ src/
 | `/sites/:id/settings` | `SettingsPage` |
 
 Everything under `/sites` is wrapped in `AppLayout`, which fetches `/api/auth/me` and sends you
-to `/` when you are not signed in. Site views are lazy-loaded.
+to `/` when you are not signed in. A failed first check shows "Could not reach the server"; a
+failed background re-check (on window focus) keeps the app and the user's place in it. Site
+views are lazy-loaded.
 
 Both route trees have `ErrorPage` as `errorElement`. After a deploy, an open tab may ask for a
-lazy chunk that no longer exists; `ErrorPage` then reloads once (remembered in
-`sessionStorage`) so the user gets the new build. Any other error shows a real error page
-instead of React Router's default.
+lazy chunk that no longer exists; `ErrorPage` then reloads (the time is remembered in
+`sessionStorage`) so the user gets the new build. A stale chunk again within a minute means the
+reload did not help (offline, a broken deploy), so it shows the error with **Reload** instead of
+"Updating…" forever; a later deploy in the same tab reloads by itself again. Any other error
+shows a real error page instead of React Router's default.
 
 ## State lives in the URL
 
@@ -113,7 +117,13 @@ It reads and writes these query parameters:
 
 It returns the parsed state, a ready-made `scope` object for API calls, actions (`setPeriod`,
 `addFilter`, `openDetail`, …) and `search`, the query string without `detail`. Use `search` in
-links between views so the period and filters follow the user.
+links between views so the period and filters follow the user. Presets are worked out again when
+the local date changes (`useToday`), so "Today" in a tab left open moves on at midnight.
+
+Change view-specific parameters (`tab`, `metric`, `event`, `prop`) with `sc.updateParams(q => …)`,
+not with `setSearchParams`: React Router hands every update the parameters of the last render, so
+two updates before the next render (a tab change and closing the sheet) would overwrite each
+other. `updateParams` builds each update on the one before it.
 
 Do not keep this kind of state in `useState`. If it should survive a reload or a shared link,
 it belongs in the URL.
@@ -130,7 +140,10 @@ Filters beyond `MAX_FILTERS` (10, the API's limit) are dropped instead of turnin
 
 - `useStats(siteId, scope, interval)` and `useBreakdown(siteId, scope, dim, opts)` in
   `lib/queries.ts`. The query key includes the whole scope, so changing a filter refetches.
-  `placeholderData: keepPreviousData` keeps the old numbers on screen while new ones load.
+  `...keepPreviousFor(view)` keeps the old numbers on screen while new ones load, but only while
+  the query shows the same thing: `view` is the key without the scope (site, dimension, event,
+  property). A new tab or site starts with a skeleton, so the old tab's rows never appear, and
+  can never be clicked, under the new heading.
 - Defaults in `main.tsx`: `staleTime` 30 s, two retries for network errors, `5xx` and `429`
   (the rate limiter refills within a second), none for other `4xx` (`shouldRetry` in
   `lib/api.ts`). A `401` from any query re-checks `/api/auth/me`, which sends the user to
@@ -151,7 +164,9 @@ Filters beyond `MAX_FILTERS` (10, the API's limit) are dropped instead of turnin
 
 Every request goes through `request()` in `lib/api.ts`, which uses same-origin credentials,
 URL-encodes the site id, sends JSON and throws `ApiError` with the status code (the message falls
-back to `HTTP <status>`, because HTTP/2 has no status text). A `401` during a mutation is handled
+back to `HTTP <status>`, because HTTP/2 has no status text). A `200` whose body is not JSON,
+usually an HTML page answering an `/api` path, is an `ApiError` too ("The server sent an
+unexpected response"), not a raw `SyntaxError`, and is not retried. A `401` during a mutation is handled
 by `MutationCache.onError` the same way as for queries. CSV exports are the exception: `exportUrl` builds plain
 `<a download>` links, because the browser sends the session cookie on the same origin and saves
 the file under the name the server gives it.
@@ -282,8 +297,8 @@ There are three layers. Each one catches what the one before cannot.
 
 | Layer | Where | Runs with | What it covers |
 |---|---|---|---|
-| Unit | `src/lib/*.test.ts` | `bun run test` (vitest, Node) | The API client (error mapping, retry policy, headers, id encoding, query strings), URL state parsing and the `hasOwn` guards, period maths, metrics, dimensions, formatting, and the CSP hash of the theme script |
-| Component | `src/components/*.test.tsx`, `src/routes/**/*.test.tsx` | `bun run test` (vitest, happy-dom, Testing Library) | Filter bar, date range picker and its shortcuts, detail sheet, goals (the overview card, adding and removing in settings), `ErrorNote` (retry, focus, no flip on background refetches) and onboarding in the site layout (polling until the first event, then the dashboard), against a mocked `fetch`, with the URL as the observable state |
+| Unit | `src/lib/*.test.ts`, `src/components/traffic-chart.test.ts` | `bun run test` (vitest, Node) | The API client (error mapping, retry policy, headers, id encoding, query strings), URL state parsing and the `hasOwn` guards, period maths and presets, goals, metrics, dimensions, formatting, where chart buckets end (months, DST days), and the CSP hash of the theme script |
+| Component | `src/components/*.test.tsx`, `src/routes/**/*.test.tsx`, `src/lib/*.test.tsx` | `bun run test` (vitest, happy-dom, Testing Library) | Filter bar, date range picker and its shortcuts, detail sheet, goals (the overview card, adding and removing in settings), `ErrorNote` (retry, focus, no flip on background refetches), onboarding in the site layout (polling until the first event, then the dashboard), the `useScope` actions and midnight rollover, which placeholder rows `useBreakdown` keeps, `AppLayout` on a failed re-check, `ErrorPage` reloading after a deploy, Realtime on a failed request, and copying a snippet, against a mocked `fetch`, with the URL as the observable state |
 | Demo engine | `src/demo/golden.test.ts` | `bun run test` | The demo's in-browser API gives the Go API's answers to about 80 requests (`TestDemoGolden` writes them; see [demo.md](demo.md#same-answers-as-the-server)) |
 | End to end | `e2e/*.spec.ts` | `bun run e2e` (Playwright) | The real Go server with seeded data and the production build: sign-in, every view of a site, filters, the detail sheet, settings, goals (conversions on the overview, adding and removing in settings), a CSV download with a filter, a failed request recovering with "Try again", and a new site waiting for its first event and switching to the dashboard when one is sent, with an axe scan on every page |
 

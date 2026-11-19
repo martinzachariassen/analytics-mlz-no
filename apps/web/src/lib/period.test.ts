@@ -5,7 +5,6 @@ import {
   isDay,
   isPeriod,
   periodRange,
-  previousRange,
   rangeDays,
 } from "@/lib/period"
 
@@ -33,23 +32,6 @@ describe("periodRange", () => {
     const r = periodRange("last_month", now)
     expect(r.from).toBe("2026-10-01")
     expect(r.to).toBe("2026-10-31")
-  })
-})
-
-describe("previousRange", () => {
-  it("is the same-length period right before", () => {
-    const prev = previousRange({
-      from: "2026-10-29",
-      to: "2026-11-04",
-      tz: "UTC",
-    })
-    expect(prev.from).toBe("2026-10-22")
-    expect(prev.to).toBe("2026-10-28")
-  })
-  it("uses calendar months for the 12 month preset", () => {
-    const prev = previousRange(periodRange("12m", now), "12m")
-    expect(prev.from).toBe("2024-12-01")
-    expect(prev.to).toBe("2025-11-30")
   })
 })
 

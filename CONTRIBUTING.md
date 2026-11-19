@@ -118,6 +118,7 @@ style is described in [docs/README.md](docs/README.md#how-these-docs-are-written
 | A colour token, or what a colour is used for | [docs/development/colours.md](docs/development/colours.md) (tables and `palette.svg`) and the tokens copied into `apps/demo/index.html` |
 | A metric's meaning | [docs/concepts.md](docs/concepts.md) and `apps/web/src/lib/metrics.ts` |
 | An architectural decision | [docs/decisions.md](docs/decisions.md) |
+| A fuzz test | The matrix in `.github/workflows/fuzz.yml` and the table in [backend.md](docs/development/backend.md#fuzzing) |
 | A CI job that runs on pull requests, or a GitHub repository setting | `scripts/github-settings.sh` (required checks), then run it; [docs/development/releasing.md](docs/development/releasing.md#repository-settings) |
 | Anything users notice | A line under "Unreleased" in [CHANGELOG.md](CHANGELOG.md) |
 

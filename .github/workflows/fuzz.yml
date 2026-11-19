@@ -1,0 +1,46 @@
+name: Fuzz
+
+# `go test` in CI only replays each fuzz target's seed corpus. This runs the fuzzer for real once
+# a week, on main, so new inputs are explored without slowing pull requests down. Not a required
+# check: a finding is a new bug to fix, not a reason to block unrelated changes.
+on:
+  schedule:
+    - cron: "41 4 * * 0" # Sundays
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    name: Fuzz ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { package: ./internal/ingest, target: FuzzEvent }
+          - { package: ./internal/ingest, target: FuzzPixel }
+          - { package: ./internal/httpx, target: FuzzClientIP }
+          - { package: ./internal/api, target: FuzzCell }
+          - { package: ./internal/store, target: FuzzNormalizeDomain }
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Install the pinned tools (mise)
+        uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
+      - name: Fuzz for five minutes
+        working-directory: apps/server
+        run: go test -run '^$' -fuzz '^${{ matrix.target }}$' -fuzztime 5m ${{ matrix.package }}
+      # A failing input is written to testdata/fuzz/<target>/. Commit it next to the fix, so it
+      # becomes part of the seed corpus every `go test` replays.
+      - name: Keep the failing input
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz-${{ matrix.target }}
+          path: apps/server/${{ matrix.package }}/testdata/fuzz/${{ matrix.target }}
+          retention-days: 30

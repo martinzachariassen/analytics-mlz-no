@@ -871,9 +871,10 @@ function finish(rows: Row[], req: BreakdownReq): Row[] {
       b.count - a.count ||
       (a.value < b.value ? -1 : a.value > b.value ? 1 : 0)
   )
-  // As store.Breakdown: an out-of-range limit means the default of 10. (The export asks
-  // for limit + 1 to detect truncation, so without a limit it gets 10 rows too.)
-  const limit = req.limit <= 0 || req.limit > 1000 ? 10 : req.limit
+  // As store.Breakdown: no limit means 10, and one row past the API's maximum is allowed,
+  // because the export asks for limit + 1 to detect truncation.
+  const limit =
+    req.limit <= 0 ? 10 : Math.min(req.limit, MAX_BREAKDOWN_LIMIT + 1)
   return kept.slice(0, limit)
 }
 

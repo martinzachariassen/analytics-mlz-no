@@ -195,6 +195,18 @@ func TestFilters(t *testing.T) {
 	if s := sum(Filter{"path", "is_not", "/pricing"}); s.Visits != 2 {
 		t.Fatalf("path is_not = %+v", s)
 	}
+	// contains on a visit dimension matches the visit's first page view.
+	if s := sum(Filter{"referrer", "contains", "oogl"}); s.Visits != 1 || s.Pageviews != 3 {
+		t.Fatalf("referrer contains = %+v", s)
+	}
+	// "is not" on an event means visits in which it did not happen.
+	if s := sum(Filter{"event", "is_not", "signup"}); s.Visits != 2 || s.Visitors != 1 || s.Pageviews != 2 {
+		t.Fatalf("event is_not = %+v", s)
+	}
+	// Two visit dimensions together: visitor 2's second visit entered on / without a referrer.
+	if s := sum(Filter{"entry", "is", "/"}, Filter{"referrer", "is_not", "google.com"}); s.Visits != 1 || s.Pageviews != 1 {
+		t.Fatalf("entry and referrer = %+v", s)
+	}
 
 	rows, err := st.Breakdown(ctx, site, r, "referrer", BreakdownOptions{Filters: Filters{{"browser", "is", "Safari"}}})
 	if err != nil || len(rows) != 2 {

@@ -57,8 +57,13 @@ All notable changes are documented here. The format follows
 - Site domains are validated: internationalised names are stored as punycode (`ærø.no` → `xn--r-3fa9c.no`, so they match the host ingest sees), a dot is required (a bare `no` would have matched every site under it) and names are capped at 100 characters without control characters.
 - The automatic `outbound-link` event stores the link's origin and path only: query strings, fragments and credentials are removed by the tracker and again by the server. Page URLs must be `http(s)`.
 - Tracker: nothing the script does can throw into the host page; a failure to send is swallowed.
+- An `outbound-link` event without a `url` property no longer crashes the request, which also wrote the client address to the server log through Go's panic message.
+- A link from another site to `/api/auth/{provider}/login` no longer signs a signed-in user out: with `Sec-Fetch-Site: cross-site` and a session cookie, it goes to the dashboard instead.
+- Site names drop bidi overrides, like event names and paths already did, so a name cannot reorder text in the dashboard.
 
 ### Fixed
+- CSV export of a table without a `limit` (and with `limit=1000`) returns up to 1000 rows again, not 10. The public demo had copied the bug.
+- Renaming a site, changing its pixel setting or deleting it can no longer leave the old values in the site cache for a minute, when an event was being looked up at the same moment.
 - Dashboard: searching a report table now also finds values beyond the rows loaded so far. When the first page is full, the search asks the server too, instead of answering "No matches" for a page that exists.
 - Dashboard: the picked event and property on the Events view are kept in the URL (`?event=`, `?prop=`), so they survive a reload and a shared link, and an event missing from a newly chosen period falls back to the top one instead of staying selected.
 - Ingestion no longer drops events with `503` while the dashboard loads a long period: statistics run on a separate read-only SQLite connection pool, and writes have a connection of their own. Health checks use the read pool, so a busy writer does not fail them.

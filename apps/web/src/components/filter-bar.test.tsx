@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, screen, waitFor } from "@testing-library/react"
+import { act, cleanup, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
@@ -52,9 +52,9 @@ describe("FilterBar", () => {
     await waitFor(() => expect(search().getAll("f")).toEqual(["path:is:/blog"]))
   })
 
-  it("adds a contains filter from typed text", async () => {
+  it("adds a contains filter from typed text, as one history entry", async () => {
     const user = userEvent.setup()
-    const { search } = renderInSite((sc) => <FilterBar sc={sc} />)
+    const { search, router } = renderInSite((sc) => <FilterBar sc={sc} />)
 
     await user.click(await screen.findByRole("button", { name: /Filter/ }))
     await user.click(await screen.findByRole("option", { name: "Page" }))
@@ -67,5 +67,21 @@ describe("FilterBar", () => {
     await waitFor(() =>
       expect(search().getAll("f")).toEqual(["path:contains:docs"])
     )
+    // Back once undoes it: Enter in the input and the selected option did not both add it.
+    await act(() => router.navigate(-1))
+    expect(search().getAll("f")).toEqual([])
+  })
+
+  it("says when the suggested values could not be loaded", async () => {
+    mockFetch({
+      "/api/sites/abc/breakdown": () =>
+        new Response(JSON.stringify({ error: "bad" }), { status: 400 }),
+    })
+    const user = userEvent.setup()
+    renderInSite((sc) => <FilterBar sc={sc} />)
+    await user.click(await screen.findByRole("button", { name: /Filter/ }))
+    await user.click(await screen.findByRole("option", { name: "Page" }))
+    expect(await screen.findByText(/Could not load the values/)).toBeTruthy()
+    expect(screen.queryByText("No values in this period")).toBeNull()
   })
 })

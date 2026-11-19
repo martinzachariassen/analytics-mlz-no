@@ -184,9 +184,6 @@ function ValueStep({
         placeholder={op === "contains" ? "Text to match…" : "Search values…"}
         value={search}
         onValueChange={setSearch}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && op === "contains" && search) onPick(search)
-        }}
       />
       <CommandList>
         {op === "contains" ? (
@@ -202,7 +199,11 @@ function ValueStep({
         ) : (
           <>
             <CommandEmpty>
-              {values.isPending ? "Loading…" : "No values in this period"}
+              {values.isError
+                ? "Could not load the values. Switch to contains to type one."
+                : values.isPending
+                  ? "Loading…"
+                  : "No values in this period"}
             </CommandEmpty>
             <CommandGroup>
               {values.data?.map((r) => (

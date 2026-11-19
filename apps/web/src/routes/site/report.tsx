@@ -73,7 +73,7 @@ const SEARCH_DEBOUNCE_MS = 250
 export function ReportPage({ report }: { report: keyof typeof REPORTS }) {
   const cfg = REPORTS[report]!
   const sc = useScope()
-  const [params, setParams] = useSearchParams()
+  const [params] = useSearchParams()
   const t = params.get("tab")
   const dim = cfg.tabs.find((x) => x.dim === t)?.dim ?? cfg.tabs[0]!.dim
   const [limit, setLimit] = useState(PAGE)
@@ -112,14 +112,7 @@ export function ReportPage({ report }: { report: keyof typeof REPORTS }) {
   const setTab = (d: FilterDim) => {
     setLimit(PAGE)
     setSearch("")
-    setParams(
-      (p) => {
-        const q = new URLSearchParams(p)
-        q.set("tab", d)
-        return q
-      },
-      { preventScrollReset: true }
-    )
+    sc.updateParams((q) => q.set("tab", d))
   }
 
   const tabs =
@@ -216,7 +209,7 @@ export function EventsPage() {
     metrics: "full",
   })
   const total = stats.data?.summary.visitors
-  const [params, setParams] = useSearchParams()
+  const [params] = useSearchParams()
   const picked = params.get("event")
   // A picked event that is not in this period's list falls back to the top one.
   const event =
@@ -224,15 +217,10 @@ export function EventsPage() {
       ? picked
       : events.data?.[0]?.value
   const setPicked = (value: string) =>
-    setParams(
-      (p) => {
-        const q = new URLSearchParams(p)
-        q.set("event", value)
-        q.delete("prop")
-        return q
-      },
-      { preventScrollReset: true }
-    )
+    sc.updateParams((q) => {
+      q.set("event", value)
+      q.delete("prop")
+    })
 
   return (
     <div className="flex flex-col gap-3 lg:gap-4">
@@ -294,7 +282,7 @@ function Properties({
   const sc = useScope()
   const scope = { ...sc.scope, compare: undefined }
   const keys = useBreakdown(sc.siteId, scope, "prop_key", { event, limit: 50 })
-  const [params, setParams] = useSearchParams()
+  const [params] = useSearchParams()
   const picked = params.get("prop")
   const key =
     picked !== null && keys.data?.some((k) => k.value === picked)
@@ -328,16 +316,7 @@ function Properties({
           {keys.data && keys.data.length > 0 && (
             <Select
               value={key}
-              onValueChange={(v) =>
-                setParams(
-                  (p) => {
-                    const q = new URLSearchParams(p)
-                    q.set("prop", v)
-                    return q
-                  },
-                  { preventScrollReset: true }
-                )
-              }
+              onValueChange={(v) => sc.updateParams((q) => q.set("prop", v))}
             >
               <SelectTrigger size="sm" className="w-40" aria-label="Property">
                 <SelectValue placeholder="Property" />

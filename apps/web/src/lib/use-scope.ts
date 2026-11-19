@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from "react"
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react"
 import { useLocation, useParams, useSearchParams } from "react-router"
 
 import type { Compare, Filter, FilterOp, Interval, Scope } from "@/lib/api"
@@ -33,6 +33,37 @@ export const encodeFilter = (f: Filter) => `${f.dim}:${f.op}:${f.value}`
 
 export type Detail = { dim: Filter["dim"]; value: string }
 
+// Presets such as "Today" are dates, so they must move on at midnight in a tab left open. One
+// timer for the whole app; it is also checked when the tab becomes visible, since timers in a
+// sleeping laptop or a background tab can fire late.
+const dayKey = () => new Date().toDateString()
+function subscribeToday(changed: () => void) {
+  let timer: ReturnType<typeof setTimeout>
+  const schedule = () => {
+    const now = new Date()
+    const midnight = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + 1
+    )
+    timer = setTimeout(
+      () => {
+        changed()
+        schedule()
+      },
+      midnight.getTime() - now.getTime() + 1000
+    )
+  }
+  schedule()
+  document.addEventListener("visibilitychange", changed)
+  return () => {
+    clearTimeout(timer)
+    document.removeEventListener("visibilitychange", changed)
+  }
+}
+/** The local date, which re-renders its users when it changes. */
+export const useToday = () => useSyncExternalStore(subscribeToday, dayKey)
+
 // React Router hands every update the params of the last render, so two updates before the
 // next render (add a filter and close the sheet, often from different components) would
 // overwrite each other. The latest unrendered params are shared by every useScope, keyed by
@@ -47,6 +78,7 @@ let pending: { key: string; params: URLSearchParams } | null = null
 export function useScope() {
   const { id = "" } = useParams()
   const [params, setParams] = useSearchParams()
+  const today = useToday()
 
   const state = useMemo(() => {
     const p = params.get("period")
@@ -61,7 +93,7 @@ export function useScope() {
     const range =
       period === "custom"
         ? { from: from!, to: to!, tz: timeZone }
-        : periodRange(period)
+        : periodRange(period, new Date(today))
 
     const c = params.get("compare")
     const compare: Compare | undefined =
@@ -96,7 +128,7 @@ export function useScope() {
       detail,
       scope,
     }
-  }, [params])
+  }, [params, today])
 
   const { key } = useLocation()
   useEffect(() => {
@@ -153,6 +185,8 @@ export function useScope() {
           for (const raw of keep) q.append("f", raw)
         }),
       clearFilters: () => update((q) => q.delete("f")),
+      /** For view-specific parameters (tab, metric, event); keeps quick updates together. */
+      updateParams: update,
       openDetail: (d: Detail | null) =>
         update((q) => {
           if (d) q.set("detail", `${d.dim}:${d.value}`)

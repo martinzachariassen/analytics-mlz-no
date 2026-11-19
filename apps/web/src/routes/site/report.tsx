@@ -89,14 +89,15 @@ export function ReportPage({ report }: { report: keyof typeof REPORTS }) {
   // search also asks the server with a "contains" filter, so values past the first page are
   // found too. Not for formatted values (countries), whose labels the server does not know.
   const truncated = rows.data?.length === limit
-  const serverSearch =
-    truncated && !DIMS[dim].format && sc.filters.length < MAX_FILTERS
+  const searchable = !DIMS[dim].format && sc.filters.length < MAX_FILTERS
+  const serverSearch = truncated && searchable
+  const searchScope = {
+    ...sc.scope,
+    filters: [...sc.filters, { dim, op: "contains" as const, value: needle }],
+  }
   const found = useBreakdown(
     sc.siteId,
-    {
-      ...sc.scope,
-      filters: [...sc.filters, { dim, op: "contains", value: needle }],
-    },
+    searchScope,
     dim,
     { limit: PAGE, metrics: "full" },
     serverSearch && needle !== ""
@@ -174,7 +175,12 @@ export function ReportPage({ report }: { report: keyof typeof REPORTS }) {
         bodyClassName="p-0"
         action={
           <ExportLink
-            href={exportUrl.breakdown(sc.siteId, sc.scope, dim)}
+            // The file holds what the table shows, so a search narrows it too.
+            href={exportUrl.breakdown(
+              sc.siteId,
+              searchable && needle !== "" ? searchScope : sc.scope,
+              dim
+            )}
             label={DIMS[dim].plural.toLowerCase()}
           />
         }

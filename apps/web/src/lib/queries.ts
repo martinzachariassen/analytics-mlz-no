@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { hashKey, type QueryKey, useQuery } from "@tanstack/react-query"
 
 import {
   api,
@@ -56,6 +56,25 @@ export function useSites() {
   })
 }
 
+/**
+ * Like keepPreviousData, but only while the query still shows the same thing: a new period or
+ * filter keeps the old numbers on screen until the new ones arrive, while a new site, tab or
+ * event starts empty, so old rows never appear (and can be clicked) under a new heading.
+ * `view` is the part of the key that names what is shown, without the scope. Spread the result
+ * into the query's options.
+ */
+export function keepPreviousFor(view: QueryKey) {
+  const id = hashKey(view)
+  return {
+    meta: { view: id },
+    placeholderData: <T>(
+      previous: T | undefined,
+      previousQuery: { meta?: Record<string, unknown> } | undefined
+    ): T | undefined =>
+      previousQuery?.meta?.view === id ? previous : undefined,
+  }
+}
+
 export function useGoals(siteId: string) {
   return useQuery({
     queryKey: ["goals", siteId],
@@ -68,7 +87,7 @@ export function useGoalStats(siteId: string, scope: Scope, enabled = true) {
   return useQuery({
     queryKey: ["goals", siteId, "stats", scope],
     queryFn: () => api.goalStats(siteId, scope),
-    placeholderData: keepPreviousData,
+    ...keepPreviousFor([siteId]),
     enabled,
   })
 }
@@ -82,7 +101,7 @@ export function useStats(
   return useQuery({
     queryKey: ["stats", siteId, scope, interval],
     queryFn: () => api.stats(siteId, scope, { interval }),
-    placeholderData: keepPreviousData,
+    ...keepPreviousFor([siteId]),
     enabled,
   })
 }
@@ -94,6 +113,15 @@ export type BreakdownOpts = {
   metrics?: "full"
 }
 
+/** A longer list (a new limit) of the same rows keeps the shorter one on screen meanwhile. */
+const breakdownView = (siteId: string, dim: Dimension, o: BreakdownOpts) => [
+  siteId,
+  dim,
+  o.event ?? "",
+  o.key ?? "",
+  o.metrics ?? "",
+]
+
 export function useBreakdown(
   siteId: string,
   scope: Scope,
@@ -104,7 +132,7 @@ export function useBreakdown(
   return useQuery({
     queryKey: ["breakdown", siteId, scope, dim, opts],
     queryFn: () => api.breakdown(siteId, scope, dim, opts),
-    placeholderData: keepPreviousData,
+    ...keepPreviousFor(breakdownView(siteId, dim, opts)),
     enabled,
   })
 }

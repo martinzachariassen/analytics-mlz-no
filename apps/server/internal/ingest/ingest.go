@@ -323,8 +323,12 @@ func (h *Handler) buildEvent(ctx context.Context, r *http.Request, p Payload, ip
 	if ev.Props, err = parseProps(p.Props); err != nil {
 		return store.Event{}, err
 	}
-	if ev.Type == "event" && ev.Name == outboundEvent {
-		ev.Props[outboundURLProp] = stripURL(ev.Props[outboundURLProp])
+	if raw, ok := ev.Props[outboundURLProp]; ok && ev.Type == "event" && ev.Name == outboundEvent {
+		if u := stripURL(raw); u != "" {
+			ev.Props[outboundURLProp] = u
+		} else {
+			delete(ev.Props, outboundURLProp)
+		}
 	}
 
 	ev.Country = h.Geo.Country(ip)

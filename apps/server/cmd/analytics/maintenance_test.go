@@ -41,6 +41,36 @@ func TestMaintainRotatesSaltWithoutTraffic(t *testing.T) {
 	}
 }
 
+func TestMaintainDeletesEventsPastRetention(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "m.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = st.Close() }()
+	site, err := st.CreateSite(ctx, "", "mlz.no")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 11, 12, 12, 0, 0, 0, time.UTC)
+	for _, age := range []int{31, 29} {
+		at := now.AddDate(0, 0, -age)
+		if err := st.InsertEvent(ctx, store.Event{SiteID: site.ID, Time: at, Type: "pageview", Path: "/", VisitorID: int64(age)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	maintain(ctx, st, 0, now, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if a, _ := st.SiteActivity(ctx, site.ID); !a.FirstEvent.Equal(now.AddDate(0, 0, -31)) {
+		t.Fatalf("retention 0 deleted events: first event %v", a.FirstEvent)
+	}
+	maintain(ctx, st, 30, now, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	a, _ := st.SiteActivity(ctx, site.ID)
+	if !a.FirstEvent.Equal(now.AddDate(0, 0, -29)) || !a.LastEvent.Equal(a.FirstEvent) {
+		t.Fatalf("after 30-day retention: first %v, last %v; want only the 29-day-old event", a.FirstEvent, a.LastEvent)
+	}
+}
+
 func TestUntilNextRun(t *testing.T) {
 	for _, c := range []struct {
 		now  time.Time

@@ -16,6 +16,9 @@ const (
 type siteCache struct {
 	mu      sync.Mutex
 	entries map[string]siteCacheEntry
+	// gen counts clears. A lookup that started before a clear may have read the old row, so
+	// put drops its result.
+	gen uint64
 }
 
 type siteCacheEntry struct {
@@ -34,9 +37,19 @@ func (c *siteCache) get(id string, now time.Time) (Site, bool, bool) {
 	return e.site, e.found, true
 }
 
-func (c *siteCache) put(id string, site Site, found bool, now time.Time) {
+// generation is read before a lookup and passed to put.
+func (c *siteCache) generation() uint64 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	return c.gen
+}
+
+func (c *siteCache) put(id string, site Site, found bool, now time.Time, gen uint64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if gen != c.gen {
+		return
+	}
 	if c.entries == nil || len(c.entries) >= siteCacheMax {
 		// Bounded memory: random ids from a flood fill the cache, so start over.
 		c.entries = make(map[string]siteCacheEntry)
@@ -48,4 +61,5 @@ func (c *siteCache) clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.entries = nil
+	c.gen++
 }

@@ -7,11 +7,12 @@ import (
 	"errors"
 	"strings"
 	"time"
-	"unicode"
 
 	"golang.org/x/net/idna"
 	sqlite "modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
+
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/text"
 )
 
 // Errors returned by the store.
@@ -98,18 +99,9 @@ func ValidSiteID(id string) bool {
 }
 
 func cleanName(name, domain string) string {
-	name = strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) {
-			return -1
-		}
-		return r
-	}, name)
-	name = strings.TrimSpace(name)
+	name = text.Truncate(strings.TrimSpace(text.Clean(name)), maxNameLen)
 	if name == "" {
 		return domain
-	}
-	if len(name) > maxNameLen {
-		name = strings.ToValidUTF8(name[:maxNameLen], "")
 	}
 	return name
 }
@@ -154,12 +146,13 @@ func (s *Store) GetSite(ctx context.Context, id string) (Site, error) {
 		}
 		return site, nil
 	}
+	gen := s.sites.generation()
 	site, err := s.getSite(ctx, id)
 	switch {
 	case err == nil:
-		s.sites.put(id, site, true, now)
+		s.sites.put(id, site, true, now, gen)
 	case errors.Is(err, ErrNotFound):
-		s.sites.put(id, Site{}, false, now)
+		s.sites.put(id, Site{}, false, now, gen)
 	}
 	return site, err
 }

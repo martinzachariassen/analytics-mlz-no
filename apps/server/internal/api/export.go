@@ -53,7 +53,7 @@ func (a *API) export(w http.ResponseWriter, r *http.Request) {
 	truncated := false
 	switch v.Get("what") {
 	case "breakdown":
-		req, err := parseBreakdown(v, q, maxBreakdownLimit)
+		req, err := parseBreakdown(v, q, store.MaxBreakdownLimit)
 		if err != nil {
 			httpx.Error(w, http.StatusBadRequest, err.Error())
 			return

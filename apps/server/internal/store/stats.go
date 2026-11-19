@@ -172,11 +172,15 @@ var Dimensions = []string{
 	"country", "browser", "os", "device", "event", "prop_key", "prop",
 }
 
+// MaxBreakdownLimit is the most rows a client may ask a breakdown for. Breakdown itself
+// returns one row more, so a caller can tell whether the limit cut the list short.
+const MaxBreakdownLimit = 1000
+
 // BreakdownOptions narrows a breakdown.
 type BreakdownOptions struct {
 	Event   string // required for "prop" and "prop_key": event name
 	PropKey string // required for "prop": property key
-	Limit   int
+	Limit   int    // 10 when zero, at most MaxBreakdownLimit+1
 	Filters Filters
 	Values  []string // if set, only these values are returned
 }
@@ -190,8 +194,11 @@ var visitDimCols = map[string]string{
 // Breakdown returns the top values of a dimension. dim must be one of Dimensions.
 func (s *Store) Breakdown(ctx context.Context, siteID string, r Range, dim string, opt BreakdownOptions) ([]BreakdownRow, error) {
 	limit := opt.Limit
-	if limit <= 0 || limit > 1000 {
+	switch {
+	case limit <= 0:
 		limit = 10
+	case limit > MaxBreakdownLimit+1:
+		limit = MaxBreakdownLimit + 1
 	}
 	sc := scope{site: siteID, r: r, filters: opt.Filters}
 	pages, pageArgs := sc.rows(false)

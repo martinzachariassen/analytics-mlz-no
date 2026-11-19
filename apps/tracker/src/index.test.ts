@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // with its own <script> element in place.
 async function load(attrs: Record<string, string>, src = "https://stats.example.com/api/script.js") {
   const script = document.createElement("script");
-  script.src = src;
+  if (src) script.src = src;
   for (const [k, v] of Object.entries(attrs)) script.setAttribute(k, v);
   Object.defineProperty(document, "currentScript", { configurable: true, value: script });
   vi.resetModules();
@@ -52,6 +52,13 @@ describe("script attributes", () => {
     await load({});
     expect(window.mlz).toBeUndefined();
     expect(sent).toHaveLength(0);
+  });
+
+  it("does not throw for an inline script without data-api, and starts with one", async () => {
+    await load({ "data-site": "site123" }, "");
+    expect(window.mlz).toBeUndefined();
+    await load({ "data-site": "site123", "data-api": "https://collect.example.net/api/event" }, "");
+    expect(sent[0]!.url).toBe("https://collect.example.net/api/event");
   });
 
   it("does not start twice", async () => {

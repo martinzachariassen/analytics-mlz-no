@@ -54,7 +54,6 @@ export function init(cfg: Config): Api & { stop?(): void } {
       const body = JSON.stringify({
         site: cfg.site,
         ...p,
-        url: cleanUrl(p.url),
         referrer: p.referrer?.split("/", 3).join("/"),
       });
       if (!navigator.sendBeacon?.(cfg.endpoint, body)) {
@@ -65,19 +64,22 @@ export function init(cfg: Config): Api & { stop?(): void } {
     }
   }
 
-  function currentUrl(): string {
-    return cfg.hash ? location.href : location.href.split("#")[0]!;
-  }
-
-  function pageview(url = currentUrl()): void {
-    if (url === lastUrl) return; // ignore duplicate navigations (e.g. hash-only changes)
+  function pageview(url = location.href): void {
+    try {
+      // Compared as sent, so a replaceState that only changes a dropped query parameter (a search
+      // box, a filter) or the hash outside hash mode is not a new page view.
+      url = cleanUrl(url, cfg.hash);
+    } catch {
+      return;
+    }
+    if (url === lastUrl) return;
     // The referrer only describes how the visitor arrived, so it is sent with the first page view only.
     send({ type: "pageview", url, referrer: lastUrl ? undefined : document.referrer || undefined });
     lastUrl = url;
   }
 
   function track(name: string, props?: Props): void {
-    if (name) send({ type: "event", name, url: currentUrl(), props });
+    if (name) send({ type: "event", name, url: cleanUrl(location.href, cfg.hash), props });
   }
 
   function onClick(e: MouseEvent): void {
@@ -97,7 +99,8 @@ export function init(cfg: Config): Api & { stop?(): void } {
     }
   }
 
-  const onNavigate = () => pageview();
+  // A router may navigate while the page is still prerendering; prerenderingchange counts it.
+  const onNavigate = () => (document as Document & { prerendering?: boolean }).prerendering || pageview();
   // A page restored from the back-forward cache is a new view, but `load` does not fire again.
   const onPageShow = (e: PageTransitionEvent) => {
     if (e.persisted) {
@@ -115,22 +118,20 @@ export function init(cfg: Config): Api & { stop?(): void } {
     // Routers navigate with pushState and redirect with replaceState; both change the page.
     history.pushState = function (this: History, ...args: Parameters<History["pushState"]>) {
       push.apply(this, args);
-      pageview();
+      onNavigate();
     };
     history.replaceState = function (this: History, ...args: Parameters<History["replaceState"]>) {
       replace.apply(this, args);
-      pageview();
+      onNavigate();
     };
     addEventListener("popstate", onNavigate);
     addEventListener("pageshow", onPageShow);
     if (cfg.hash) addEventListener("hashchange", onNavigate);
 
-    // Don't count prerendered pages (Speculation Rules) until the user actually navigates to them.
-    if ((document as Document & { prerendering?: boolean }).prerendering) {
-      document.addEventListener("prerenderingchange", onNavigate, { once: true });
-    } else {
-      pageview();
-    }
+    // Don't count prerendered pages (Speculation Rules) until the user actually navigates to
+    // them. The event fires once, and only on a page that was prerendering.
+    document.addEventListener("prerenderingchange", onNavigate);
+    onNavigate();
   }
 
   return MLZ_TEST
@@ -154,11 +155,13 @@ export function init(cfg: Config): Api & { stop?(): void } {
 }
 
 /**
- * The page URL as sent: query parameters other than utm_* are dropped. A query inside a hash
- * route is dropped by the server; stripping it here too would not fit the size budget.
+ * The page URL as sent, resolved against the current page: query parameters other than utm_*
+ * are dropped, and so is the hash unless `hash` is set. A query inside a hash route is dropped
+ * by the server; stripping it here too would not fit the size budget.
  */
-export function cleanUrl(href: string): string {
-  const u = new URL(href);
+export function cleanUrl(href: string, hash?: boolean): string {
+  const u = new URL(href, location.href);
+  if (!hash) u.hash = "";
   u.search = `${new URLSearchParams([...u.searchParams].filter(([k]) => /^utm_/.test(k)))}`;
   return u.href;
 }

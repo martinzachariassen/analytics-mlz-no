@@ -57,11 +57,12 @@ afterEach(() => {
 
 describe("cleanUrl", () => {
   it("keeps origin, path, hash and UTM tags only", () => {
-    expect(cleanUrl("https://a.example/p?x=1&utm_source=nl&y=2#/route")).toBe(
+    expect(cleanUrl("https://a.example/p?x=1&utm_source=nl&y=2#/route", true)).toBe(
       "https://a.example/p?utm_source=nl#/route"
     );
     expect(cleanUrl("https://a.example/p?session=abc")).toBe("https://a.example/p");
     expect(cleanUrl("https://a.example/")).toBe("https://a.example/");
+    expect(cleanUrl("https://a.example/p#top")).toBe("https://a.example/p");
   });
 });
 
@@ -119,7 +120,7 @@ describe("page views", () => {
     expect(sent).toHaveLength(0);
     Object.defineProperty(document, "prerendering", { configurable: true, value: false });
     document.dispatchEvent(new Event("prerenderingchange"));
-    document.dispatchEvent(new Event("prerenderingchange")); // listener is { once: true }
+    document.dispatchEvent(new Event("prerenderingchange")); // a repeat is a duplicate
     expect(sent.map((p) => p.type)).toEqual(["pageview"]);
     delete (document as { prerendering?: boolean }).prerendering;
   });
@@ -147,6 +148,37 @@ describe("page views", () => {
       "https://www.example.com/start?utm_source=newsletter",
       "https://www.example.com/login",
     ]);
+  });
+
+  it("ignores replaceState changes to query parameters that are not sent", () => {
+    window.happyDOM.setURL("https://www.example.com/search");
+    start(base);
+    history.replaceState({}, "", "/search?q=a");
+    history.replaceState({}, "", "/search?q=ab&page=2");
+    history.replaceState({}, "", "/search?q=ab&utm_source=nl");
+    expect(sent.map((p) => p.url)).toEqual([
+      "https://www.example.com/search",
+      "https://www.example.com/search?utm_source=nl",
+    ]);
+  });
+
+  it("resolves a relative URL given to pageview and drops its hash outside hash mode", () => {
+    const api = start({ ...base, auto: false });
+    api.pageview("/docs/intro#access_token=secret");
+    api.pageview("https://www.example.com/docs/intro");
+    expect(sent.map((p) => p.url)).toEqual(["https://www.example.com/docs/intro"]);
+  });
+
+  it("does not count router navigations while the page is prerendering", () => {
+    Object.defineProperty(document, "prerendering", { configurable: true, value: true });
+    start(base);
+    history.replaceState({}, "", "/redirected");
+    history.pushState({}, "", "/final");
+    expect(sent).toHaveLength(0);
+    Object.defineProperty(document, "prerendering", { configurable: true, value: false });
+    document.dispatchEvent(new Event("prerenderingchange"));
+    expect(sent.map((p) => p.url)).toEqual(["https://www.example.com/final"]);
+    delete (document as { prerendering?: boolean }).prerendering;
   });
 
   it("counts a page restored from the back-forward cache again", () => {

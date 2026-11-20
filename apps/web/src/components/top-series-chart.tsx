@@ -118,7 +118,7 @@ export function TopSeriesChart({
             width={44}
             tickLine={false}
             axisLine={false}
-            allowDecimals={metric.key === "views_per_visit"}
+            allowDecimals={metric.fractional === true}
             tick={AXIS_TICK}
             tickFormatter={(n: number) => metric.format(n)}
           />

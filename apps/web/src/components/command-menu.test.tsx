@@ -15,12 +15,18 @@ afterEach(() => {
   localStorage.clear()
 })
 
-function Menu({ onShortcuts = () => {} }: { onShortcuts?: () => void }) {
+function Menu({
+  onShortcuts = () => {},
+  picker = true,
+}: {
+  onShortcuts?: () => void
+  picker?: boolean
+}) {
   const [open, setOpen] = useState(false)
   const sc = useScope()
   return (
     <>
-      <DateRangePicker sc={sc} />
+      {picker && <DateRangePicker sc={sc} />}
       <CommandMenu
         open={open}
         onOpenChange={setOpen}
@@ -95,6 +101,13 @@ describe("CommandMenu", () => {
     await openMenu()
     await userEvent.click(screen.getByRole("option", { name: "Custom range…" }))
     expect(await screen.findByRole("button", { name: "Apply" })).toBeTruthy()
+  })
+
+  it("leaves out the custom range where no period picker is shown", async () => {
+    renderApp(<Menu picker={false} />, routes)
+    await openMenu()
+    expect(screen.getByRole("option", { name: "Last 12 months" })).toBeTruthy()
+    expect(screen.queryByRole("option", { name: "Custom range…" })).toBeNull()
   })
 
   it("toggles the theme, also when it follows the system", async () => {

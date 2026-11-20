@@ -124,10 +124,12 @@ It returns the parsed state, a ready-made `scope` object for API calls, actions 
 links between views so the period and filters follow the user. Presets are worked out again when
 the local date changes (`useToday`), so "Today" in a tab left open moves on at midnight.
 
-For a parameter that must be one of a fixed list, use `useParamChoice(key, allowed)` from
-`use-scope.ts`: it falls back to the first value, leaves that one out of the URL, and writes
-through `updateParams`. `useMetricParam()` is the one for `metric`. The site list keeps its
-`period` (Today, 7, 30 days, 12 months) the same way and carries it into each row's link.
+For a parameter that must be one of a fixed list, use `useParamChoice(key, allowed, fallback?)`
+from `use-scope.ts`: it falls back to `fallback` (the first value unless given), leaves that one
+out of the URL, and writes through `updateParams`. `useMetricParam()` is the one for `metric`.
+The site list keeps its `period` (Today, 7 days, 30 days, 12 months; 7 days by default) the same
+way and carries it into each row's link. `sc.search`, the query string carried between views and
+sites, leaves out `detail` and `new`.
 
 Change view-specific parameters (`tab`, `metric`, `event`, `prop`) with `sc.updateParams(q => …)`,
 not with `setSearchParams`: React Router hands every update the parameters of the last render, so
@@ -211,7 +213,8 @@ overview with `?new=1`. A site that has never received an event has nothing to c
 any view: a live "Waiting for the first event…" status ("Site added." in front while `new` is
 set), the snippet, custom event examples (`EventSnippets` from `tracking-snippet.tsx`), a link to
 the tracking pixel in settings, and what to check if nothing arrives. When polling sees
-`first_event_at`, the layout swaps in the dashboard, drops `new` and toasts "First event
+`first_event_at`, the layout swaps in the dashboard, drops `new` (replacing the history entry,
+so Back still leaves the site) and toasts "First event
 received". Settings shows "Waiting for the first event…" until then and "Last event … ago" once
 there is data. The site list shows "Waiting for first event" and skips the stats request for
 such sites. The Events view without any events shows how to send one instead of an empty
@@ -240,7 +243,9 @@ been purged or aged out by `RETENTION_DAYS` shows it again until the next event.
 **Keyboard.** Single keys (periods, <kbd>X</kbd>, <kbd>D</kbd>) and <kbd>⌘K</kbd> are listed in
 `SHORTCUTS` (`lib/keys.ts`). <kbd>?</kbd>, the ⌘K menu and the user menu open the shortcut help
 (`components/shortcuts-dialog.tsx`). The ⌘K menu also switches the comparison (previous period,
-year over year, off) and opens the calendar for a custom range (`openRangePicker`). Add a new
+year over year, off) and opens the calendar for a custom range (`openRangePicker`); it offers
+that only while a period picker is on screen (`useHasRangePicker`), so not on Realtime, Settings
+or a site waiting for its first event. Add a new
 shortcut to `SHORTCUTS` so it shows up there. `CommandDialog` from shadcn is only the dialog:
 the menu puts its own `<Command>` root inside it, which cmdk needs.
 
@@ -268,7 +273,7 @@ Use these before writing new layout:
 | `shortcuts-dialog.tsx` | The keyboard shortcut help, from `SHORTCUTS` |
 | `filter-bar.tsx` | Active filters as removable chips |
 | `date-range-picker.tsx` | Period, custom range, comparison (`CompareSelect`) and interval selects |
-| `detail-sheet.tsx` | Side sheet for one value, with "Filter dashboard by this" and a link to its view on the right tab. Takes a `range` for views without a period: on Realtime it shows today |
+| `detail-sheet.tsx` | Side sheet for one value, with "Filter dashboard by this" and a link to its view on the right tab. Takes a `period` for views without one: on Realtime it shows today, and its view link opens on today too |
 | `delta.tsx` | Up/down change, coloured with `--positive`/`--negative` |
 | `export-link.tsx` | The "CSV" download in a panel's action slot. Build its `href` with `exportUrl.breakdown`/`exportUrl.timeseries` from `lib/api.ts`, passing the panel's scope so the file matches what is on screen |
 | `goals-card.tsx`, `goals-settings.tsx`, `goal-button.tsx` | Conversions per goal on the overview (a row filters by the goal), goal management in settings (`#goals`), and "Make this a goal" in the detail sheet and the event properties panel. `lib/goals.ts` has the labels and the goal-to-filter mapping; `formatRate` in `lib/format.ts` formats conversion rates |

@@ -253,7 +253,7 @@ export function EventsPage() {
       <ErrorNote queries={[stats, events]} />
       <Panel
         title="Top events over time"
-        description={`${METRIC[metric].label} who triggered each event`}
+        description={`${METRIC[metric].label} per event`}
         action={<IntervalSelect sc={sc} />}
       >
         {events.isError ? (

@@ -14,7 +14,6 @@ import { FilterBar } from "@/components/filter-bar"
 import { PageHeader } from "@/components/page-header"
 import { WaitingForData } from "@/components/waiting-for-data"
 import { ApiError } from "@/lib/api"
-import { periodRange } from "@/lib/period"
 import { useSite } from "@/lib/queries"
 import { useScope } from "@/lib/use-scope"
 import { useTitle } from "@/lib/use-title"
@@ -28,15 +27,17 @@ export function SiteLayout() {
   const sc = useScope()
   const { pathname } = useLocation()
   const site = useSite(sc.siteId)
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   useFirstEventToast(sc.siteId, site.data?.first_event_at)
   // "new" only means something while waiting; a later reload should not say "Site added".
-  const { updateParams } = sc
+  // Replaced, not pushed: Back would land on ?new=1 and be sent forward again.
   const hasData = !!site.data?.first_event_at
-  const isNew = params.has("new")
   useEffect(() => {
-    if (hasData && isNew) updateParams((q) => q.delete("new"))
-  }, [hasData, isNew, updateParams])
+    if (!hasData || !params.has("new")) return
+    const next = new URLSearchParams(params)
+    next.delete("new")
+    setParams(next, { replace: true, preventScrollReset: true })
+  }, [hasData, params, setParams])
   const sub = pathname.slice(`/sites/${sc.siteId}`.length).replace(/^\//, "")
   const settings = sub === "settings"
   const view = VIEWS.find((v) => v.path === sub)
@@ -109,7 +110,7 @@ export function SiteLayout() {
       </div>
       {sub === "realtime" ? (
         <DetailSheet
-          range={periodRange("today")}
+          period="today"
           rangeNote="Today · the Realtime page itself shows the last 30 minutes"
         />
       ) : (

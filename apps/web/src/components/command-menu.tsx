@@ -28,7 +28,7 @@ import {
 import type { Compare } from "@/lib/api"
 import { PERIODS, type Period } from "@/lib/period"
 import { useSites } from "@/lib/queries"
-import { openRangePicker, useScope } from "@/lib/use-scope"
+import { openRangePicker, useHasRangePicker, useScope } from "@/lib/use-scope"
 
 const COMPARE_ACTIONS: { value: Compare | undefined; label: string }[] = [
   { value: "previous", label: "Compare with previous period" },
@@ -52,6 +52,7 @@ export function CommandMenu({
   const { resolvedTheme, toggleTheme } = useTheme()
   const dark = resolvedTheme === "dark"
   const sites = useSites()
+  const hasRangePicker = useHasRangePicker()
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -101,10 +102,12 @@ export function CommandMenu({
                   {PERIODS[p]}
                 </CommandItem>
               ))}
-              <CommandItem onSelect={run(openRangePicker)}>
-                <CalendarRange />
-                Custom range…
-              </CommandItem>
+              {hasRangePicker && (
+                <CommandItem onSelect={run(openRangePicker)}>
+                  <CalendarRange />
+                  Custom range…
+                </CommandItem>
+              )}
             </CommandGroup>
           )}
           <CommandGroup heading="Sites">

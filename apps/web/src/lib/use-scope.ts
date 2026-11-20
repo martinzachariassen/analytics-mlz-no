@@ -200,6 +200,7 @@ export function useScope() {
   const search = useMemo(() => {
     const q = new URLSearchParams(params)
     q.delete("detail")
+    q.delete("new")
     const s = q.toString()
     return s ? `?${s}` : ""
   }, [params])
@@ -217,6 +218,31 @@ export const PICK_RANGE = "mlz:pick-range"
  */
 export const openRangePicker = () => window.dispatchEvent(new Event(PICK_RANGE))
 
+let rangePickers = 0
+const rangePickerListeners = new Set<() => void>()
+function subscribeRangePickers(changed: () => void) {
+  rangePickerListeners.add(changed)
+  return () => {
+    rangePickerListeners.delete(changed)
+  }
+}
+function countRangePicker(delta: number) {
+  rangePickers += delta
+  for (const l of rangePickerListeners) l()
+}
+
+/** Called by the period picker, so the command menu only offers a range it can open. */
+export function useRangePickerMounted() {
+  useEffect(() => {
+    countRangePicker(1)
+    return () => countRangePicker(-1)
+  }, [])
+}
+
+/** Whether a period picker is on screen to answer openRangePicker. */
+export const useHasRangePicker = () =>
+  useSyncExternalStore(subscribeRangePickers, () => rangePickers > 0)
+
 /** Sets one parameter in a query string. */
 export function withParam(search: string, key: string, value: string): string {
   const q = new URLSearchParams(search)
@@ -229,24 +255,25 @@ export const withTab = (search: string, dim: string) =>
   withParam(search, "tab", dim)
 
 /**
- * A view parameter that must be one of `allowed`; the first one is the default and is
- * left out of the URL.
+ * A view parameter that must be one of `allowed`; the default (the first one unless given)
+ * is left out of the URL.
  */
 export function useParamChoice<T extends string>(
   key: string,
-  allowed: readonly T[]
+  allowed: readonly T[],
+  fallback: T = allowed[0]!
 ): [T, (v: T) => void] {
   const [params] = useSearchParams()
   const { updateParams } = useScope()
   const raw = params.get(key)
-  const value = allowed.find((a) => a === raw) ?? allowed[0]!
+  const value = allowed.find((a) => a === raw) ?? fallback
   const set = useCallback(
     (v: T) =>
       updateParams((q) => {
-        if (v === allowed[0]) q.delete(key)
+        if (v === fallback) q.delete(key)
         else q.set(key, v)
       }),
-    [updateParams, key, allowed]
+    [updateParams, key, fallback]
   )
   return [value, set]
 }

@@ -23,13 +23,13 @@ import { useParamChoice } from "@/lib/use-scope"
 import { useTitle } from "@/lib/use-title"
 
 /** The periods the site list offers; each row links to the dashboard with the same one. */
-const LIST_PERIODS = ["7d", "today", "30d", "12m"] as const satisfies Period[]
+const LIST_PERIODS = ["today", "7d", "30d", "12m"] as const satisfies Period[]
 
 export function SitesPage() {
   useTitle("Sites")
   const sites = useSites()
   const count = sites.data?.length
-  const [period, setPeriod] = useParamChoice("period", LIST_PERIODS)
+  const [period, setPeriod] = useParamChoice("period", LIST_PERIODS, "7d")
 
   return (
     <>

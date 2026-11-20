@@ -15,12 +15,12 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
-import type { Dimension, FilterDim, RangeParams, Scope } from "@/lib/api"
+import type { Dimension, FilterDim, Scope } from "@/lib/api"
 import { DIM_VIEW, DIMS, formatValue } from "@/lib/dims"
 import { formatPercent } from "@/lib/format"
 import { goalKindFor } from "@/lib/goals"
 import { METRIC, type MetricKey } from "@/lib/metrics"
-import { intervalsFor } from "@/lib/period"
+import { intervalsFor, type Period, periodRange } from "@/lib/period"
 import { useBreakdown, useStats } from "@/lib/queries"
 import { type Detail, useScope, withParam, withTab } from "@/lib/use-scope"
 
@@ -55,17 +55,28 @@ const SHEET_METRICS: MetricKey[] = [
   "avg_duration",
 ]
 
+/** The query string for the view link: on the sheet's own period, so it shows the same numbers. */
+function carried(search: string, period: Period | undefined): string {
+  if (!period) return search
+  const q = new URLSearchParams(search)
+  q.set("period", period)
+  q.delete("from")
+  q.delete("to")
+  q.delete("interval")
+  return `?${q.toString()}`
+}
+
 /**
  * A slide-in panel with everything about one value (a page, a source, a
  * country…): its numbers, trend and what it breaks down into. Opened from any
  * list; its state is in the URL (?detail=dim:value).
  */
 export function DetailSheet({
-  range,
+  period,
   rangeNote,
 }: {
-  /** A range other than the dashboard's period, for views that have none (Realtime). */
-  range?: RangeParams
+  /** A period other than the dashboard's, for views that have none (Realtime). */
+  period?: Period
   rangeNote?: string
 } = {}) {
   const sc = useScope()
@@ -73,7 +84,7 @@ export function DetailSheet({
   return (
     <Sheet open={d !== null} onOpenChange={(o) => !o && sc.openDetail(null)}>
       <SheetContent className="w-full gap-0 overflow-y-auto p-0 sm:max-w-xl">
-        {d && <DetailBody d={d} range={range} rangeNote={rangeNote} />}
+        {d && <DetailBody d={d} period={period} rangeNote={rangeNote} />}
       </SheetContent>
     </Sheet>
   )
@@ -81,14 +92,15 @@ export function DetailSheet({
 
 function DetailBody({
   d,
-  range,
+  period,
   rangeNote,
 }: {
   d: Detail
-  range?: RangeParams
+  period?: Period
   rangeNote?: string
 }) {
   const sc = useScope()
+  const range = period ? periodRange(period) : undefined
   const base: Scope = range ? { ...sc.scope, ...range } : sc.scope
   const interval = range ? intervalsFor(range).auto : sc.interval
   const scope: Scope = {
@@ -105,8 +117,8 @@ function DetailBody({
   // Events have no tabs: their view picks the event instead.
   const viewSearch =
     d.dim === "event"
-      ? withParam(sc.search, "event", d.value)
-      : withTab(sc.search, d.dim)
+      ? withParam(carried(sc.search, period), "event", d.value)
+      : withTab(carried(sc.search, period), d.dim)
   const goalKind = goalKindFor(d.dim)
   const title = formatValue(d.dim, d.value)
   const share =

@@ -20,6 +20,8 @@ export type Metric = {
   lowerIsBetter?: boolean
   /** Rates and averages are not summed over buckets. */
   average?: boolean
+  /** Lives below whole numbers (a ratio, a few views), so a chart axis needs decimal ticks. */
+  fractional?: boolean
 }
 
 const perVisit = (s: Summary | Bucket) =>
@@ -54,6 +56,7 @@ export const METRICS: Metric[] = [
     value: perVisit,
     format: (n) => n.toFixed(1),
     average: true,
+    fractional: true,
   },
   {
     key: "bounce_rate",
@@ -63,6 +66,7 @@ export const METRICS: Metric[] = [
     format: formatPercent,
     lowerIsBetter: true,
     average: true,
+    fractional: true,
   },
   {
     key: "avg_duration",

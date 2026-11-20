@@ -154,7 +154,7 @@ describe("SiteLayout", () => {
     ).toBe("/sites/abc/settings#pixel")
   })
 
-  it("drops ?new once the site has data", async () => {
+  it("drops ?new once the site has data, without a history entry", async () => {
     mockFetch({
       "/api/sites/abc": {
         ...waiting,
@@ -162,9 +162,13 @@ describe("SiteLayout", () => {
         last_event_at: "2026-11-12T10:05:00Z",
       },
     })
-    const { search } = renderInSite(layout, "/sites/abc?new=1&period=30d")
+    const { search, router } = renderInSite(
+      layout,
+      "/sites/abc?new=1&period=30d"
+    )
     await waitFor(() => expect(search().has("new")).toBe(false))
     expect(search().get("period")).toBe("30d")
+    expect(router.state.historyAction).toBe("REPLACE")
   })
 
   it("shows the comparison picker on every screen size", async () => {

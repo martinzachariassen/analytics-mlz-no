@@ -68,7 +68,8 @@ All notable changes are documented here. The format follows
 - Dashboard: the ⌘K menu no longer crashes when it opens (the menu had no cmdk root inside its dialog).
 - Dashboard: the comparison can be changed on phones again (the picker was hidden below tablet width), and the quick filter button in lists works on touch screens.
 - Dashboard: metric help in the KPI strip opens on focus and on tap, not only on hover, and is no longer a non-focusable element inside the tile's button.
-- Dashboard: "Open Pages" (and the other views) in the detail sheet opens the right tab or event; on Realtime the sheet shows today and says so instead of silently using the dashboard period.
+- Dashboard: "Open Pages" (and the other views) in the detail sheet opens the right tab or event; on Realtime the sheet shows today and says so instead of silently using the dashboard period, and its view link opens on today too.
+- Dashboard: with Bounce rate picked, the chart's axis shows steps such as 20 %, 40 % instead of 0 %, 100 %, 200 %.
 - Dashboard: toggling the theme from the ⌘K menu works when the theme follows the system; the <kbd>X</kbd> hint is shown only on the comparison it would pick.
 - Dashboard: "No such site" and the loading screen have the top bar, so the sidebar can be opened on a phone. The add-filter button has a name when it shows only its icon.
 - Dashboard: the Active hours heatmap works with the keyboard (one tab stop, arrow keys, a label and tooltip per cell), and charts have a sentence for screen readers. The landing page's preview colours its changes by direction.

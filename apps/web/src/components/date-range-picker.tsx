@@ -27,7 +27,11 @@ import {
   PERIODS,
   type Period,
 } from "@/lib/period"
-import { PICK_RANGE, type ScopeState } from "@/lib/use-scope"
+import {
+  PICK_RANGE,
+  type ScopeState,
+  useRangePickerMounted,
+} from "@/lib/use-scope"
 import { cn } from "@/lib/utils"
 
 const PRESETS = (Object.keys(PERIOD_KEYS) as Period[]).map((value) => ({
@@ -61,6 +65,7 @@ export function useScopeShortcuts(sc: ScopeState) {
 export function DateRangePicker({ sc }: { sc: ScopeState }) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<DateRange | undefined>()
+  useRangePickerMounted()
   const label =
     sc.period === "custom" ? formatRange(sc.range) : PERIODS[sc.period]
   const { from, to } = sc.range

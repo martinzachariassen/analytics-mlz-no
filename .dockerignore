@@ -27,5 +27,4 @@ apps/tracker/*
 !apps/tracker/package.json
 # A local `make embed-web` copy; the image embeds its own fresh build.
 apps/server/internal/web/static/*
-apps/demo
 gha-creds-*.json

@@ -5,7 +5,7 @@
 //	analytics sites list
 //	analytics events purge -site ID -from 2026-11-01 -to 2026-11-02 [-path /x]   delete spam
 //	analytics sessions revoke [-user LOGIN]   sign a user (or everyone) out everywhere
-//	analytics seed [-days 730] [-scale 1] [-reset] [-live]   demo sites with synthetic data for local development
+//	analytics seed [-days 730] [-scale 1] [-reset] [-live [-demo ADDR]]   demo sites with synthetic data for local development
 //	analytics version                         print the version
 package main
 
@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -325,15 +326,30 @@ func parseTime(s string) (time.Time, error) {
 	return time.Parse(time.RFC3339, s)
 }
 
-// demoSites are the sites `seed` creates. The first is tracked by the demo page in apps/demo.
+// demoSites are the sites `seed` creates, together covering every dashboard feature
+// (docs/development/seed-data.md). The first is tracked by the demo page that
+// `seed -live -demo` serves. Names must not contain another demo site's name: the e2e
+// tests find sites by it.
 var demoSites = []struct {
 	name, domain string
-	visits       int
+	visits       int // average visits a weekday; 0 leaves the site without events
 	profile      *devdata.Profile
 	goals        [][2]string // kind, value
+	pixel, spam  bool
+	quietDays    int // days since the last visit; such a site gets no live visits either
 }{
-	{"Fjord Labs Blog (demo)", "localhost", 80, devdata.Blog, [][2]string{{"event", "newsletter-signup"}, {"event", "contact-submit"}, {"path", "/contact"}}},
-	{"Fjord Labs Docs (demo)", "docs.localhost", 35, devdata.Docs, [][2]string{{"event", "copy-code"}, {"path", "/docs/*"}}},
+	{
+		name: "Fjord Labs Blog (demo)", domain: "localhost", visits: 80, profile: devdata.Blog,
+		// /pricing/enterprise is never visited, so one goal always shows zero conversions.
+		goals: [][2]string{{"event", "newsletter-signup"}, {"event", "contact-submit"}, {"path", "/contact"}, {"path", "/pricing/enterprise"}},
+		pixel: true, spam: true,
+	},
+	{
+		name: "Fjord Labs Docs (demo)", domain: "docs.localhost", visits: 35, profile: devdata.Docs,
+		goals: [][2]string{{"event", "copy-code"}, {"path", "/docs/*"}, {"path", "/docs/*/install"}},
+	},
+	{name: "Old Portfolio (demo)", domain: "old.localhost", visits: 12, profile: devdata.Portfolio, quietDays: 45},
+	{name: "Side Project (demo)", domain: "side.localhost"},
 }
 
 // notifyContext is signal.NotifyContext; tests replace it to stop `seed -live` without a signal.
@@ -348,13 +364,27 @@ func seed(cfg config.Config, args []string) error {
 	scale := fs.Float64("scale", 1, "multiply the amount of traffic")
 	reset := fs.Bool("reset", false, "delete the demo sites and their events first (requires DEV_LOGIN=1)")
 	live := fs.Bool("live", false, "after seeding, keep adding visits as they happen until interrupted")
+	demoAddr := fs.String("demo", "", "with -live, also serve the demo page on this address, such as 127.0.0.1:8081")
 	_ = fs.Parse(args)
 	if *reset && !cfg.DevLogin {
 		return errors.New("seed -reset deletes sites and is only allowed with DEV_LOGIN=1")
 	}
+	if *demoAddr != "" && !*live {
+		return errors.New("seed -demo needs -live")
+	}
 
 	ctx, stop := notifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+	var demoLn net.Listener
+	if *demoAddr != "" {
+		// Listen before seeding, so a port that is taken fails at once.
+		ln, err := (&net.ListenConfig{}).Listen(ctx, "tcp", *demoAddr)
+		if err != nil {
+			return fmt.Errorf("demo site: %w", err)
+		}
+		defer func() { _ = ln.Close() }()
+		demoLn = ln
+	}
 	st, err := store.Open(ctx, cfg.DatabasePath)
 	if err != nil {
 		return err
@@ -374,13 +404,22 @@ func seed(cfg config.Config, args []string) error {
 	opts := make([]devdata.Options, len(demoSites))
 	for i, demo := range demoSites {
 		opts[i] = devdata.Options{
-			Days: *days, DailyVisits: int(float64(demo.visits) * *scale), Hostname: demo.domain, Profile: demo.profile,
+			Days: *days, DailyVisits: max(1, int(float64(demo.visits)**scale)), Hostname: demo.domain, Profile: demo.profile,
+			Pixel: demo.pixel, Spam: demo.spam,
+		}
+		if demo.quietDays > 0 {
+			opts[i].End = time.Now().AddDate(0, 0, -demo.quietDays)
 		}
 		if old, ok := existing[demo.domain]; ok {
 			if !*reset {
 				ids[i] = old.ID
 				if old.Name != demo.name {
 					if _, err := st.UpdateSite(ctx, old.ID, demo.name, "", nil); err != nil {
+						return err
+					}
+				}
+				if demo.pixel && !old.PixelEnabled {
+					if _, err := st.SetSitePixel(ctx, old.ID, true); err != nil {
 						return err
 					}
 				}
@@ -403,6 +442,15 @@ func seed(cfg config.Config, args []string) error {
 				return err
 			}
 		}
+		if demo.pixel {
+			if _, err := st.SetSitePixel(ctx, site.ID, true); err != nil {
+				return err
+			}
+		}
+		if demo.visits == 0 {
+			fmt.Printf("Created %s (%s, %s) without events, to show a site waiting for its first one.\n", demo.name, site.ID, demo.domain)
+			continue
+		}
 		start := time.Now()
 		n, err := devdata.Seed(ctx, st, site.ID, opts[i])
 		if err != nil {
@@ -416,11 +464,32 @@ func seed(cfg config.Config, args []string) error {
 	}
 
 	fmt.Println("Sending live visits to the demo sites; press Ctrl+C to stop.")
-	errs := make(chan error, len(demoSites))
-	for i := range demoSites {
+	errs := make(chan error, len(demoSites)+1)
+	waits := 0
+	for i, demo := range demoSites {
+		if demo.visits == 0 || demo.quietDays > 0 {
+			continue
+		}
+		waits++
 		go func() { errs <- devdata.Live(ctx, st, ids[i], opts[i]) }()
 	}
-	for range demoSites {
+	if demoLn != nil {
+		waits++
+		srv := &http.Server{Handler: devdata.Demo(ids[0]), ReadHeaderTimeout: 5 * time.Second}
+		go func() {
+			<-ctx.Done()
+			_ = srv.Close()
+		}()
+		go func() {
+			if err := srv.Serve(demoLn); !errors.Is(err, http.ErrServerClosed) {
+				errs <- fmt.Errorf("demo site: %w", err)
+				return
+			}
+			errs <- nil
+		}()
+		fmt.Printf("Demo site: http://%s\n", demoLn.Addr())
+	}
+	for range waits {
 		if err := <-errs; err != nil {
 			stop()
 			return err

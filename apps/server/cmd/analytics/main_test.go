@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -117,13 +119,13 @@ func TestCLI(t *testing.T) {
 	}
 
 	t.Setenv("DEV_LOGIN", "1")
-	if out, err := run("seed", "-days", "2", "-scale", "0.05"); err != nil || strings.Count(out, "over 2 days") != 2 {
+	if out, err := run("seed", "-days", "2", "-scale", "0.05"); err != nil || strings.Count(out, "over 2 days") != 3 || !strings.Contains(out, "Side Project (demo)") {
 		t.Fatalf("seed: %q, %v", out, err)
 	}
 	if out, err := run("seed", "-days", "2", "-scale", "0.05"); err != nil || !strings.Contains(out, "already has data") {
 		t.Fatalf("seed again: %q, %v", out, err)
 	}
-	if out, err := run("seed", "-reset", "-days", "1", "-scale", "0.05"); err != nil || strings.Count(out, "over 1 days") != 2 {
+	if out, err := run("seed", "-reset", "-days", "1", "-scale", "0.05"); err != nil || strings.Count(out, "over 1 days") != 3 {
 		t.Fatalf("seed -reset: %q, %v", out, err)
 	}
 	if out, err := run("sites", "list"); err != nil || !strings.Contains(out, "Fjord Labs Blog (demo)") || !strings.Contains(out, id) {
@@ -141,6 +143,35 @@ func TestCLI(t *testing.T) {
 	}
 	if time.Since(start) > 10*time.Second {
 		t.Fatal("seed -live did not stop when its context ended")
+	}
+
+	if _, err := run("seed", "-demo", "127.0.0.1:0"); err == nil || !strings.Contains(err.Error(), "-live") {
+		t.Fatalf("seed -demo without -live: %v", err)
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := ln.Addr().String()
+	_ = ln.Close()
+	got := make(chan string, 1)
+	go func() {
+		client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+		for range 50 {
+			if resp, err := client.Get("http://" + addr + "/blog"); err == nil {
+				_ = resp.Body.Close()
+				got <- resp.Header.Get("Location")
+				return
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+		got <- ""
+	}()
+	if out, err := run("seed", "-live", "-demo", addr, "-days", "1", "-scale", "0.05"); err != nil || !strings.Contains(out, "Demo site: http://"+addr) {
+		t.Fatalf("seed -live -demo: %q, %v", out, err)
+	}
+	if loc := <-got; !strings.HasPrefix(loc, "?site=") {
+		t.Fatalf("demo site redirected to %q, want ?site=<id>", loc)
 	}
 }
 

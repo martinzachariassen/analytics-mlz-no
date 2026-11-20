@@ -1,6 +1,6 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
-.PHONY: run verify test lint format build docker tracker web embed-web dev-web dev dev-api dev-demo dev-live dev-reset deploy deploy-check deploy-server deploy-web
+.PHONY: run verify test lint format build docker tracker web embed-web dev-web dev dev-api dev-live dev-reset deploy deploy-check deploy-server deploy-web
 
 run:
 	go run ./apps/server/cmd/analytics serve
@@ -36,29 +36,23 @@ dev-web:
 
 # ---------------------------------------------------------------- local test environment
 
-# Everything for trying the dashboard locally: a separate database with synthetic data,
-# automatic sign-in (DEV_LOGIN, localhost only), a demo site that sends real events and a
-# steady trickle of synthetic visits so Realtime moves.
+# Everything for trying the dashboard locally: a separate database with synthetic data for
+# every feature, automatic sign-in (DEV_LOGIN, localhost only), a demo site that sends real
+# events and a steady trickle of synthetic visits so Realtime moves. scripts/dev.sh starts
+# it all and prints what runs where; dev-api, dev-web and dev-live start one part each.
 #   dashboard  http://localhost:5173
-#   demo site  http://localhost:8081/?site=<id>   (printed below)
-DEV_ENV = DATABASE_PATH=data/dev.db PUBLIC_URL=http://localhost:5173 DEV_LOGIN=1 GITHUB_CLIENT_ID= GITHUB_CLIENT_SECRET=
+#   API        http://127.0.0.1:8080
+#   demo site  http://localhost:8081   (served by `seed -live -demo`)
+DEV_ENV = DATABASE_PATH=data/dev.db PUBLIC_URL=http://localhost:5173 DEV_LOGIN=1 GITHUB_CLIENT_ID= GITHUB_CLIENT_SECRET= ADDR=127.0.0.1:8080
 
 dev:
-	@$(DEV_ENV) go run ./apps/server/cmd/analytics seed
-	@echo
-	@echo "  Dashboard:  http://localhost:5173"
-	@echo "  Demo site:  http://localhost:8081/?site=$$($(DEV_ENV) go run ./apps/server/cmd/analytics sites list | awk '$$NF != "CREATED" && $$(NF-1) == "localhost" {print $$1}')"
-	@echo
-	@$(MAKE) --no-print-directory -j4 dev-api dev-web dev-demo dev-live
+	@./scripts/dev.sh
 
 dev-api:
 	$(DEV_ENV) go run ./apps/server/cmd/analytics serve
 
-dev-demo:
-	python3 -m http.server 8081 --bind 127.0.0.1 --directory apps/demo
-
 dev-live:
-	$(DEV_ENV) go run ./apps/server/cmd/analytics seed -live
+	$(DEV_ENV) go run ./apps/server/cmd/analytics seed -live -demo 127.0.0.1:8081
 
 # Start over with fresh synthetic data on the next `make dev`.
 dev-reset:

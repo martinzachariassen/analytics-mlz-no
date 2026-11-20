@@ -84,6 +84,8 @@ func TestParsePeriodErrors(t *testing.T) {
 		"too long":       {"from": {"2010-01-01"}, "to": {"2026-01-01"}},
 		"hourly too far": {"from": {"2026-01-01"}, "to": {"2026-02-01"}, "interval": {"hour"}},
 		"bad interval":   {"interval": {"fortnight"}},
+		"bad to":         {"from": {"2026-11-01"}, "to": {"03.11.2026"}},
+		"daily too far":  {"from": {"2025-01-01"}, "to": {"2026-02-05"}, "interval": {"day"}},
 	} {
 		if _, err := parsePeriod(q, now); err == nil {
 			t.Errorf("%s: expected error", name)
@@ -138,6 +140,24 @@ func TestParseFilters(t *testing.T) {
 	for _, bad := range []string{"path", "path:is", "password:is:x", "path:like:x"} {
 		if _, err := parseFilters(url.Values{"f": {bad}}); err == nil {
 			t.Errorf("%q: expected error", bad)
+		}
+	}
+}
+
+func TestParsePeriodLimitsAreInclusive(t *testing.T) {
+	from := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	for _, c := range []struct {
+		interval string
+		days     int
+	}{{"hour", maxHourlyDays}, {"day", maxDailyDays}, {"month", maxRangeDays}} {
+		q := func(days int) url.Values {
+			return url.Values{"from": {from.Format(time.DateOnly)}, "to": {from.AddDate(0, 0, days-1).Format(time.DateOnly)}, "interval": {c.interval}}
+		}
+		if _, err := parsePeriod(q(c.days), now); err != nil {
+			t.Errorf("%s over %d days: %v", c.interval, c.days, err)
+		}
+		if _, err := parsePeriod(q(c.days+1), now); err == nil {
+			t.Errorf("%s over %d days: expected error", c.interval, c.days+1)
 		}
 	}
 }

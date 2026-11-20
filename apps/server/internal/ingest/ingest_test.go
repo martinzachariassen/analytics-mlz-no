@@ -144,6 +144,8 @@ func TestRejected(t *testing.T) {
 		want             int
 	}{
 		"unknown site":              {`{"site":"nope","url":"https://example.com/"}`, chromeUA, "", 400},
+		"well-formed unknown site":  {`{"site":"abcdefghijkm","url":"https://example.com/"}`, chromeUA, "", 400},
+		"unknown event type":        {`{"site":"` + site.ID + `","type":"click","name":"x","url":"https://example.com/"}`, chromeUA, "", 400},
 		"junk site id":              {`{"site":"` + strings.Repeat("Z", 5000) + `","url":"https://example.com/"}`, chromeUA, "", 400},
 		"ftp scheme":                {`{"site":"` + site.ID + `","url":"ftp://example.com/"}`, chromeUA, "", 400},
 		"javascript scheme":         {`{"site":"` + site.ID + `","url":"javascript:alert(1)"}`, chromeUA, "", 400},
@@ -443,17 +445,70 @@ func TestPeerLimitCatchesForgedForwardedFor(t *testing.T) {
 }
 
 func TestWriteSlotsFull(t *testing.T) {
+	t.Parallel() // waits out writeWait
 	h, rec, site := setup(t)
 	h.WriteSlots = make(chan struct{}, 1)
 	h.WriteSlots <- struct{}{} // occupied by a stuck writer
+	w := post(h, `{"site":"`+site.ID+`","url":"https://example.com/"}`, chromeUA, "")
+	if w.Code != http.StatusServiceUnavailable || w.Header().Get("Retry-After") == "" {
+		t.Fatalf("status = %d, Retry-After = %q; want 503 with Retry-After", w.Code, w.Header().Get("Retry-After"))
+	}
+	if len(rec.events) != 0 {
+		t.Fatal("stored an event without a write slot")
+	}
+}
+
+func TestWriteSlotsCancelledRequestStoresNothing(t *testing.T) {
+	h, rec, site := setup(t)
+	h.WriteSlots = make(chan struct{}, 1)
+	h.WriteSlots <- struct{}{}
 	req := httptest.NewRequest(http.MethodPost, "/api/event", strings.NewReader(`{"site":"`+site.ID+`","url":"https://example.com/"}`))
 	req.Header.Set("User-Agent", chromeUA)
 	req.Header.Set("Origin", "https://example.com")
 	ctx, cancel := context.WithTimeout(req.Context(), 50*time.Millisecond)
 	defer cancel()
-	w := httptest.NewRecorder()
-	h.ServeHTTP(w, req.WithContext(ctx))
+	h.ServeHTTP(httptest.NewRecorder(), req.WithContext(ctx))
 	if len(rec.events) != 0 {
 		t.Fatal("stored an event without a write slot")
+	}
+}
+
+func TestEmptyPropKeysAreDropped(t *testing.T) {
+	h, rec, site := setup(t)
+	body := `{"site":"` + site.ID + `","type":"event","name":"x","url":"https://example.com/","props":{"  ":"a","\u0007":"b","ok":"c"}}`
+	if w := post(h, body, chromeUA, ""); w.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body)
+	}
+	if len(rec.events) != 1 {
+		t.Fatalf("got %d events", len(rec.events))
+	}
+	if p := rec.events[0].Props; len(p) != 1 || p["ok"] != "c" {
+		t.Fatalf("props = %v, want only ok=c", p)
+	}
+}
+
+func TestEmptyPathIsRoot(t *testing.T) {
+	h, rec, site := setup(t)
+	if w := post(h, `{"site":"`+site.ID+`","url":"https://example.com"}`, chromeUA, ""); w.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body)
+	}
+	if len(rec.events) != 1 || rec.events[0].Path != "/" {
+		t.Fatalf("events = %+v, want path /", rec.events)
+	}
+}
+
+func TestDeviceType(t *testing.T) {
+	for ua, want := range map[string]string{
+		"Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1":          "tablet",
+		"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1": "mobile",
+		chromeUA: "desktop",
+	} {
+		h, rec, site := setup(t)
+		if w := post(h, `{"site":"`+site.ID+`","url":"https://example.com/"}`, ua, ""); w.Code != http.StatusAccepted {
+			t.Fatalf("%s: status = %d", want, w.Code)
+		}
+		if len(rec.events) != 1 || rec.events[0].Device != want {
+			t.Errorf("device for %q = %+v, want %s", ua, rec.events, want)
+		}
 	}
 }

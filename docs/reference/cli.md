@@ -15,7 +15,7 @@
 | `analytics sites list` | Lists all sites |
 | `analytics events purge -site ID -from T -to T [-path P]` | Deletes events in a time window |
 | `analytics sessions revoke [-user LOGIN]` | Signs one dashboard user, or everyone, out everywhere |
-| `analytics seed [-days N] [-scale X] [-reset] [-live]` | Creates the two demo sites with synthetic traffic |
+| `analytics seed [-days N] [-scale X] [-reset] [-live [-demo ADDR]]` | Creates the two demo sites with synthetic traffic |
 | `analytics version` | Prints the version, without reading any configuration |
 
 Every command except `version` reads the same environment variables as the server (see
@@ -146,15 +146,30 @@ DEV_LOGIN=1 analytics seed -reset     # regenerate the demo data
 analytics seed -days 90 -scale 0.2
 ```
 
-Creates "Fjord Labs Blog (demo)" (`localhost`) and "Fjord Labs Docs (demo)" (`docs.localhost`) and fills them with
-synthetic traffic from `internal/devdata`, plus a few goals (newsletter sign-ups and `/contact` on
-the blog, `copy-code` and `/docs/*` on the docs). A demo site that already exists is left alone unless
-you pass `-reset`, which deletes it and its events first (an older name is updated, though).
+Creates four demo sites and fills them with synthetic traffic from `internal/devdata`. Together
+they touch every dashboard feature; [seed-data.md](../development/seed-data.md) lists which data
+shows which feature.
+
+| Site | Domain | Data |
+|---|---|---|
+| Fjord Labs Blog (demo) | `localhost` | Long tails of pages and referrers, three hostnames, UTM campaigns, events with zero to two properties, a few visits split by the session timeout. Goals: `newsletter-signup`, `contact-submit`, `/contact`, `/pricing/enterprise` (never reached). **Tracking pixel** on, with README views and email opens through image proxies. A spam burst on admin paths three days ago, for `events purge` |
+| Fjord Labs Docs (demo) | `docs.localhost` | Developer traffic, a `search` event with many values. Goals: `copy-code`, `/docs/*`, `/docs/*/install` |
+| Old Portfolio (demo) | `old.localhost` | Traffic that stops 45 days ago |
+| Side Project (demo) | `side.localhost` | No events, so the dashboard shows onboarding |
+ A demo site that already exists is left alone unless
+you pass `-reset`, which deletes it and its events first. An older name is updated, though, and
+the blog's pixel is switched on.
 
 With `-live` it then keeps going until <kbd>Ctrl+C</kbd>: new visits arrive at the rate the
-seeded traffic has for the current hour, at least one a minute per site, and each event is
-written when its time comes, so **Realtime** always has visitors. `make dev` runs it as its own
+seeded traffic has for the current hour, at least one a minute per site (not Old Portfolio or
+Side Project), and each event is written when its time comes, so **Realtime** always has visitors. `make dev` runs it as its own
 process next to the server.
+
+With `-demo ADDR` as well, it serves the demo site on that address until it stops: a page with
+one card per tracker feature that loads `/api/script.js` from `:8080` on the same host and sends
+real events to "Fjord Labs Blog (demo)". Every path returns the page, so its client-side routes
+survive a reload, and a URL without `?site=` is redirected to one with the blog's id. `make dev`
+uses `-demo 127.0.0.1:8081`.
 
 | Flag | Default | Meaning |
 |---|---|---|
@@ -162,6 +177,7 @@ process next to the server.
 | `-scale` | `1` | Multiplies the amount of traffic |
 | `-reset` | off | Delete and recreate the demo sites. Refused unless `DEV_LOGIN=1`, so it cannot wipe a production database by accident |
 | `-live` | off | After seeding, keep sending synthetic visits as they happen until interrupted |
+| `-demo` | off | With `-live`, also serve the demo site on this address, such as `127.0.0.1:8081` |
 
 Only use it on a development database. `make dev` runs it with `DATABASE_PATH=data/dev.db`.
 

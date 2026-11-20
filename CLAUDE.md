@@ -14,12 +14,12 @@ A PR that changes behaviour without matching docs is not done.
 
 ## Layout
 
-Monorepo: `apps/` holds everything that runs (`server`, `web`, `tracker`, `demo`), `infra/` holds Docker and Terraform. The Go module lives in `apps/server`; a root `go.work` lets `go run ./apps/server/cmd/analytics` work from the repo root.
+Monorepo: `apps/` holds everything that runs (`server`, `web`, `tracker`), `infra/` holds Docker and Terraform. The Go module lives in `apps/server`; a root `go.work` lets `go run ./apps/server/cmd/analytics` work from the repo root.
 
 - `apps/server/cmd/analytics` — main binary (`serve`, `sites add|list`, `events purge`, `sessions revoke`, `seed`, `version`)
 - `apps/server/internal/` — `config`, `store` (SQLite + embedded migrations, stats queries), `ingest` (POST /api/event, GET /api/pixel.gif), `text` (cleaning shared by ingest and goals), `visitor` (daily salt + hashing), `geo`, `httpx` (client IP, rate limit, JSON, gzip negotiation), `auth` (GitHub OAuth + sessions), `api` (sites, goals, stats + CSV export endpoints), `script` (embedded tracking script), `web` (embedded dashboard, mirrors `apps/web/firebase.json`; `make embed-web` fills `static/`), `server` (router)
 - Docs: API `docs/reference/api.md`; env/Terraform vars `docs/reference/configuration.md`; CLI `docs/reference/cli.md`; privacy facts `docs/privacy.md` (update when stored fields change); operations `docs/operations/runbook.md`; release process `docs/development/releasing.md` + `.github/workflows/release.yml`; `CHANGELOG.md` gets a line per user-visible change. The "If you change…, update…" table in `CONTRIBUTING.md` says which page to update. Docs changes go in the same PR as the code.
-- `apps/server/internal/devdata` — synthetic traffic for `analytics seed`; `apps/demo/` — demo site for `make dev`
+- `apps/server/internal/devdata` — synthetic traffic for `analytics seed` (what each demo site covers: `docs/development/seed-data.md`), and the demo site (`demo/index.html`) that `seed -live -demo` serves on :8081 for `make dev`
 - `infra/docker/` — Dockerfile, docker-compose, Litestream config, entrypoint, standalone backup script, restore and backup tests
 - `apps/tracker/` — TypeScript tracking script (`src/core.ts` logic, `src/index.ts` entry). Built with esbuild into `apps/server/internal/script/script.js`, which is committed and embedded in the Go binary. Run `make tracker` after changes; CI fails if it's stale or over 1100 B gzipped.
 - `apps/web/` — dashboard: React 19 + Vite + Tailwind v4 + shadcn/ui (radix-nova), TanStack Query, React Router. `src/lib/api.ts` is the typed API client; `src/components/ui/` is shadcn-generated (add with `cd apps/web && bunx shadcn@latest add <name>`, avoid hand-editing; Biome skips that folder). Dev server proxies `/api` to :8080 (override with `API_PROXY`), same as Firebase Hosting in production.
@@ -37,7 +37,7 @@ Tools are pinned in `mise.toml` (`mise install`); JavaScript packages are a Bun 
 - `cd apps/web && bun run e2e` — Playwright + axe end-to-end tests against a seeded server (`scripts/verify.sh e2e`); see `docs/development/dashboard.md#tests`
 - `make lint` — Biome + gofmt, then `golangci-lint run`; `make format` fixes formatting
 - `make run` — run the server locally on :8080 (data in `./data`)
-- `make dev` — local test environment: API + dashboard + demo site (:8081), two demo sites with two years of synthetic data in `data/dev.db`, one-click sign-in via `DEV_LOGIN=1` (localhost only). `make dev-reset` wipes it.
+- `make dev` — `scripts/dev.sh`: local test environment with API (127.0.0.1:8080), dashboard (:5173) and demo site (:8081), four demo sites with data for every feature in `data/dev.db` (`docs/development/seed-data.md`), one-click sign-in via `DEV_LOGIN=1` (localhost only). It checks the ports, builds once, prints what runs where and stops everything on Ctrl+C. `make dev-reset` wipes the data.
 - `make dev-web` — dashboard on :5173; set `PUBLIC_URL=http://localhost:5173` for the server
 - `docker compose -f infra/docker/docker-compose.yml up --build`
 - `infra/docker/test-restore.sh` — verifies Litestream backup/restore with the local Docker image; `infra/docker/test-backup.sh` — verifies `backup.sh`; `scripts/check-replica.sh gs://<project_id>-db/analytics` — read-only check for overlapping LTX files in the replica (runbook "Litestream compaction fails"); `go run ./apps/server/cmd/loadtest` — ingest load test

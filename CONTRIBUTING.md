@@ -11,13 +11,12 @@ an issue first if you are unsure whether something fits.
 ## Setup
 
 Every tool (Go, Bun, Node, Terraform, golangci-lint, shellcheck, hadolint, actionlint) is
-pinned in [`mise.toml`](mise.toml), so one command installs them all. You also need Python 3
-(serves the demo site) and, optionally, Docker.
+pinned in [`mise.toml`](mise.toml), so one command installs them all. Docker is optional.
 
 ```sh
 mise install    # the pinned tools
 bun install     # JavaScript packages (workspaces apps/web and apps/tracker); also wires up the pre-commit hook
-make dev        # API :8080, dashboard :5173, demo site :8081, synthetic and live data, one-click sign-in
+make dev        # API :8080, dashboard :5173, demo site :8081, seed data for every feature, one-click sign-in; prints what runs where
 make dev-reset  # start over with fresh data
 ```
 
@@ -115,7 +114,7 @@ style is described in [docs/README.md](docs/README.md#how-these-docs-are-written
 | Deployment (`Makefile` deploy targets, `.github/workflows/deploy.yml`, `infra/terraform/main/deploy.tf`), alerts, backups | [docs/guides/deploy-gcp.md](docs/guides/deploy-gcp.md) and [docs/operations/runbook.md](docs/operations/runbook.md) |
 | A package, invariant or data flow | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | Dashboard hosting headers or rewrites (`apps/web/firebase.json`) | `apps/server/internal/web/web.go` to match (`TestMatchesFirebaseHosting`), and [dashboard.md](docs/development/dashboard.md#building-and-hosting) |
-| A colour token, or what a colour is used for | [docs/development/colours.md](docs/development/colours.md) (tables and `palette.svg`) and the tokens copied into `apps/demo/index.html` |
+| A colour token, or what a colour is used for | [docs/development/colours.md](docs/development/colours.md) (tables and `palette.svg`) and the tokens copied into `apps/server/internal/devdata/demo/index.html` |
 | A metric's meaning | [docs/concepts.md](docs/concepts.md) and `apps/web/src/lib/metrics.ts` |
 | An architectural decision | [docs/decisions.md](docs/decisions.md) |
 | A fuzz test | The matrix in `.github/workflows/fuzz.yml` and the table in [backend.md](docs/development/backend.md#fuzzing) |

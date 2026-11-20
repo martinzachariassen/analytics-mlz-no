@@ -24,7 +24,8 @@ make dev
 ```
 
 This starts the API (:8080), the dashboard (<http://localhost:5173>) and a demo site
-(<http://localhost:8081>) with two years of synthetic traffic. Sign-in is one click, with no
+(<http://localhost:8081>) with two years of synthetic traffic for every feature, and prints what
+runs where. Sign-in is one click, with no
 setup. Tools (Go, Bun, Node, Terraform, linters) are pinned in `mise.toml`. Next:
 [Getting started](docs/getting-started.md).
 

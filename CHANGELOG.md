@@ -7,6 +7,9 @@ All notable changes are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `analytics seed` covers every dashboard feature (listed in `docs/development/seed-data.md`): long tails of pages and referrers, several hostnames, more campaigns, countries and devices, unknown country, browser and OS, events with zero or two properties, visits split by the session timeout, pixel views through image proxies (the blog's pixel is switched on), a spam burst to purge, a goal nobody reaches, and two new demo sites: "Old Portfolio (demo)", which went quiet 45 days ago, and "Side Project (demo)", with no events, which shows onboarding. Run `make dev-reset` to get it.
+- `make dev` (`scripts/dev.sh`) checks that its ports are free and says what holds a taken one, builds the server once, prefixes each process's log, prints the dashboard, API, tracker and demo site URLs, bind addresses, database, sign-in mode, sites and process ids once everything answers, and stops all of it on Ctrl+C. The API listens on 127.0.0.1 only in development.
+- `analytics seed -live -demo ADDR` serves the demo site, and `make dev` uses it, so local development no longer needs Python. The demo link has no `?site=<id>` to copy any more (the server adds it), and reloading one of its pages such as `/blog` works. The page moved from `apps/demo` to `apps/server/internal/devdata/demo`.
 - Dashboard: keyboard shortcut help (<kbd>?</kbd>, or from the ⌘K and user menus). The ⌘K menu can also switch the comparison (previous period, year over year, off) and open the calendar for a custom range.
 - Dashboard: the site list has a period picker (today, 7 days, 30 days, 12 months), and each row opens the dashboard on that period.
 - `.github/workflows/fuzz.yml` runs every Go fuzz test for five minutes each week (CI only replays their seed inputs) and keeps a failing input as an artifact.

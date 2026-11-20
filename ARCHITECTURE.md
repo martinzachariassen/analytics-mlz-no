@@ -124,7 +124,7 @@ What the server defends against, and what it does not, is in the
 | `internal/text` | `Clean` and `Truncate`: how ingest cleans browser strings before storing them, shared with goals so a goal typed as sent matches |
 | `internal/script` | Embeds `script.js` (built from `apps/tracker`) and serves it gzipped with an `ETag` |
 | `internal/web` | Embeds the dashboard build (`static/`, copied from `apps/web/dist` by `make embed-web` and the Dockerfile; only a placeholder is committed) and serves it with the rewrites and headers of `apps/web/firebase.json`, which `TestMatchesFirebaseHosting` holds it to. Without a build, `Handler` returns nil and the binary has no dashboard |
-| `internal/devdata` | Synthetic traffic profiles for `analytics seed`: history (`Seed`) and visits as they happen (`Live`, for `seed -live`) |
+| `internal/devdata` | Synthetic traffic profiles for `analytics seed`: history (`Seed`) and visits as they happen (`Live`, for `seed -live`), plus the embedded demo site (`Demo`, `demo/index.html`) that `seed -live -demo` serves |
 
 ### `apps/tracker`: tracking script
 
@@ -143,12 +143,12 @@ See [docs/development/dashboard.md](docs/development/dashboard.md).
 
 | Path | What |
 |---|---|
-| `apps/demo` | Static demo site for `make dev` |
 | `infra/docker` | `Dockerfile` (dashboard build, static binary with it embedded, DB-IP database, Litestream), `entrypoint.sh` (Litestream restore and replicate, `REQUIRE_REPLICA`), `docker-compose.yml` (hardened; settings from `.env`, template `.env.example`), `backup.sh` (the standalone backup job), `test-restore.sh`, `test-backup.sh` |
 | `infra/terraform/bootstrap` | GCP project, APIs, state bucket, budget |
 | `infra/terraform/main` | Cloud Run service and backup job, buckets, Secret Manager, Firebase Hosting, monitoring dashboard and alerts, Workload Identity Federation for the Deploy workflow (`deploy.tf`) |
 | `.github/workflows` | `ci.yml` (one job per `scripts/verify.sh` group, plus docs links, Docker, security) `codeql.yml` (CodeQL for Go, TypeScript and the workflows), `scorecard.yml` (OpenSSF Scorecard), `release.yml` (images with SBOM and provenance attestations, binaries on tag) and `deploy.yml` (deploys `main` to Cloud Run and Firebase Hosting after CI passes, through the `make deploy-*` targets) |
 | `.trivyignore.yaml` | Image-scan findings CI may ignore, each with a reason and an expiry |
+| `scripts/dev.sh` | `make dev`: checks ports, builds once, seeds, starts API, dashboard and demo site, prints what runs where |
 | `scripts/verify.sh` | The quality gate: groups `lint`, `go`, `tracker`, `web`, `e2e`, `infra`. `make verify` and CI run it |
 | `scripts/github-settings.sh` | GitHub repository settings, rulesets and the `production` environment as code (`--check` for drift); see [releasing.md](docs/development/releasing.md#repository-settings) |
 | `mise.toml`, `package.json`, `bun.lock`, `biome.json`, `.githooks/` | Pinned tool versions, the Bun workspace (`apps/web`, `apps/tracker`), Biome config, the pre-commit hook |

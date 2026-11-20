@@ -41,6 +41,7 @@
 - [Backend (Go)](development/backend.md)
 - [Dashboard (React)](development/dashboard.md)
 - [Colours](development/colours.md): what each colour means, the palette, and how to change it
+- [Seed data](development/seed-data.md): the demo sites from `make dev`, and which data shows which feature
 - [Tracking script (TypeScript)](development/tracker.md)
 - [Releasing](development/releasing.md)
 

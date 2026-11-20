@@ -103,7 +103,10 @@ for (const view of ["realtime", "sources", "locations", "devices", "events"]) {
 test("settings shows the tracking code", async ({ page }) => {
   const base = await openSite(page, "Fjord Labs Docs")
   await page.goto(`${base}/settings`)
-  await expect(page.getByText("Tracking code")).toBeVisible()
+  await expect(
+    page.getByRole("navigation", { name: "Settings" })
+  ).toBeVisible()
+  await expect(page.getByText("Tracking code").first()).toBeVisible()
   await expect(page.locator("pre").first()).toContainText("data-site")
   await expectAccessible(page)
 })
@@ -195,15 +198,13 @@ test("a new site waits for its first event, then moves on by itself", async ({
     .getByRole("button", { name: "Add site" })
     .click()
 
-  await expect(page).toHaveURL(/\/settings\?new=1$/)
+  // Adding a site lands on its overview, which waits for the first event.
+  await expect(page).toHaveURL(/\/sites\/[^/]+\?new=1$/)
   const status = page.getByRole("status").filter({ hasText: "Waiting" })
   await expect(status).toContainText("Site added. Waiting for the first event")
+  await expect(page.getByRole("heading", { name: `Install ${domain}` })).toBeVisible()
   await expectAccessible(page)
   const siteId = new URL(page.url()).pathname.split("/")[2]!
-
-  await page.goto(`/sites/${siteId}`)
-  await expect(page.getByText(`No data for ${domain} yet`)).toBeVisible()
-  await expectAccessible(page)
 
   // What the tracking script sends, straight to the API server (the preview proxy may
   // rewrite headers). A browser user agent, since bots are dropped silently.
@@ -219,10 +220,9 @@ test("a new site waits for its first event, then moves on by itself", async ({
   expect(res.status()).toBe(202)
 
   // The overview polls the site every 5 seconds and swaps in the dashboard.
-  await expect(page.getByText(`No data for ${domain} yet`)).toBeHidden({
-    timeout: 15_000,
-  })
+  await expect(status).toBeHidden({ timeout: 15_000 })
   await expect(page.getByText("Visitors").first()).toBeVisible()
+  await expect(page).not.toHaveURL(/[?&]new=/)
 })
 
 test("the tracking pixel can be turned on and records a proxied view", async ({
@@ -236,8 +236,11 @@ test("the tracking pixel can be turned on and records a proxied view", async ({
     .getByRole("dialog")
     .getByRole("button", { name: "Add site" })
     .click()
-  await expect(page).toHaveURL(/\/settings\?new=1$/)
+  await expect(page).toHaveURL(/\/sites\/[^/]+\?new=1$/)
   const siteId = new URL(page.url()).pathname.split("/")[2]!
+  await page.getByText("Custom events and the tracking pixel").click()
+  await page.getByRole("link", { name: "tracking pixel" }).click()
+  await expect(page).toHaveURL(/\/settings#pixel$/)
 
   const pixel = (ua: string) =>
     page.request.get(
@@ -263,6 +266,228 @@ test("the tracking pixel can be turned on and records a proxied view", async ({
   expect((await pixel("github-camo (e2e)")).status()).toBe(200)
   // Settings polls the site while it waits and shows when the first event arrived.
   await expect(
-    page.getByRole("status").filter({ hasText: "Receiving data" })
-  ).toBeVisible({ timeout: 15_000 })
+    page.getByRole("status").filter({ hasText: "Waiting" })
+  ).toBeHidden({ timeout: 15_000 })
+  await expect(page.getByText(/^Last event/)).toBeVisible()
+})
+
+/** A site of its own for a test that changes it: the projects share one database. */
+async function addSite(page: Page, prefix: string, project: string) {
+  const domain = `${prefix}-${project}-${Date.now()}.example`
+  await page.goto("/sites")
+  await page.getByRole("button", { name: "Add site" }).first().click()
+  await page.getByLabel("Domain").fill(domain)
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Add site" })
+    .click()
+  await expect(page).toHaveURL(/\/sites\/[^/]+\?new=1$/)
+  return { domain, id: new URL(page.url()).pathname.split("/")[2]! }
+}
+
+test("the period, comparison and interval controls change the view", async ({
+  page,
+}) => {
+  await openSite(page, "Fjord Labs Blog")
+
+  await page.getByRole("button", { name: "Last 7 days", exact: true }).click()
+  await page.getByRole("button", { name: /^Last 30 days/ }).click()
+  await expect(page).toHaveURL(/[?&]period=30d/)
+
+  // Picked in the calendar: the 1st to the 3rd of the month shown.
+  await page.getByRole("button", { name: "Last 30 days", exact: true }).click()
+  const calendar = page.getByRole("dialog")
+  const days = calendar.getByRole("gridcell").getByRole("button")
+  await days.filter({ hasText: /^1$/ }).first().click()
+  await days.filter({ hasText: /^3$/ }).first().click()
+  await calendar.getByRole("button", { name: "Apply" }).click()
+  await expect(page).toHaveURL(/[?&]period=custom&from=\d{4}-\d{2}-01&to=\d{4}-\d{2}-03/)
+
+  // The comparison picker is there on phones too.
+  await page.getByRole("combobox", { name: "Compare with" }).click()
+  await page.getByRole("option", { name: "Year over year" }).click()
+  await expect(page).toHaveURL(/[?&]compare=year/)
+
+  await page.goto(`${new URL(page.url()).pathname}?period=30d`)
+  await page.getByRole("combobox", { name: "Interval" }).first().click()
+  await page.getByRole("option", { name: "Weekly" }).click()
+  await expect(page).toHaveURL(/[?&]interval=week/)
+  await expect(page.getByText("Visitors").first()).toBeVisible()
+  await expectAccessible(page)
+})
+
+test("the overview groups its reports and keeps card tabs in the URL", async ({
+  page,
+}) => {
+  await openSite(page, "Fjord Labs Blog")
+  for (const name of [
+    "Content and acquisition",
+    "Conversions",
+    "Audience",
+    "Technology and time",
+  ])
+    await expect(page.getByRole("region", { name })).toBeVisible()
+
+  await page.getByRole("tab", { name: "Entry" }).click()
+  await expect(page).toHaveURL(/[?&]pages_tab=entry/)
+  await page.reload()
+  await expect(page.getByRole("tab", { name: "Entry" })).toHaveAttribute(
+    "aria-selected",
+    "true"
+  )
+})
+
+test("the main chart exports its time series as CSV", async ({ page }) => {
+  await openSite(page, "Fjord Labs Blog")
+  const download = page.waitForEvent("download")
+  await page.getByRole("link", { name: "Export the time series as CSV" }).click()
+  const file = await download
+  let csv = ""
+  for await (const chunk of await file.createReadStream()) csv += chunk
+  const [header, first] = csv.split("\n")
+  // The default period compares with the one before it.
+  expect(header).toBe(
+    "\uFEFFstart,pageviews,visitors,visits,bounce_rate,avg_duration_seconds,previous_start,previous_pageviews,previous_visitors,previous_visits,previous_bounce_rate,previous_avg_duration_seconds"
+  )
+  expect(first).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+})
+
+test("a site can be renamed and deleted", async ({ page }, testInfo) => {
+  const { domain, id } = await addSite(page, "settings", testInfo.project.name)
+  await page.goto(`/sites/${id}/settings#general`)
+
+  await page.getByLabel("Name").fill(`Renamed ${testInfo.project.name}`)
+  await page.getByRole("button", { name: "Save" }).click()
+  await expect(page.getByText("Site updated")).toBeVisible()
+  await page.reload()
+  await expect(page.getByLabel("Name")).toHaveValue(
+    `Renamed ${testInfo.project.name}`
+  )
+
+  await page.getByRole("button", { name: "Delete site" }).click()
+  const confirm = page.getByRole("alertdialog")
+  await expect(confirm).toContainText(`Delete Renamed ${testInfo.project.name}?`)
+  await expectAccessible(page)
+  await confirm.getByRole("button", { name: "Delete" }).click()
+  await expect(page).toHaveURL(/\/sites$/)
+  await expect(page.getByText(domain)).toHaveCount(0)
+  const gone = await page.request.get(`/api/sites/${id}`)
+  expect(gone.status()).toBe(404)
+})
+
+test("keyboard: shortcut help, ⌘K and theme", async ({ page, isMobile }) => {
+  test.skip(isMobile, "keyboard shortcuts need a keyboard")
+  await openSite(page, "Fjord Labs Blog")
+  await expect(page.getByText("Visitors").first()).toBeVisible()
+
+  await page.keyboard.press("?")
+  const help = page.getByRole("dialog", { name: "Keyboard shortcuts" })
+  await expect(help).toContainText("Toggle the comparison")
+  await expectAccessible(page)
+  await page.keyboard.press("Escape")
+
+  await page.keyboard.press("ControlOrMeta+k")
+  await page.getByPlaceholder("Go to a view, site or period…").fill("year over")
+  await page.getByRole("option", { name: "Compare year over year" }).click()
+  await expect(page).toHaveURL(/[?&]compare=year/)
+  await expect(page.getByRole("dialog")).toHaveCount(0)
+
+  const theme = await page.locator("html").getAttribute("data-theme")
+  await page.keyboard.press("d")
+  await expect(page.locator("html")).not.toHaveAttribute("data-theme", theme!)
+})
+
+test("the user menu switches the theme", async ({ page, isMobile }) => {
+  await openSite(page, "Fjord Labs Blog")
+  if (isMobile) await page.getByRole("button", { name: "Toggle Sidebar" }).first().click()
+  const theme = await page.locator("html").getAttribute("data-theme")
+  await page.getByRole("button", { name: /Local demo/ }).click()
+  await page
+    .getByRole("menuitem", { name: theme === "dark" ? /Light mode/ : /Dark mode/ })
+    .click()
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-theme",
+    theme === "dark" ? "light" : "dark"
+  )
+})
+
+test.describe("own session", () => {
+  // Signing out revokes the session, so this test must not share the stored one.
+  test.use({ storageState: { cookies: [], origins: [] } })
+
+  test("signing out ends the session", async ({ page, isMobile }) => {
+    await page.goto("/")
+    await page.getByRole("link", { name: "Open demo dashboard" }).click()
+    await expect(page).toHaveURL(/\/sites$/)
+    if (isMobile)
+      await page.getByRole("button", { name: "Toggle Sidebar" }).first().click()
+    await page.getByRole("button", { name: /Local demo/ }).click()
+    await page.getByRole("menuitem", { name: "Sign out" }).click()
+    await expect(page).toHaveURL(/\/$/)
+    expect((await page.request.get("/api/auth/me")).status()).toBe(401)
+    await page.goto("/sites")
+    await expect(page).toHaveURL(/\/$/)
+  })
+})
+
+test("the real tracking script records a page view and an event", async ({
+  page,
+}, testInfo) => {
+  // The tracker stays quiet in automated browsers and headless user agents, which is right
+  // for real sites; here it has to run.
+  await page.addInitScript(() =>
+    Object.defineProperty(Navigator.prototype, "webdriver", { get: () => false })
+  )
+  const sites = await (await page.request.get("/api/sites")).json()
+  const blog = sites.find((s: { domain: string }) => s.domain === "localhost")
+  const path = `/e2e-tracker-${testInfo.project.name}-${Date.now()}`
+  const event = `e2e-click-${testInfo.project.name}`
+  // A page "on" the blog's domain (localhost), served by the test itself on the API server's
+  // origin: Chrome blocks a page it did not load from a loopback address from reaching one.
+  const origin = "http://localhost:18080"
+  await page.route(`${origin}${path}`, (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: `<!doctype html><html><head><title>Tracker test</title>
+<script defer src="${origin}/api/script.js" data-site="${blog.id}" data-allow-localhost="true"></script>
+</head><body><button data-mlz-event="${event}" data-mlz-event-plan="pro">Sign up</button></body></html>`,
+    })
+  )
+  const sent = page.waitForResponse(
+    (r) => r.url() === `${origin}/api/event` && r.request().method() === "POST"
+  )
+  await page.goto(`${origin}${path}`)
+  expect((await sent).status()).toBe(202)
+
+  await expect
+    .poll(
+      async () => {
+        const rt = await (
+          await page.request.get(`/api/sites/${blog.id}/realtime?detail=1`)
+        ).json()
+        return (rt.pages ?? []).map((p: { value: string }) => p.value)
+      },
+      { timeout: 15_000 }
+    )
+    .toContain(path)
+
+  const clicked = page.waitForResponse(
+    (r) => r.url() === `${origin}/api/event` && r.request().method() === "POST"
+  )
+  await page.getByRole("button", { name: "Sign up" }).click()
+  expect((await clicked).status()).toBe(202)
+  const today = new Date().toISOString().slice(0, 10)
+  await expect
+    .poll(
+      async () => {
+        const rows = await (
+          await page.request.get(
+            `/api/sites/${blog.id}/breakdown?dim=event&from=${today}&to=${today}&tz=UTC&limit=100`
+          )
+        ).json()
+        return rows.map((r: { value: string }) => r.value)
+      },
+      { timeout: 15_000 }
+    )
+    .toContain(event)
 })

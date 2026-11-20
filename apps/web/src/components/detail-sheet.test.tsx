@@ -61,4 +61,18 @@ describe("DetailSheet", () => {
     await waitFor(() => expect(search().get("detail")).toBeNull())
     expect(search().getAll("f")).toEqual(["path:is:/blog"])
   })
+
+  it("opens the view on its own period when it has one", async () => {
+    renderInSite(
+      () => <DetailSheet period="today" />,
+      "/sites/abc?period=12m&interval=month&detail=path:/blog"
+    )
+    const link = await screen.findByRole("link", { name: /Open Pages/ })
+    expect(link.getAttribute("href")).toBe(
+      "/sites/abc/pages?period=today&tab=path"
+    )
+    expect(
+      calls.some((c) => c.includes("stats") && c.includes("interval=hour"))
+    ).toBe(true)
+  })
 })

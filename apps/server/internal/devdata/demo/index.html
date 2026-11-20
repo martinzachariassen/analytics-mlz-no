@@ -1,8 +1,9 @@
 <!doctype html>
 <!--
-  Demo site for local development (`make dev`, served on http://localhost:8081).
-  Loads the real tracking script from the local server and sends events to the
-  "localhost" site created by `analytics seed`. Pass its id as ?site=<id>.
+  Demo site for local development, served by `analytics seed -live -demo` (`make dev`
+  puts it on http://localhost:8081). Loads the real tracking script from the local
+  server and sends events to the "localhost" site created by `analytics seed`; the
+  Go handler (demo.go) adds its id as ?site=<id>.
 
   It shows every tracker feature next to a preview of the dashboard and its colours.
   The colour tokens are copied from apps/web/src/index.css; keep them in step
@@ -238,7 +239,7 @@
           </div>
           <div class="card">
             <h3>Goals</h3>
-            <p class="secondary small">Fjord Labs Blog has three goals: the <em>newsletter-signup</em> and <em>contact-submit</em> events, and visits to <code>/contact</code>. Send the form on the Contact page to hit two at once.</p>
+            <p class="secondary small">Fjord Labs Blog has four goals: the <em>newsletter-signup</em> and <em>contact-submit</em> events, visits to <code>/contact</code>, and <code>/pricing/enterprise</code>, which nobody visits, so it shows zero conversions. Send the form on the Contact page to hit two at once.</p>
             <p class="how">Dashboard: Overview → Goals, with conversion rate</p>
             <div class="act row"><button type="button" data-go="/contact">Go to Contact</button></div>
           </div>
@@ -478,7 +479,7 @@
     function status(state, text) { $("status-dot").className = `dot ${state}`; $("status").textContent = text; }
     if (!site) {
       status("off", "Not tracking");
-      $("warn").innerHTML = '<p class="warn">Add <code>?site=&lt;id&gt;</code> to the URL. <code>make dev</code> prints the full link.</p>';
+      $("warn").innerHTML = '<p class="warn">Add <code>?site=&lt;id&gt;</code> to the URL, or open the link <code>make dev</code> prints.</p>';
     } else {
       // Remember the id, then drop it from the URL so tracked paths stay clean (utm_* tags stay).
       const keep = new URLSearchParams([...new URLSearchParams(location.search)].filter(([k]) => k.startsWith("utm_")));

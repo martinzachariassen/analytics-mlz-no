@@ -4,6 +4,7 @@ package devdata
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"math/rand/v2"
 	"slices"
@@ -15,13 +16,21 @@ import (
 
 // Options controls how much traffic Seed generates.
 type Options struct {
-	Days        int      // days of history ending now (two years by default, so "Last 12 months" has a comparison)
+	Days        int      // days of history ending at Now (two years by default, so "Last 12 months" has a comparison)
 	DailyVisits int      // average visits per weekday at the end of the period
 	Hostname    string   // hostname recorded on events (the site's domain)
 	Profile     *Profile // kind of site; nil uses Blog
 	Now         time.Time
-	Rand        *rand.Rand     // nil uses a fixed seed, so runs are reproducible
-	Location    *time.Location // time zone for the daily pattern; nil uses time.Local
+	// End stops Seed's traffic at this time instead of Now, for a site that has gone quiet.
+	End      time.Time
+	Rand     *rand.Rand     // nil uses a fixed seed, so runs are reproducible
+	Location *time.Location // time zone for the daily pattern; nil uses time.Local
+	// Pixel adds README views and email opens through image proxies, stored the way
+	// GET /api/pixel.gif stores them: no country, browser, OS or device.
+	Pixel bool
+	// Spam adds a burst of probing requests from one visitor three days ago, to try
+	// `analytics events purge` on.
+	Spam bool
 }
 
 // Profile describes the kind of site being simulated: its pages and where visitors come from.
@@ -29,9 +38,57 @@ type Profile struct {
 	entryPages []weighted[string]
 	nextPages  []weighted[string]
 	sources    []weighted[source]
+	// Subdomains some visits arrive on, prepended to Options.Hostname ("" is the domain itself).
+	hostPrefixes []weighted[string]
 	// Referrer of the big traffic spike in the last month.
 	spikeRef string
 }
+
+// longTail returns n paths built by name(i), weighted 1/(i+1) and scaled to sum to total,
+// so a few are popular and most are seen now and then.
+func longTail(n int, total float64, name func(i int) string) []weighted[string] {
+	var h float64
+	for i := range n {
+		h += 1 / float64(i+1)
+	}
+	out := make([]weighted[string], n)
+	for i := range n {
+		out[i] = weighted[string]{name(i), total / h / float64(i+1)}
+	}
+	return out
+}
+
+var (
+	blogTopics = []string{
+		"sqlite", "go", "litestream", "cloud-run", "privacy", "terraform", "react", "vite", "tailwind",
+		"postgres", "docker", "github-actions", "observability", "caching", "testing", "http",
+	}
+	// Enough posts that the pages report needs more than one page of 100 rows.
+	blogPosts = longTail(140, 20, func(i int) string {
+		return fmt.Sprintf("/blog/notes-on-%s-%d", blogTopics[i%len(blogTopics)], i/len(blogTopics)+1)
+	})
+	docsSections = []string{"guides", "reference", "integrations", "self-hosting", "api", "cli"}
+	docsPages    = []string{"install", "configure", "upgrade", "troubleshooting", "overview", "examples", "faq", "limits", "security", "migrate"}
+	docsTail     = longTail(len(docsSections)*len(docsPages), 25, func(i int) string {
+		return "/docs/" + docsSections[i%len(docsSections)] + "/" + docsPages[i/len(docsSections)]
+	})
+	// A long tail of small referrers, so the sources report has more than the top ten.
+	smallReferrers = func() []weighted[source] {
+		names := []string{
+			"lobste.rs", "dev.to", "hashnode.com", "medium.com", "substack.com", "mastodon.social", "fosstodon.org",
+			"hachyderm.io", "bsky.app", "threads.net", "facebook.com", "instagram.com", "youtube.com", "slack.com",
+			"discord.com", "teams.microsoft.com", "notion.so", "feedly.com", "inoreader.com", "newsblur.com",
+			"kagi.com", "ecosia.org", "search.brave.com", "startpage.com", "yandex.ru", "baidu.com", "naver.com",
+			"qwant.com", "perplexity.ai", "chatgpt.com", "claude.ai", "gemini.google.com", "golangweekly.com",
+			"changelog.com", "tldr.tech", "hn.algolia.com", "tildes.net", "kode24.no", "digi.no", "vg.no",
+		}
+		out := make([]weighted[source], len(names))
+		for i, n := range names {
+			out[i] = weighted[source]{source{ref: n}, 0.6 / float64(1+i%4)}
+		}
+		return out
+	}()
+)
 
 type weighted[T any] struct {
 	v T
@@ -54,15 +111,17 @@ func pick[T any](r *rand.Rand, items []weighted[T]) T {
 
 // Blog is a personal blog: mostly search and social traffic.
 var Blog = &Profile{
-	entryPages: []weighted[string]{
+	entryPages: append([]weighted[string]{
 		{"/", 40}, {"/blog/sqlite-on-cloud-run", 18}, {"/blog/privacy-first-analytics", 14},
-		{"/blog", 8}, {"/projects", 8}, {"/blog/go-1-27-notes", 7}, {"/about", 5},
-	},
-	nextPages: []weighted[string]{
-		{"/blog", 25}, {"/projects", 15}, {"/about", 15}, {"/", 10}, {"/contact", 8},
+		{"/blog", 8}, {"/projects", 8}, {"/blog/go-1-27-notes", 7}, {"/about", 5}, {"/pricing", 3},
+		{"/blog/ærlig-talt-om-sqlite", 2},
+		{"/blog/2026/11/running-sqlite-on-serverless-containers-without-losing-a-single-write", 1},
+	}, blogPosts...),
+	nextPages: append([]weighted[string]{
+		{"/blog", 25}, {"/projects", 15}, {"/about", 15}, {"/", 10}, {"/contact", 8}, {"/pricing", 6},
 		{"/blog/sqlite-on-cloud-run", 10}, {"/blog/privacy-first-analytics", 9}, {"/blog/go-1-27-notes", 8},
-	},
-	sources: []weighted[source]{
+	}, blogPosts...),
+	sources: append([]weighted[source]{
 		{source{}, 30}, // direct
 		{source{ref: "google.com"}, 28},
 		{source{ref: "duckduckgo.com"}, 5},
@@ -74,20 +133,24 @@ var Blog = &Profile{
 		{source{ref: "reddit.com"}, 4},
 		{source{utmSource: "newsletter", utmMedium: "email", utmCampaign: "monthly"}, 4},
 		{source{ref: "linkedin.com", utmSource: "linkedin", utmMedium: "social", utmCampaign: "launch"}, 2},
-	},
-	spikeRef: "news.ycombinator.com",
+		{source{utmSource: "newsletter", utmMedium: "email", utmCampaign: "autumn-launch"}, 1.5},
+		{source{ref: "mastodon.social", utmSource: "mastodon", utmMedium: "social", utmCampaign: "autumn-launch"}, 1},
+		{source{utmSource: "podcast"}, 0.5}, // a source without medium or campaign
+	}, smallReferrers...),
+	hostPrefixes: []weighted[string]{{"", 90}, {"www.", 8}, {"staging.", 2}},
+	spikeRef:     "news.ycombinator.com",
 }
 
 // Docs is a documentation site: developers arriving from GitHub and search.
 var Docs = &Profile{
-	entryPages: []weighted[string]{
+	entryPages: append([]weighted[string]{
 		{"/", 20}, {"/docs/getting-started", 30}, {"/docs/tracking-script", 18},
 		{"/docs/self-hosting", 14}, {"/docs/api", 12}, {"/changelog", 6},
-	},
-	nextPages: []weighted[string]{
+	}, docsTail...),
+	nextPages: append([]weighted[string]{
 		{"/docs/getting-started", 15}, {"/docs/tracking-script", 20}, {"/docs/custom-events", 15},
 		{"/docs/self-hosting", 15}, {"/docs/api", 15}, {"/docs/faq", 10}, {"/changelog", 5},
-	},
+	}, docsTail...),
 	sources: []weighted[source]{
 		{source{}, 25},
 		{source{ref: "github.com"}, 30},
@@ -96,13 +159,28 @@ var Docs = &Profile{
 		{source{ref: "stackoverflow.com"}, 6},
 		{source{ref: "pkg.go.dev"}, 4},
 		{source{ref: "reddit.com"}, 4},
+		{source{ref: "github.com", utmSource: "github", utmMedium: "referral", utmCampaign: "readme"}, 3},
+		{source{utmSource: "newsletter", utmMedium: "email", utmCampaign: "docs-update"}, 1.5},
 	},
 	spikeRef: "reddit.com",
+}
+
+// Portfolio is a small personal portfolio.
+var Portfolio = &Profile{
+	entryPages: []weighted[string]{{"/", 60}, {"/work", 15}, {"/work/fjord-labs", 10}, {"/cv", 10}, {"/contact", 5}},
+	nextPages:  []weighted[string]{{"/work", 30}, {"/work/fjord-labs", 20}, {"/work/mlz", 15}, {"/cv", 20}, {"/contact", 15}},
+	sources: []weighted[source]{
+		{source{}, 40}, {source{ref: "google.com"}, 25}, {source{ref: "linkedin.com"}, 25}, {source{ref: "github.com"}, 10},
+	},
+	spikeRef: "linkedin.com",
 }
 
 var (
 	countries = []weighted[string]{
 		{"NO", 42}, {"SE", 10}, {"DK", 6}, {"DE", 8}, {"GB", 7}, {"US", 14}, {"NL", 4}, {"FI", 3}, {"FR", 3}, {"PL", 3},
+		{"ES", 1.5}, {"IT", 1.5}, {"CA", 2}, {"BR", 1.5}, {"MX", 0.6}, {"AR", 0.4}, {"IN", 2}, {"JP", 1.2},
+		{"KR", 0.6}, {"SG", 0.5}, {"AU", 1.2}, {"NZ", 0.3}, {"ZA", 0.4}, {"NG", 0.3}, {"KE", 0.2}, {"EG", 0.2},
+		{"", 2.2}, // not found in the GeoIP database
 	}
 
 	clients = []weighted[client]{
@@ -117,7 +195,20 @@ var (
 		{client{"Safari", "iOS", "mobile"}, 16},
 		{client{"Chrome", "Android", "mobile"}, 10},
 		{client{"Safari", "iOS", "tablet"}, 3},
-		{client{"Samsung Internet", "Android", "mobile"}, 1},
+		{client{"Samsung Browser", "Android", "mobile"}, 1},
+		{client{"Chrome", "Android", "tablet"}, 1},
+		{client{"Chrome", "ChromeOS", "desktop"}, 1},
+		{client{"Opera", "Windows", "desktop"}, 0.7},
+		{client{"Vivaldi", "Linux", "desktop"}, 0.3},
+		{client{"Chrome", "Linux", "other"}, 0.5}, // a TV or a console
+		{client{"", "", "other"}, 1},              // a user agent the parser does not know
+	}
+
+	searchQueries = []string{
+		"install", "docker", "goals", "pixel", "csv export", "retention", "litestream", "backup", "restore",
+		"api key", "oauth", "github login", "custom events", "spa", "hash routing", "utm", "bots", "rate limit",
+		"proxy", "nginx", "caddy", "cloud run", "terraform", "self-hosting", "upgrade", "purge", "timezone",
+		"country", "privacy", "gdpr",
 	}
 
 	// Relative traffic per hour of day (local time).
@@ -174,6 +265,10 @@ func withDefaults(o Options) Options {
 // Seed inserts synthetic events for siteID and returns how many were written.
 func Seed(ctx context.Context, st *store.Store, siteID string, o Options) (int, error) {
 	o = withDefaults(o)
+	quiet := !o.End.IsZero() && o.End.Before(o.Now)
+	if quiet {
+		o.Now = o.End
+	}
 	r := o.Rand
 	if r == nil {
 		r = rand.New(rand.NewPCG(1, 2)) //nolint:gosec // synthetic test data, not security-sensitive
@@ -240,6 +335,24 @@ func Seed(ctx context.Context, st *store.Store, siteID string, o Options) (int, 
 		}
 	}
 
+	if o.Pixel {
+		k, err := seedPixel(ctx, st, r, siteID, o, today)
+		n += k
+		if err != nil {
+			return n, err
+		}
+	}
+	if o.Spam && o.Days > 3 {
+		k, err := seedSpam(ctx, st, r, siteID, o, today.AddDate(0, 0, -3))
+		n += k
+		if err != nil {
+			return n, err
+		}
+	}
+	if quiet {
+		return n, nil
+	}
+
 	// A few visitors right now, so the realtime counter shows something.
 	for i := range 3 + r.IntN(4) {
 		start := o.Now.Add(-time.Duration(i*40+r.IntN(40)) * time.Second)
@@ -248,6 +361,67 @@ func Seed(ctx context.Context, st *store.Store, siteID string, o Options) (int, 
 		if err != nil {
 			return n, err
 		}
+	}
+	return n, nil
+}
+
+// seedPixel adds what the tracking pixel records: README views through GitHub's image proxy
+// on most days, and a monthly newsletter whose opens arrive through Gmail's proxy. Behind a
+// proxy, ingest stores no country, browser, OS or device, and the proxy's few addresses
+// make few visitors.
+func seedPixel(ctx context.Context, st *store.Store, r *rand.Rand, siteID string, o Options, today time.Time) (int, error) {
+	n := 0
+	insert := func(ev store.Event) error {
+		if ev.Time.After(o.Now) {
+			return nil
+		}
+		ev.SiteID, ev.Hostname = siteID, o.Hostname
+		if err := st.InsertEvent(ctx, ev); err != nil {
+			return err
+		}
+		n++
+		return nil
+	}
+	for d := o.Days - 1; d >= 0; d-- {
+		day := today.AddDate(0, 0, -d)
+		for range poisson(r, float64(o.DailyVisits)*0.06*dayFactor(day, d, o.Days)) {
+			t := day.Add(time.Duration(r.IntN(86400)) * time.Second)
+			if err := insert(store.Event{Time: t, Type: "pageview", Path: "/readme", ReferrerHost: "github.com", VisitorID: int64(1000 + r.IntN(3))}); err != nil {
+				return n, err
+			}
+		}
+		if day.Day() != 1 {
+			continue
+		}
+		for range poisson(r, float64(o.DailyVisits)*0.5) {
+			ev := store.Event{
+				Time: day.Add(9*time.Hour + time.Duration(r.ExpFloat64()*4*3600)*time.Second), Type: "event",
+				Name: "email-open", Path: "/newsletter", ReferrerHost: "mail.google.com",
+				UTMSource: "newsletter", UTMMedium: "email", UTMCampaign: "monthly", VisitorID: int64(2000 + r.IntN(5)),
+			}
+			if err := insert(ev); err != nil {
+				return n, err
+			}
+		}
+	}
+	return n, nil
+}
+
+// seedSpam adds a scanner probing for well-known admin paths: one visitor, a few dozen
+// page views in twenty minutes at night.
+func seedSpam(ctx context.Context, st *store.Store, r *rand.Rand, siteID string, o Options, day time.Time) (int, error) {
+	paths := []string{"/wp-login.php", "/.env", "/xmlrpc.php", "/wp-admin/", "/.git/config", "/phpmyadmin/"}
+	start := day.Add(3*time.Hour + 12*time.Minute)
+	n := 0
+	for i := range 48 {
+		ev := store.Event{
+			SiteID: siteID, Time: start.Add(time.Duration(i*25) * time.Second), Type: "pageview", Hostname: o.Hostname,
+			Path: paths[r.IntN(len(paths))], Country: "US", Browser: "Chrome", OS: "Linux", Device: "desktop", VisitorID: 4242,
+		}
+		if err := st.InsertEvent(ctx, ev); err != nil {
+			return n, err
+		}
+		n++
 	}
 	return n, nil
 }
@@ -272,6 +446,14 @@ func newVisitor(r *rand.Rand) visitor {
 	return visitor{id: r.Int64(), country: pick(r, countries), client: pick(r, clients)}
 }
 
+// visitHost is the hostname one visit arrives on.
+func visitHost(r *rand.Rand, p *Profile, domain string) string {
+	if len(p.hostPrefixes) == 0 {
+		return domain
+	}
+	return pick(r, p.hostPrefixes) + domain
+}
+
 // visit writes the part of one session that has happened by o.Now.
 func visit(ctx context.Context, st *store.Store, r *rand.Rand, siteID string, o Options, v visitor, start time.Time, src source) (int, error) {
 	n := 0
@@ -292,7 +474,7 @@ func visit(ctx context.Context, st *store.Store, r *rand.Rand, siteID string, o 
 func visitEvents(r *rand.Rand, siteID, hostname string, p *Profile, v visitor, start time.Time, src source) []store.Event {
 	base := store.Event{
 		SiteID:    siteID,
-		Hostname:  hostname,
+		Hostname:  visitHost(r, p, hostname),
 		Country:   v.country,
 		Browser:   v.client.browser,
 		OS:        v.client.os,
@@ -319,7 +501,12 @@ func visitEvents(r *rand.Rand, siteID, hostname string, p *Profile, v visitor, s
 		if ev2, ok := maybeEvent(r, base, path, t); ok {
 			events = append(events, ev2)
 		}
-		t = t.Add(time.Duration(10+r.IntN(170)) * time.Second)
+		gap := time.Duration(10+r.IntN(170)) * time.Second
+		if r.Float64() < 0.01 {
+			// Left the tab open and came back: past store.SessionTimeout, so a second session.
+			gap = store.SessionTimeout + time.Duration(1+r.IntN(60))*time.Minute
+		}
+		t = t.Add(gap)
 		path = pick(r, p.nextPages)
 	}
 	return events
@@ -391,7 +578,16 @@ func maybeEvent(r *rand.Rand, base store.Event, path string, t time.Time) (store
 	case path == "/contact" && x < 0.3:
 		ev.Name, ev.Props = "contact-submit", map[string]string{"topic": pick(r, []weighted[string]{{"work", 3}, {"question", 2}, {"other", 1}})}
 	case path == "/" && x < 0.04:
-		ev.Name, ev.Props = "newsletter-signup", map[string]string{"position": pick(r, []weighted[string]{{"footer", 3}, {"hero", 2}})}
+		ev.Name, ev.Props = "newsletter-signup", map[string]string{"position": pick(r, []weighted[string]{{"footer", 3}, {"hero", 2}, {"sidebar", 1}, {"popup", 0.5}})}
+	case path == "/pricing" && x < 0.15:
+		ev.Name, ev.Props = "plan-selected", map[string]string{
+			"plan":  pick(r, []weighted[string]{{"hobby", 5}, {"pro", 3}, {"team", 1}}),
+			"seats": pick(r, []weighted[string]{{"1", 5}, {"3", 2}, {"10", 1}}),
+		}
+	case path == "/pricing" && x < 0.25:
+		ev.Name = "signup-start" // an event without properties
+	case strings.HasPrefix(path, "/docs/") && x < 0.05:
+		ev.Name, ev.Props = "search", map[string]string{"query": searchQueries[min(len(searchQueries)-1, int(r.ExpFloat64()*6))]}
 	case (strings.HasPrefix(path, "/blog/") || strings.HasPrefix(path, "/docs/")) && x < 0.08:
 		ev.Name, ev.Props = "copy-code", map[string]string{"lang": pick(r, []weighted[string]{{"go", 4}, {"sql", 2}, {"sh", 2}, {"hcl", 1}})}
 	case x < 0.06:

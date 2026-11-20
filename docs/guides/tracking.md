@@ -17,7 +17,8 @@ Content Security Policy.
 ## The basics
 
 1. Create a site in the dashboard (**Add site**) or with `analytics sites add -domain example.com`.
-   You get a **site id**.
+   You get a **site id**. In the dashboard, adding a site opens its overview, which shows the
+   snippet with the id filled in until the first event arrives.
 2. Add the script tag above to every page. Replace the host with your analytics server and
    `SITE_ID` with the id.
 3. Open the site in a browser and watch the **Realtime** view in the dashboard.

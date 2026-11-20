@@ -1,4 +1,3 @@
-import { useQuery } from "@tanstack/react-query"
 import { format } from "date-fns"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 
@@ -8,18 +7,15 @@ import { Panel } from "@/components/panel"
 import { AXIS_TICK, TipBox, TipRow } from "@/components/traffic-chart"
 import { ChartContainer, ChartTooltip } from "@/components/ui/chart"
 import { Skeleton } from "@/components/ui/skeleton"
-import { api, type BreakdownRow, type FilterDim } from "@/lib/api"
+import type { BreakdownRow, FilterDim } from "@/lib/api"
 import { formatNumber } from "@/lib/format"
+import { useRealtime } from "@/lib/queries"
 import { useScope } from "@/lib/use-scope"
 
 /** What is happening right now: live visitors and the last 30 minutes. */
 export function RealtimePage() {
   const sc = useScope()
-  const rt = useQuery({
-    queryKey: ["realtime", sc.siteId, "detail"],
-    queryFn: () => api.realtime(sc.siteId, true),
-    refetchInterval: 10_000,
-  })
+  const rt = useRealtime(sc.siteId, true)
   const d = rt.data
   const minutes = d?.minutes ?? []
   const pageviews = minutes.reduce((n, m) => n + m.pageviews, 0)

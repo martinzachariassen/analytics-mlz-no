@@ -1,4 +1,5 @@
 import { Info } from "lucide-react"
+import { useState } from "react"
 
 import { Delta } from "@/components/delta"
 import { Sparkline } from "@/components/sparkline"
@@ -38,20 +39,17 @@ export function KpiStrip({
     >
       {METRICS.map((m) => {
         const active = m.key === metric
-        const Cell = onMetric ? "button" : "div"
         const series =
           stats?.timeseries
             .filter((b) => new Date(b.t).getTime() <= now)
             .map((b) => m.value(b)) ?? []
         return (
-          <Cell
+          <div
             key={m.key}
-            type={onMetric ? "button" : undefined}
-            aria-pressed={onMetric ? active : undefined}
-            onClick={onMetric ? () => onMetric(m.key) : undefined}
             className={cn(
-              "group relative flex min-w-0 flex-col gap-2 bg-surface px-4 pt-3.5 pb-3 text-left",
-              onMetric && "transition-colors hover:bg-surface-2",
+              "relative flex min-w-0 flex-col gap-2 bg-surface px-4 pt-3.5 pb-3 text-left",
+              onMetric &&
+                "transition-colors focus-within:bg-surface-2 hover:bg-surface-2",
               active && "bg-surface-2"
             )}
           >
@@ -63,26 +61,26 @@ export function KpiStrip({
               )}
             />
             <span className="flex items-center gap-1.5">
-              <span
-                className={cn(
-                  "text-xs font-medium",
-                  active ? "text-fg" : "text-fg-muted"
-                )}
-              >
-                {m.label}
-              </span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span
-                    role="img"
-                    aria-label={`About ${m.label}`}
-                    className="text-fg-muted/60 opacity-0 transition-opacity group-hover:opacity-100 hover:text-fg"
-                  >
-                    <Info className="size-3" />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent className="max-w-64">{m.help}</TooltipContent>
-              </Tooltip>
+              {onMetric ? (
+                // The ::after covers the whole tile, so the tile is one big target while the
+                // help button next to it stays a separate one.
+                <button
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => onMetric(m.key)}
+                  className={cn(
+                    "text-xs font-medium outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-accent focus-visible:after:ring-inset",
+                    active ? "text-fg" : "text-fg-muted"
+                  )}
+                >
+                  {m.label}
+                </button>
+              ) : (
+                <span className="text-xs font-medium text-fg-muted">
+                  {m.label}
+                </span>
+              )}
+              <HelpTip label={m.label} help={m.help} />
             </span>
             {stats ? (
               <>
@@ -108,9 +106,33 @@ export function KpiStrip({
                 <Skeleton className="h-8 w-full" />
               </>
             )}
-          </Cell>
+          </div>
         )
       })}
     </div>
+  )
+}
+
+/** What a metric means: on hover, on keyboard focus and on tap. */
+function HelpTip({ label, help }: { label: string; help: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <Tooltip open={open} onOpenChange={setOpen}>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={`About ${label}`}
+          onClick={(e) => {
+            // Radix closes a tooltip on click, but a tap is how touch screens ask for one.
+            e.preventDefault()
+            setOpen(true)
+          }}
+          className="relative z-10 -m-1 rounded-sm p-1 text-fg-muted/60 transition-colors hover:text-fg focus-visible:text-fg"
+        >
+          <Info className="size-3" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-64">{help}</TooltipContent>
+    </Tooltip>
   )
 }

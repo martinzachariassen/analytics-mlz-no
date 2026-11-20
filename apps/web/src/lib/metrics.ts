@@ -1,5 +1,6 @@
 import type { Bucket, Summary } from "@/lib/api"
 import { formatDuration, formatNumber, formatPercent } from "@/lib/format"
+import { useParamChoice } from "@/lib/use-scope"
 
 export type MetricKey =
   | "visitors"
@@ -19,6 +20,8 @@ export type Metric = {
   lowerIsBetter?: boolean
   /** Rates and averages are not summed over buckets. */
   average?: boolean
+  /** Lives below whole numbers (a ratio, a few views), so a chart axis needs decimal ticks. */
+  fractional?: boolean
 }
 
 const perVisit = (s: Summary | Bucket) =>
@@ -53,6 +56,7 @@ export const METRICS: Metric[] = [
     value: perVisit,
     format: (n) => n.toFixed(1),
     average: true,
+    fractional: true,
   },
   {
     key: "bounce_rate",
@@ -62,6 +66,7 @@ export const METRICS: Metric[] = [
     format: formatPercent,
     lowerIsBetter: true,
     average: true,
+    fractional: true,
   },
   {
     key: "avg_duration",
@@ -80,3 +85,8 @@ export const METRIC: Record<MetricKey, Metric> = Object.fromEntries(
 export function isMetric(v: string | null): v is MetricKey {
   return v !== null && Object.hasOwn(METRIC, v)
 }
+
+const METRIC_KEYS: MetricKey[] = METRICS.map((m) => m.key)
+
+/** The metric the KPI strip picks for the chart (?metric=), visitors by default. */
+export const useMetricParam = () => useParamChoice("metric", METRIC_KEYS)

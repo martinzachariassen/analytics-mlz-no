@@ -23,7 +23,8 @@
 | Green and red (`--positive`, `--negative`) | Up and down, with an arrow; the live dot; destructive actions | A series, a category |
 
 The landing page (`routes/home.tsx`) is the one place that also uses violet as decoration
-(eyebrows, separators, big numbers), because it introduces the brand.
+(eyebrows, separators, big numbers), because it introduces the brand. Its dashboard preview
+still follows the up/down rule: the changes there are `<Delta>`s in green and red.
 
 Why this rule: an analytics dashboard is read for its numbers, so the numbers get the only
 colour on the screen. Primary buttons are already the text colour (`--primary: var(--fg)`), so the
@@ -167,5 +168,5 @@ automated, so run them by hand when you change a series colour.
 
 - [Dashboard development](dashboard.md): app primitives and where the charts live.
 - `apps/web/src/index.css`: the tokens themselves.
-- `apps/demo/index.html` (`make dev`, <http://localhost:8081>): the palette and sample charts in
+- `apps/server/internal/devdata/demo/index.html` (`make dev`, <http://localhost:8081>): the palette and sample charts in
   both themes. It copies the tokens, so update it when you change one.

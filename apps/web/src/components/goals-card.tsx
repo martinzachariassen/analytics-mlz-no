@@ -71,7 +71,7 @@ function GoalRows({ goals, compare }: { goals: GoalStat[]; compare: boolean }) {
       <div className="mb-1 flex items-center justify-between gap-3 px-2 text-[11px] font-medium text-fg-muted">
         <span>Goal</span>
         <span className="flex gap-4">
-          <span className="w-16 text-right">Conversions</span>
+          <span className="w-16 text-right max-sm:hidden">Conversions</span>
           <span className="w-14 text-right">Visitors</span>
           <span className="w-14 text-right">Rate</span>
           {compare && <span className="w-14 text-right">Change</span>}
@@ -119,7 +119,7 @@ function GoalRows({ goals, compare }: { goals: GoalStat[]; compare: boolean }) {
                   )}
                 </span>
                 <span className="tnum relative flex shrink-0 gap-4 text-fg-secondary">
-                  <span className="w-16 text-right">
+                  <span className="w-16 text-right max-sm:hidden">
                     {formatNumber(g.completions)}
                   </span>
                   <span className="w-14 text-right">

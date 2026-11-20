@@ -1,7 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { Trash2 } from "lucide-react"
-import { type FormEvent, useEffect, useRef, useState } from "react"
-import { useLocation } from "react-router"
+import { type FormEvent, useState } from "react"
 import { toast } from "sonner"
 
 import { ErrorNote } from "@/components/error-note"
@@ -36,12 +35,6 @@ const PLACEHOLDER: Record<GoalKind, string> = {
 export function GoalsSettings({ siteId }: { siteId: string }) {
   const queryClient = useQueryClient()
   const goals = useGoals(siteId)
-  const { hash } = useLocation()
-  const card = useRef<HTMLDivElement>(null)
-  // The router does not scroll to a hash; the overview links here with #goals.
-  useEffect(() => {
-    if (hash === "#goals") card.current?.scrollIntoView({ block: "start" })
-  }, [hash])
   const [kind, setKind] = useState<GoalKind>("event")
   const [value, setValue] = useState("")
   const refresh = () =>
@@ -67,7 +60,7 @@ export function GoalsSettings({ siteId }: { siteId: string }) {
   }
 
   return (
-    <Card id="goals" ref={card} className="scroll-mt-20">
+    <Card>
       <CardHeader>
         <CardTitle>Goals</CardTitle>
         <CardDescription>

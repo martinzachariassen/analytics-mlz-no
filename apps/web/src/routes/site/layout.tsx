@@ -1,6 +1,6 @@
 import { ChevronRight } from "lucide-react"
 import { useEffect, useRef } from "react"
-import { Link, Outlet, useLocation } from "react-router"
+import { Link, Outlet, useLocation, useSearchParams } from "react-router"
 import { toast } from "sonner"
 
 import { VIEWS } from "@/components/app-sidebar"
@@ -27,7 +27,17 @@ export function SiteLayout() {
   const sc = useScope()
   const { pathname } = useLocation()
   const site = useSite(sc.siteId)
+  const [params, setParams] = useSearchParams()
   useFirstEventToast(sc.siteId, site.data?.first_event_at)
+  // "new" only means something while waiting; a later reload should not say "Site added".
+  // Replaced, not pushed: Back would land on ?new=1 and be sent forward again.
+  const hasData = !!site.data?.first_event_at
+  useEffect(() => {
+    if (!hasData || !params.has("new")) return
+    const next = new URLSearchParams(params)
+    next.delete("new")
+    setParams(next, { replace: true, preventScrollReset: true })
+  }, [hasData, params, setParams])
   const sub = pathname.slice(`/sites/${sc.siteId}`.length).replace(/^\//, "")
   const settings = sub === "settings"
   const view = VIEWS.find((v) => v.path === sub)
@@ -36,12 +46,18 @@ export function SiteLayout() {
 
   if (site.error instanceof ApiError && site.error.status === 404) {
     return (
-      <div className="flex flex-col items-start gap-3 p-8">
-        <p className="display text-2xl">No such site</p>
-        <Link to="/sites" className="text-sm text-accent-deep underline">
-          ← Back to sites
-        </Link>
-      </div>
+      <>
+        <PageHeader title="No such site" />
+        <div className="flex flex-col items-start gap-3 p-8">
+          <p className="display text-2xl">No such site</p>
+          <p className="text-sm text-fg-secondary">
+            It may have been deleted, or the link is wrong.
+          </p>
+          <Link to="/sites" className="text-sm text-accent-deep underline">
+            ← Back to sites
+          </Link>
+        </div>
+      </>
     )
   }
 
@@ -68,7 +84,7 @@ export function SiteLayout() {
       <>
         <PageHeader title={title} />
         <div className="p-3 sm:p-4 lg:p-6">
-          <WaitingForData site={site.data} />
+          <WaitingForData site={site.data} isNew={params.has("new")} />
         </div>
       </>
     )
@@ -81,9 +97,7 @@ export function SiteLayout() {
         actions={
           sub !== "realtime" && (
             <>
-              <span className="max-md:hidden">
-                <CompareSelect sc={sc} />
-              </span>
+              <CompareSelect sc={sc} />
               <DateRangePicker sc={sc} />
             </>
           )
@@ -94,7 +108,14 @@ export function SiteLayout() {
       <div className="mx-auto w-full max-w-[1400px] p-3 sm:p-4 lg:p-6">
         <Outlet />
       </div>
-      <DetailSheet />
+      {sub === "realtime" ? (
+        <DetailSheet
+          period="today"
+          rangeNote="Today · the Realtime page itself shows the last 30 minutes"
+        />
+      ) : (
+        <DetailSheet />
+      )}
     </>
   )
 }

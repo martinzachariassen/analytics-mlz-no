@@ -95,6 +95,11 @@ describe("useScope", () => {
     expect(search().get("tab")).toBe("entry")
   })
 
+  it("carries the scope to other views, but not the open sheet or ?new", () => {
+    const { sc } = scopeAt("/sites/abc?period=30d&detail=path:/a&new=1")
+    expect(sc().search).toBe("?period=30d")
+  })
+
   it("resets the interval and custom dates when a preset is picked", () => {
     const { sc, search } = scopeAt(
       "/sites/abc?period=custom&from=2026-11-01&to=2026-11-02&interval=hour"

@@ -18,7 +18,8 @@ declare global {
 const script = document.currentScript as HTMLScriptElement | null;
 const ds = script?.dataset;
 
-if (ds?.site && !window.mlz) {
+// An inline script without data-api has no origin to post to, and must not throw into the page.
+if (ds?.site && (ds.api || script!.src) && !window.mlz) {
   window.mlz = init({
     site: ds.site,
     endpoint: ds.api || new URL("/api/event", script!.src).href,

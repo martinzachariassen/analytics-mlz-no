@@ -25,21 +25,16 @@ const WorldMap = lazy(() =>
 /** The overview: headline numbers, the main chart and a dense grid of reports. */
 export function OverviewPage() {
   const sc = useScope()
-  const [params, setParams] = useSearchParams()
+  const [params] = useSearchParams()
   const m = params.get("metric")
   const metric: MetricKey = isMetric(m) ? m : "visitors"
   const stats = useStats(sc.siteId, sc.scope, sc.interval)
   const total = stats.data?.summary.visitors
   const setMetric = (k: MetricKey) =>
-    setParams(
-      (p) => {
-        const q = new URLSearchParams(p)
-        if (k === "visitors") q.delete("metric")
-        else q.set("metric", k)
-        return q
-      },
-      { preventScrollReset: true }
-    )
+    sc.updateParams((q) => {
+      if (k === "visitors") q.delete("metric")
+      else q.set("metric", k)
+    })
 
   return (
     <div className="flex flex-col gap-3 lg:gap-4">

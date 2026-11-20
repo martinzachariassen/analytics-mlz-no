@@ -32,11 +32,22 @@ export const TOOLTIP_FORMAT: Record<Interval, string> = {
   week: "'Week of' d MMM yyyy",
   month: "MMMM yyyy",
 }
-export const BUCKET_MS: Record<Interval, number> = {
-  hour: 3_600_000,
-  day: 86_400_000,
-  week: 7 * 86_400_000,
-  month: 31 * 86_400_000,
+const DAY_MS = 86_400_000
+
+/**
+ * When each bucket ends: where the next one starts, and for the last one the end of the
+ * period (midnight after `to`, at the last bucket's UTC offset, which is off by an hour at most
+ * when the period ends on a DST change). Months and DST days have no fixed length, so a bucket
+ * size alone would mark the wrong bucket as unfinished.
+ */
+export function bucketEnds(
+  stats: Pick<Stats, "timeseries" | "period">
+): number[] {
+  const starts = stats.timeseries.map((b) => Date.parse(b.t))
+  const last = stats.timeseries.at(-1)?.t
+  const offset = last?.match(/(Z|[+-]\d\d:\d\d)$/)?.[1] ?? "Z"
+  const periodEnd = Date.parse(`${stats.period.to}T00:00:00${offset}`) + DAY_MS
+  return starts.map((_, i) => starts[i + 1] ?? periodEnd)
 }
 
 export const AXIS_TICK = {
@@ -85,17 +96,20 @@ export function TrafficChart({
   const interval = stats?.period.interval ?? "day"
   const prevSeries = stats?.previous_timeseries
 
+  const ends = stats ? bucketEnds(stats) : []
+  // A lone point has no line to continue, so it is drawn as a dot instead of a tail.
+  const single = stats?.timeseries.length === 1
   const data: Point[] =
     stats?.timeseries.map((b, i) => {
       const time = new Date(b.t).getTime()
       const prev = prevSeries?.[i]
       const value = time > now ? null : metric.value(b)
-      const partial = time <= now && now < time + BUCKET_MS[interval]
+      const partial = time <= now && now < ends[i]!
       return {
         time,
         prevTime: prev ? new Date(prev.t).getTime() : undefined,
         value,
-        current: partial ? null : value,
+        current: partial && !single ? null : value,
         previous: prev ? metric.value(prev) : undefined,
         partial,
       }
@@ -208,6 +222,11 @@ export function TrafficChart({
           stroke="var(--color-current)"
           strokeWidth={2}
           fill="url(#fill-current)"
+          dot={
+            single
+              ? { r: 3, strokeWidth: 0, fill: "var(--color-current)" }
+              : false
+          }
           activeDot={{
             r: 4,
             strokeWidth: 2,

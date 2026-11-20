@@ -32,7 +32,9 @@ export function AppLayout() {
     // Keep ?auth_error=… from a failed OAuth callback so the home page can show it.
     return <Navigate to={`/${location.search}`} replace />
   }
-  if (me.isError) {
+  // A failed background re-check (window focus) keeps the signed-in user: only a first load
+  // that failed replaces the app with an error.
+  if (!me.data) {
     return (
       <ErrorNote
         queries={[me]}

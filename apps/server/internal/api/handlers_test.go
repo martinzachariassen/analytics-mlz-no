@@ -286,3 +286,36 @@ func TestUpdateSitePixel(t *testing.T) {
 		t.Fatalf("site = %+v", s)
 	}
 }
+
+// March compared with February: the 28 February buckets line up with March's first 28 days,
+// and the last three are zero.
+func TestPreviousTimeseriesIsPaddedToTheSameLength(t *testing.T) {
+	day := func(m time.Month, d int) time.Time { return time.Date(2026, m, d, 12, 0, 0, 0, time.UTC) }
+	h, base := newTestAPI(t, day(4, 1), []store.Event{
+		{Time: day(2, 1), VisitorID: 1, Path: "/"},
+		{Time: day(2, 28), VisitorID: 2, Path: "/"},
+		{Time: day(3, 31), VisitorID: 3, Path: "/"},
+	})
+	resp := get[statsResponse](t, h, base+"/stats?from=2026-03-01&to=2026-03-31&tz=UTC&compare=previous")
+	if resp.Compare == nil || resp.Compare.From != "2026-02-01" || resp.Compare.To != "2026-02-28" {
+		t.Fatalf("compare = %+v", resp.Compare)
+	}
+	if len(resp.Timeseries) != 31 || len(resp.PreviousTimeseries) != 31 {
+		t.Fatalf("lengths = %d, %d; want 31 and 31", len(resp.Timeseries), len(resp.PreviousTimeseries))
+	}
+	prev := resp.PreviousTimeseries
+	if prev[0].Pageviews != 1 || prev[27].Pageviews != 1 || !prev[27].Start.Equal(day(2, 28).Truncate(24*time.Hour)) {
+		t.Errorf("February buckets = %+v, %+v", prev[0], prev[27])
+	}
+	for _, b := range prev[28:] {
+		if b != (store.Bucket{}) {
+			t.Errorf("padding bucket = %+v, want zero", b)
+		}
+	}
+	if resp.Timeseries[30].Pageviews != 1 || resp.Summary.Pageviews != 1 || resp.Previous.Pageviews != 2 {
+		t.Errorf("current = %+v, summary %+v, previous %+v", resp.Timeseries[30], resp.Summary, resp.Previous)
+	}
+	if plain := get[statsResponse](t, h, base+"/stats?from=2026-03-01&to=2026-03-31&tz=UTC"); plain.PreviousTimeseries != nil || plain.Compare != nil {
+		t.Errorf("without compare: previous_timeseries %v, compare %v", plain.PreviousTimeseries, plain.Compare)
+	}
+}

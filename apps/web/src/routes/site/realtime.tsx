@@ -3,7 +3,7 @@ import { format } from "date-fns"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 
 import { BarList } from "@/components/bar-list"
-import { ErrorNote } from "@/components/error-note"
+import { ErrorNote, Unavailable } from "@/components/error-note"
 import { Panel } from "@/components/panel"
 import { AXIS_TICK, TipBox, TipRow } from "@/components/traffic-chart"
 import { ChartContainer, ChartTooltip } from "@/components/ui/chart"
@@ -24,6 +24,8 @@ export function RealtimePage() {
   const minutes = d?.minutes ?? []
   const pageviews = minutes.reduce((n, m) => n + m.pageviews, 0)
   const data = minutes.map((m) => ({ time: new Date(m.t).getTime(), ...m }))
+  // Nothing to show and the note above says why: placeholders stop instead of loading forever.
+  const failed = rt.isError && !d
 
   return (
     <div className="flex flex-col gap-3 lg:gap-4">
@@ -34,17 +36,20 @@ export function RealtimePage() {
           hint="Active in the last 5 minutes"
           value={d ? formatNumber(d.visitors) : undefined}
           live
+          failed={failed}
         />
         <Stat
           label="Page views"
           hint="Last 30 minutes"
           value={d ? formatNumber(pageviews) : undefined}
+          failed={failed}
         />
         <Stat
           label="Top page"
           hint="Last 30 minutes"
           value={d ? (d.pages?.[0]?.value ?? "–") : undefined}
           mono
+          failed={failed}
         />
       </div>
 
@@ -53,7 +58,9 @@ export function RealtimePage() {
         description="Page views per minute · updates every 10 seconds"
         bodyClassName="px-2 pt-3 pb-2 sm:px-3"
       >
-        {!d ? (
+        {failed ? (
+          <Unavailable className="h-56" />
+        ) : !d ? (
           <Skeleton className="h-56" />
         ) : (
           <ChartContainer
@@ -146,12 +153,15 @@ function Stat({
   value,
   live,
   mono,
+  failed,
 }: {
   label: string
   hint: string
   value?: string
   live?: boolean
   mono?: boolean
+  /** The request failed: a dash instead of a skeleton. */
+  failed?: boolean
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-2 bg-surface px-5 py-4">
@@ -164,7 +174,9 @@ function Stat({
         )}
         {label}
       </span>
-      {value === undefined ? (
+      {failed ? (
+        <span className="figure text-[36px] text-fg-muted">–</span>
+      ) : value === undefined ? (
         <Skeleton className="h-9 w-24" />
       ) : (
         <span

@@ -44,9 +44,6 @@
   --color-sidebar: var(--bg);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
   --color-ring: var(--ring);
   --color-input: var(--border);
   --color-border: var(--border);
@@ -73,7 +70,6 @@
   --radius-2xl: 12px;
   --radius-3xl: 12px;
   --radius-4xl: 12px;
-  --ease-brand: var(--ease);
 }
 
 /* Light. */
@@ -140,14 +136,10 @@
   /* Charts: the main series in the accent, the comparison quiet. */
   --chart-1: var(--series-1);
   --chart-2: var(--fg-muted);
-  --chart-3: var(--series-2);
-  --chart-4: var(--series-3);
-  --chart-5: var(--series-4);
   --chart-fill: var(--accent);
   --grid: color-mix(in oklch, var(--border) 70%, transparent);
   --radius: 8px;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 @layer base {

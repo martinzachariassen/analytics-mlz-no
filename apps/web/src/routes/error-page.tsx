@@ -1,9 +1,26 @@
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { isRouteErrorResponse, useRouteError } from "react-router"
 
 import { Button } from "@/components/ui/button"
 
 const RELOAD_KEY = "mlz_chunk_reload"
+/**
+ * A stale chunk reloads by itself once in this window. Another one right after means the
+ * reload did not help (offline, or a broken deploy), so the page offers the buttons instead;
+ * a later deploy in the same tab reloads by itself again.
+ */
+const RELOAD_WINDOW_MS = 60_000
+
+function reloadedRecently(): boolean {
+  try {
+    return (
+      Date.now() - Number(sessionStorage.getItem(RELOAD_KEY) ?? 0) <
+      RELOAD_WINDOW_MS
+    )
+  } catch {
+    return false
+  }
+}
 
 /** A lazy route whose chunk no longer exists on the server (it was redeployed). */
 function isStaleChunk(err: unknown): boolean {
@@ -23,38 +40,33 @@ function isStaleChunk(err: unknown): boolean {
 export function ErrorPage() {
   const err = useRouteError()
   const stale = isStaleChunk(err)
+  const [retried] = useState(reloadedRecently)
+  const updating = stale && !retried
 
   useEffect(() => {
-    if (!stale) return
+    if (!updating) return
     try {
-      if (sessionStorage.getItem(RELOAD_KEY)) return
-      sessionStorage.setItem(RELOAD_KEY, "1")
+      sessionStorage.setItem(RELOAD_KEY, String(Date.now()))
     } catch {
-      // storage unavailable: reload anyway, once per page life
+      // storage unavailable: reload anyway
     }
     window.location.reload()
-  }, [stale])
+  }, [updating])
 
-  useEffect(() => {
-    try {
-      if (!stale) sessionStorage.removeItem(RELOAD_KEY)
-    } catch {
-      // ignore
-    }
-  }, [stale])
-
-  const message = isRouteErrorResponse(err)
-    ? `${err.status} ${err.statusText}`
-    : err instanceof Error
-      ? err.message
-      : "Unknown error"
+  const message = stale
+    ? "A new version of the dashboard could not be loaded. Check your connection, then reload."
+    : isRouteErrorResponse(err)
+      ? `${err.status} ${err.statusText}`
+      : err instanceof Error
+        ? err.message
+        : "Unknown error"
 
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-4 bg-background p-6 text-center">
       <p className="display text-2xl">
-        {stale ? "Updating…" : "Something went wrong"}
+        {updating ? "Updating…" : "Something went wrong"}
       </p>
-      {!stale && (
+      {!updating && (
         <>
           <p className="max-w-[48ch] text-sm text-fg-secondary">{message}</p>
           <div className="flex gap-2">

@@ -72,6 +72,13 @@ describe("ReportPage search", () => {
     )
     expect(screen.getByRole("button", { name: "/deep" })).toBeTruthy()
     expect(calls.some((c) => c.includes("contains"))).toBe(false)
+    // The CSV holds what the table shows.
+    const csv = screen.getByRole("link", { name: "Export pages as CSV" })
+    await waitFor(() =>
+      expect(
+        new URL(csv.getAttribute("href")!, "http://x").searchParams.getAll("f")
+      ).toEqual(["path:contains:deep"])
+    )
   })
 })
 

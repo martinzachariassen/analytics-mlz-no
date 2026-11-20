@@ -151,7 +151,7 @@ so unique visitors are not meaningful for proxied views; page views are.
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/api/auth/config` | `{"providers": ["github"]}` — enabled sign-in options (`["dev"]` with `DEV_LOGIN=1`, `[]` with none) |
-| `GET` | `/api/auth/github/login` | Redirects to GitHub (OAuth with PKCE); returns to `PUBLIC_URL/` when done. Starting a sign-in ends any existing session |
+| `GET` | `/api/auth/github/login` | Redirects to GitHub (OAuth with PKCE); returns to `PUBLIC_URL/` when done. Starting a sign-in ends any existing session; a link from another site (`Sec-Fetch-Site: cross-site`) while signed in goes to the dashboard instead |
 | `GET` | `/api/auth/github/callback` | OAuth callback (configure this URL in the GitHub OAuth App) |
 | `GET` | `/api/auth/dev/login`, `/api/auth/dev/callback` | Only with `DEV_LOGIN=1`: signs in as `dev` without a provider. Refused (`403`) unless the connection comes from the loopback interface |
 | `GET` | `/api/auth/me` | `{"login": "...", "provider": "github"}` or 401 |

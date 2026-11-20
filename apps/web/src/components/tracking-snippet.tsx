@@ -1,5 +1,6 @@
 import { Check, Copy } from "lucide-react"
-import { useState } from "react"
+import { useRef, useState } from "react"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 
@@ -22,16 +23,30 @@ export function pixelUrlFor(
 
 export function CodeBlock({ code }: { code: string }) {
   const [copied, setCopied] = useState(false)
+  const pre = useRef<HTMLPreElement>(null)
 
   async function copy() {
-    await navigator.clipboard.writeText(code)
+    try {
+      await navigator.clipboard.writeText(code)
+    } catch {
+      // No clipboard access (an insecure origin, a denied permission): select the code so
+      // copying by hand is one keystroke.
+      if (pre.current) getSelection()?.selectAllChildren(pre.current)
+      toast.error(
+        "Could not copy. The code is selected: copy it with your keyboard."
+      )
+      return
+    }
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
   }
 
   return (
     <div className="relative rounded-lg border bg-surface-2 text-fg">
-      <pre className="overflow-x-auto p-3.5 pr-12 font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
+      <pre
+        ref={pre}
+        className="overflow-x-auto p-3.5 pr-12 font-mono text-xs leading-relaxed break-all whitespace-pre-wrap"
+      >
         {code}
       </pre>
       <Button

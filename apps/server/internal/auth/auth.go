@@ -167,9 +167,15 @@ func (s *Service) config(w http.ResponseWriter, _ *http.Request) {
 }
 
 // login starts the OAuth flow. Any existing session is ended first, so a stale cookie is
-// never left pointing at a live session row.
+// never left pointing at a live session row. The state cookie replaces the session cookie,
+// so a link from another site that carries a session goes to the dashboard instead: it must
+// not be able to sign the user out.
 func (s *Service) login(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(CookieName); err == nil && isSessionValue(c.Value) {
+		if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+			http.Redirect(w, r, s.PublicURL+"/", http.StatusFound)
+			return
+		}
 		_ = s.Store.DeleteSession(r.Context(), hashToken(c.Value))
 	}
 	state, verifier := newToken(), newToken()

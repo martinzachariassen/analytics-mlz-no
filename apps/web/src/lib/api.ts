@@ -38,7 +38,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(res.status, message)
   }
   if (res.status === 204) return undefined as T
-  return (await res.json()) as T
+  try {
+    return (await res.json()) as T
+  } catch {
+    // Usually an HTML page answering an /api path (a proxy or rewrite that is off), which
+    // retrying will not fix; the SyntaxError's "Unexpected token <" would mean nothing to a user.
+    throw new ApiError(res.status, "The server sent an unexpected response")
+  }
 }
 
 export type User = { login: string; provider: string }

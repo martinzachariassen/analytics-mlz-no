@@ -21,8 +21,8 @@ func Error(w http.ResponseWriter, status int, msg string) {
 	WriteJSON(w, status, map[string]string{"error": msg})
 }
 
-// ErrNotJSON is returned by ReadJSON when the request is not application/json.
-var ErrNotJSON = errors.New("content type must be application/json")
+// errNotJSON is returned by ReadJSON when the request is not application/json.
+var errNotJSON = errors.New("content type must be application/json")
 
 // MaxJSONBody is the largest request body ReadJSON accepts.
 const MaxJSONBody = 64 << 10
@@ -35,7 +35,7 @@ const MaxJSONBody = 64 << 10
 // triggers a CORS preflight that the API never approves.
 func ReadJSON(w http.ResponseWriter, r *http.Request, v any) error {
 	if mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mt != "application/json" {
-		return ErrNotJSON
+		return errNotJSON
 	}
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, MaxJSONBody))
 	dec.DisallowUnknownFields()

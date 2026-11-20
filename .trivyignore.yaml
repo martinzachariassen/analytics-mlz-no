@@ -16,3 +16,12 @@ vulnerabilities:
     paths:
       - usr/local/bin/litestream
     expired_at: 2026-12-15
+  - id: CVE-2026-97054
+    # In the Litestream binary (Go 1.26.10 standard library), not in our code, which is built
+    # with Go 1.27.4. Affects HTTP/1 servers using MaxBytesReader; Litestream only serves HTTP
+    # when litestream.yml sets `addr`, which ours does not, so the vulnerable code is never
+    # reached. Litestream main already builds with Go 1.26.11; waiting for the release after
+    # 0.5.18.
+    paths:
+      - usr/local/bin/litestream
+    expired_at: 2026-12-15

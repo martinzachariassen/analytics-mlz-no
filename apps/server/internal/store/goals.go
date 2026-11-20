@@ -188,6 +188,10 @@ func goalStatsSQL(siteID string, r Range, f Filters, goals []Goal) (string, []an
 		cols = append(cols, "COUNT(DISTINCT CASE WHEN "+c+" THEN visitor_id END)", "COALESCE(SUM("+c+"), 0)")
 		args = append(args, a, a)
 	}
+	// Without goals there is no aggregate, so a FROM clause would yield a row per event, or none.
+	if len(goals) == 0 {
+		return `SELECT ` + cols[0], args
+	}
 	where, wargs := sc.rows(true)
 	// #nosec G202 -- cols and where are built from constants; values are placeholders.
 	return `SELECT ` + strings.Join(cols, ", ") + ` FROM events WHERE ` + where, append(args, wargs...)

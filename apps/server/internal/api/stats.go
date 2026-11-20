@@ -16,13 +16,12 @@ import (
 
 // Limits on stats queries.
 const (
-	maxRangeDays      = 5 * 366
-	maxHourlyDays     = 7
-	maxDailyDays      = 400
-	realtimeWindow    = 5 * time.Minute
-	maxBreakdownLimit = 1000
-	maxFilters        = 10
-	realtimeMinutes   = 30
+	maxRangeDays    = 5 * 366
+	maxHourlyDays   = 7
+	maxDailyDays    = 400
+	realtimeWindow  = 5 * time.Minute
+	maxFilters      = 10
+	realtimeMinutes = 30
 )
 
 // period is a parsed date range in a time zone.
@@ -313,8 +312,8 @@ func parseBreakdown(v url.Values, q query, limit int) (breakdownRequest, error) 
 	}
 	if l := v.Get("limit"); l != "" {
 		n, err := strconv.Atoi(l)
-		if err != nil || n < 1 || n > maxBreakdownLimit {
-			return req, fmt.Errorf("limit must be 1-%d", maxBreakdownLimit)
+		if err != nil || n < 1 || n > store.MaxBreakdownLimit {
+			return req, fmt.Errorf("limit must be 1-%d", store.MaxBreakdownLimit)
 		}
 		req.opt.Limit = n
 	}

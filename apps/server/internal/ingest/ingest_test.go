@@ -254,8 +254,21 @@ func TestOutboundLinkIsStrippedToOriginAndPath(t *testing.T) {
 	}
 	// Not a URL at all: nothing is kept.
 	post(h, `{"site":"`+site.ID+`","type":"event","name":"outbound-link","url":"https://example.com/","props":{"url":"nonsense"}}`, chromeUA, "")
-	if got := rec.events[1].Props["url"]; got != "" {
-		t.Fatalf("url = %q, want empty", got)
+	if _, ok := rec.events[1].Props["url"]; ok {
+		t.Fatalf("props = %v, want no url", rec.events[1].Props)
+	}
+}
+
+func TestOutboundLinkWithoutURLProp(t *testing.T) {
+	h, rec, site := setup(t)
+	for i, props := range []string{``, `,"props":{}`, `,"props":{"label":"docs"}`} {
+		body := `{"site":"` + site.ID + `","type":"event","name":"outbound-link","url":"https://example.com/"` + props + `}`
+		if w := post(h, body, chromeUA, ""); w.Code != http.StatusAccepted {
+			t.Fatalf("%q: status = %d %s", props, w.Code, w.Body)
+		}
+		if _, ok := rec.events[i].Props["url"]; ok {
+			t.Errorf("%q: props = %v, want no url", props, rec.events[i].Props)
+		}
 	}
 }
 

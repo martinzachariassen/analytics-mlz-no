@@ -192,6 +192,10 @@ func TestGoalStats(t *testing.T) {
 	if gs, err := st.GoalStats(ctx, site.ID, r, nil, nil); err != nil || gs.Visitors != 4 || len(gs.Goals) != 0 {
 		t.Fatalf("no goals = %+v, %v", gs, err)
 	}
+	empty := Range{From: r.From.AddDate(-1, 0, 0), To: r.From.AddDate(-1, 0, 1)}
+	if gs, err := st.GoalStats(ctx, site.ID, empty, nil, nil); err != nil || gs.Visitors != 0 {
+		t.Fatalf("no goals, empty range = %+v, %v", gs, err)
+	}
 }
 
 func TestGlobPatternOnlyStarIsSpecial(t *testing.T) {

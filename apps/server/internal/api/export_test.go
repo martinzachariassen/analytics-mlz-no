@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/csv"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -138,6 +139,22 @@ func TestExportTruncation(t *testing.T) {
 	recs, hdr = exportCSV(t, h, base+"/export?what=breakdown&dim=path&from=2026-11-02&limit=3")
 	if len(recs) != 4 || hdr.Get("X-Truncated") != "" {
 		t.Errorf("limit=3 of 3: %d records, X-Truncated %q; want 4 and none", len(recs), hdr.Get("X-Truncated"))
+	}
+}
+
+// The default and the largest limit both export every row, not the breakdown default of 10.
+func TestExportWithoutLimitKeepsAllRows(t *testing.T) {
+	at := func(m int) time.Time { return time.Date(2026, 11, 2, 10, m, 0, 0, time.UTC) }
+	var events []store.Event
+	for i := range 25 {
+		events = append(events, store.Event{Time: at(i), VisitorID: 1, Path: fmt.Sprintf("/p%d", i)})
+	}
+	h, base := newTestAPI(t, at(30), events)
+	for _, q := range []string{"", fmt.Sprintf("&limit=%d", store.MaxBreakdownLimit)} {
+		recs, hdr := exportCSV(t, h, base+"/export?what=breakdown&dim=path&from=2026-11-02"+q)
+		if len(recs) != 26 || hdr.Get("X-Truncated") != "" {
+			t.Errorf("%q: %d records, X-Truncated %q; want 26 and none", q, len(recs), hdr.Get("X-Truncated"))
+		}
 	}
 }
 

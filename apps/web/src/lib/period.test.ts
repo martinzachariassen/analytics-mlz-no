@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  formatRange,
   intervalsFor,
   isDay,
   isPeriod,
@@ -33,6 +34,38 @@ describe("periodRange", () => {
     expect(r.from).toBe("2026-10-01")
     expect(r.to).toBe("2026-10-31")
   })
+  it("covers today, yesterday, this month, 30 days and 12 months", () => {
+    const range = (p: Parameters<typeof periodRange>[0]) => {
+      const r = periodRange(p, now)
+      return [r.from, r.to]
+    }
+    expect(range("today")).toEqual(["2026-11-04", "2026-11-04"])
+    expect(range("yesterday")).toEqual(["2026-11-03", "2026-11-03"])
+    expect(range("month")).toEqual(["2026-11-01", "2026-11-04"])
+    expect(range("30d")).toEqual(["2026-10-06", "2026-11-04"])
+    expect(range("12m")).toEqual(["2025-12-01", "2026-11-04"])
+    // Yesterday from the 1st of January is in the year before.
+    expect(periodRange("yesterday", new Date(2027, 0, 1, 12)).from).toBe(
+      "2026-12-31"
+    )
+  })
+})
+
+describe("formatRange", () => {
+  it("shortens what the two ends share", () => {
+    expect(formatRange({ from: "2026-11-03", to: "2026-11-03" })).toBe(
+      "Tue 3 Nov 2026"
+    )
+    expect(formatRange({ from: "2026-11-01", to: "2026-11-07" })).toBe(
+      "1–7 Nov 2026"
+    )
+    expect(formatRange({ from: "2026-10-28", to: "2026-11-03" })).toBe(
+      "28 Oct – 3 Nov 2026"
+    )
+    expect(formatRange({ from: "2025-12-01", to: "2026-11-04" })).toBe(
+      "1 Dec 2025 – 4 Nov 2026"
+    )
+  })
 })
 
 describe("intervalsFor", () => {
@@ -53,5 +86,7 @@ describe("validators", () => {
     expect(isPeriod(null)).toBe(false)
     expect(isDay("2026-11-04")).toBe(true)
     expect(isDay("04.11.2026")).toBe(false)
+    expect(isDay("2026-02-30")).toBe(false)
+    expect(isDay("2026-13-01")).toBe(false)
   })
 })

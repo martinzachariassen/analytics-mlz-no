@@ -45,7 +45,9 @@ What `init` does:
 3. **Follows single-page apps** by wrapping `history.pushState` and `history.replaceState` and
    listening for `popstate` (and `hashchange` with `data-hash`). A page restored from the
    back-forward cache (`pageshow` with `persisted`) counts again. The same URL twice in a row is
-   ignored.
+   ignored, compared as sent: a `replaceState` that only changes a query parameter the script
+   drops (a search box, a filter) is not a new page view. Navigations while the page is still
+   prerendering are not counted; the page view on activation uses the final URL.
 4. **Handles clicks** (left and middle): an element with `data-mlz-event` sends a custom event
    with its `data-mlz-event-*` attributes as properties. Otherwise a link to another host sends
    `outbound-link` with the link's origin and path only (no query string, fragment or
@@ -53,10 +55,12 @@ What `init` does:
 5. **Sends** with `navigator.sendBeacon`, falling back to `fetch(..., { keepalive: true })`. The
    body is a JSON string sent as `text/plain`, which avoids a CORS preflight request. `send()` is
    wrapped in `try`/`catch`, so a CSP-blocked beacon or unserialisable props never reach the host
-   page's click handler or router.
+   page's click handler or router. An inline copy of the script without `data-api` has no origin
+   to post to, so it does not start.
 
-The payload is `{ site, type, url, name?, referrer?, props? }`. Before sending, `cleanUrl` drops
-every query parameter except `utm_*`, so tokens in a URL (`?token=…`, `?email=…`) never leave the
+The payload is `{ site, type, url, name?, referrer?, props? }`. Before sending, `cleanUrl` resolves
+the URL against the page (so `mlz.pageview("/path")` works), drops the fragment unless
+`data-hash` is set, and drops every query parameter except `utm_*`, so tokens in a URL (`?token=…`, `?email=…`) never leave the
 browser, and the referrer is reduced to its scheme and host. A query inside a hash route
 (`#/reset?token=…`) is dropped by the server instead: stripping it in the script too would not
 fit the size budget. The server does the rest of the normalisation (path, referrer host, UTM,

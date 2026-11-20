@@ -65,7 +65,7 @@ it has run, and is never defined when the visitor blocks it.
 |---|---|
 | `data-site` | Site id (required) |
 | `data-api` | Collection endpoint, if it is not on the same host as the script |
-| `data-auto="false"` | Turn off automatic page views and call `mlz.pageview()` yourself |
+| `data-auto="false"` | Turn off automatic page views and call `mlz.pageview()` yourself (optionally with a URL or path, such as `mlz.pageview("/checkout/done")`) |
 | `data-hash="true"` | Include the `#hash` in paths (for hash-based routers) |
 | `data-allow-localhost="true"` | Also track on a developer's machine: `localhost`, `*.localhost`, `127.0.0.0/8`, `0.0.0.0`, `[::1]` and `file:` pages |
 | `data-respect-dnt="true"` | Don't track visitors who have Do Not Track enabled |
@@ -96,7 +96,8 @@ The script reads and writes no cookies.
 
 `history.pushState` and `history.replaceState` are wrapped, and `popstate` is observed, so router
 navigations and redirects count as page views. A page restored from the back-forward cache counts
-again. The same URL twice in a row is counted once. With `data-hash="true"`, `hashchange` counts
+again. The same URL twice in a row is counted once, so a `replaceState` that only changes a query
+parameter the script does not send (a search box, a filter) is not a new page view. With `data-hash="true"`, `hashchange` counts
 too and the fragment is sent; the server keeps it only when it looks like a route (`#/docs`,
 `#!/docs`).
 

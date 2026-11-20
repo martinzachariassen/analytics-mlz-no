@@ -30,6 +30,15 @@ describe("api errors", () => {
     expect(err).toBeInstanceOf(ApiError)
     expect((err as ApiError).message).toMatch(/^(HTTP 502|Bad Gateway)$/)
   })
+  it("turns a successful response that is not JSON into an ApiError that is not retried", async () => {
+    respond(200, "<!doctype html><title>Dashboard</title>")
+    const err = await api.site("x").catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(ApiError)
+    expect((err as ApiError).message).toBe(
+      "The server sent an unexpected response"
+    )
+    expect(shouldRetry(0, err)).toBe(false)
+  })
 })
 
 describe("api requests", () => {

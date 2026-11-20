@@ -7,6 +7,8 @@ All notable changes are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Dashboard: keyboard shortcut help (<kbd>?</kbd>, or from the ⌘K and user menus). The ⌘K menu can also switch the comparison (previous period, year over year, off) and open the calendar for a custom range.
+- Dashboard: the site list has a period picker (today, 7 days, 30 days, 12 months), and each row opens the dashboard on that period.
 - `.github/workflows/fuzz.yml` runs every Go fuzz test for five minutes each week (CI only replays their seed inputs) and keeps a failing input as an artifact.
 - Releases attach the binaries' signed provenance bundle as `analytics_<tag>.intoto.jsonl`, so `gh attestation verify --bundle` works without GitHub's attestation API.
 - The dashboard is built into the Docker image and the release binaries, so `docker compose up` gives a working dashboard on the same origin as the API, with the same security headers, rewrites and caching as Firebase Hosting (`internal/web`, kept in line with `apps/web/firebase.json` by a test). Text files are served gzipped with an `ETag`. `make build` embeds it too (`make embed-web`, needs Bun); production keeps serving the dashboard from Firebase Hosting.
@@ -20,7 +22,6 @@ All notable changes are documented here. The format follows
 - Onboarding: a site with no stored events (new, or emptied by a purge or retention) shows "Waiting for the first event…" with its snippet and troubleshooting tips instead of empty charts, and switches to the dashboard by itself (with a "First event received" toast) when the first event arrives. It checks every 5 s in the first hour after the site was added, then every minute. Settings shows the same status and when the last event arrived; the site list shows "Waiting for first event" instead of an empty trend.
 - API: sites have `first_event_at` and `last_event_at` (oldest and newest stored events, `null` before the first one).
 - `docs/decisions.md` has a "Next" section with the product roadmap.
-- Public demo at `/demo/`: the real dashboard on two years of made-up traffic for Lumen, a fictional SaaS company (pages, docs, blog, campaigns, launches, goals, events with properties, about 50 countries), generated in the browser and always ending today, with live visits in Realtime. No server or sign-in; read-only except goals, which can be tried out for the visit. Built by `bun run build` into `dist/demo` and published with the dashboard. The home page links to it.
 - Demo site (`make dev`, :8081): one card per tracker feature (SPA page views, attribute and JavaScript events with properties, outbound links, UTM campaigns, goals, the tracking pixel), a live count and log of what the tab sent, an illustrated dashboard with sample data for 7 days to 12 months (KPIs, traffic, top lists, sources over time, devices, active hours, realtime, goals, countries, browsers, events and properties, new and returning visitors, a sortable pages table), and the colour palette in both themes.
 - Documentation reorganised around reader needs: a start page with reading paths (`docs/README.md`), guides, reference (API, configuration, CLI), an operations runbook, and development guides. Every page starts with a TL;DR.
 - `ARCHITECTURE.md`: a page view end to end, where the data lives (replica and backups), and the server's handler chain. `docs/decisions.md` lists what must be settled before 1.0; `SECURITY.md` covers the supply chain.
@@ -64,6 +65,15 @@ All notable changes are documented here. The format follows
 - Site names drop bidi overrides, like event names and paths already did, so a name cannot reorder text in the dashboard.
 
 ### Fixed
+- Dashboard: the ⌘K menu no longer crashes when it opens (the menu had no cmdk root inside its dialog).
+- Dashboard: the comparison can be changed on phones again (the picker was hidden below tablet width), and the quick filter button in lists works on touch screens.
+- Dashboard: metric help in the KPI strip opens on focus and on tap, not only on hover, and is no longer a non-focusable element inside the tile's button.
+- Dashboard: "Open Pages" (and the other views) in the detail sheet opens the right tab or event; on Realtime the sheet shows today and says so instead of silently using the dashboard period.
+- Dashboard: toggling the theme from the ⌘K menu works when the theme follows the system; the <kbd>X</kbd> hint is shown only on the comparison it would pick.
+- Dashboard: "No such site" and the loading screen have the top bar, so the sidebar can be opened on a phone. The add-filter button has a name when it shows only its icon.
+- Dashboard: the Active hours heatmap works with the keyboard (one tab stop, arrow keys, a label and tooltip per cell), and charts have a sentence for screen readers. The landing page's preview colours its changes by direction.
+- Dashboard: the sidebar's live count and the Realtime page share one poll.
+- Dashboard: the calendar starts a new range on the first click instead of moving an end of the preset's range.
 - Docker: the health check (in the image and in `docker-compose.yml`) follows `ADDR` when it is set, like the server, instead of always probing `PORT`, so a container listening on another port is no longer reported unhealthy.
 - Docker: `REQUIRE_REPLICA=1` without `LITESTREAM_REPLICA_URL` stops the container with an error instead of quietly starting an unreplicated server.
 - Dashboard: switching a report's tab (or the site) no longer shows the previous tab's rows, clickable, under the new heading while the new ones load. A new period or filter still keeps the old numbers on screen until the new ones arrive.
@@ -74,7 +84,7 @@ All notable changes are documented here. The format follows
 - Dashboard: after a deploy, a stale page reloads by itself once a minute at most. When the reload does not help (offline), it shows the error with a Reload button instead of "Updating…" forever, and a later deploy in the same tab reloads by itself again.
 - Dashboard: the CSV link of a report table includes the search, so the file holds the rows on screen. A response that is not JSON shows "The server sent an unexpected response" instead of a parser error. Pressing Enter on a "contains" filter adds it once (it added two history entries), the filter's value list says when it could not be loaded, and a failed copy to the clipboard selects the code and says so. Changing a report's tab, the overview metric or the picked event no longer drops an update made at the same moment.
 - Tracker: a `replaceState` that only changes a query parameter the script does not send (a search box, a filter) no longer counts a page view per change. Router navigations while a page is prerendering are not counted, `mlz.pageview("/path")` with a relative path works (it sent nothing), a manual page view drops the fragment outside `data-hash` mode, and an inline copy of the script without `data-api` no longer throws into the page. The script is 1098 B gzipped.
-- CSV export of a table without a `limit` (and with `limit=1000`) returns up to 1000 rows again, not 10. The public demo had copied the bug.
+- CSV export of a table without a `limit` (and with `limit=1000`) returns up to 1000 rows again, not 10.
 - Renaming a site, changing its pixel setting or deleting it can no longer leave the old values in the site cache for a minute, when an event was being looked up at the same moment.
 - Dashboard: searching a report table now also finds values beyond the rows loaded so far. When the first page is full, the search asks the server too, instead of answering "No matches" for a page that exists.
 - Dashboard: the picked event and property on the Events view are kept in the URL (`?event=`, `?prop=`), so they survive a reload and a shared link, and an event missing from a newly chosen period falls back to the top one instead of staying selected.
@@ -100,6 +110,10 @@ All notable changes are documented here. The format follows
 - Dashboard accessibility (WCAG 2.1 AA): muted text, deltas and sidebar group labels have enough contrast in both themes; clickable table rows are real buttons instead of rows with `role="button"`; the clickable world map is a group instead of an image; the landing page's Home link is named by its visible text and its code block wraps instead of scrolling; animations skip their delay when reduced motion is on.
 
 ### Changed
+- Dashboard: the overview is grouped into sections by question (content and acquisition, conversions, audience, technology and time), with goals moved up from the bottom. Card tabs (`?pages_tab=` …) and the heatmap metric (`?hours=`) are kept in the URL.
+- Dashboard: KPI tiles pick the chart metric on report and Events views too. A row in the Events table opens the detail sheet like every other table; the properties panel has its own event picker.
+- Dashboard: settings have a section menu (tracking code, pixel, goals, general, delete site), with deleting the site last and apart.
+- Dashboard: **Add site** opens the new site's overview, which waits for the first event and shows the snippet, custom event examples and a link to the tracking pixel; the Events view without events explains how to send one.
 - Dashboard colours: the UI stays greyscale and colour means data, with mlz violet as the main data colour. The five chart series are muted (violet, gold, teal, coral, sky, in that order) and keep their colour vision separation; the sixth series colour is gone. Dark mode sits a little above black with slightly softer text, neutrals use mlz.no's blue-grey hue, and the red and dark-mode green for changes are less saturated. The active KPI now shows its violet marker and the active tab a text-coloured underline, both of which were nearly invisible. The "Waiting for the first event" dot is green like the other live dots. [docs/development/colours.md](docs/development/colours.md) documents what each colour is for.
 - Tooling: every tool is pinned in `mise.toml` (`mise install`), JavaScript packages are one Bun workspace (`bun install`), Biome replaces eslint and prettier, a pre-commit hook runs `bun run lint`, and `scripts/verify.sh` (`make verify`) is the one quality gate that CI runs too, including Terraform `fmt`/`validate`, shellcheck, hadolint and actionlint.
 - `404`, `405` and `429` responses are JSON like the API's other errors.

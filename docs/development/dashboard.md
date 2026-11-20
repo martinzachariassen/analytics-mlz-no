@@ -53,7 +53,8 @@ src/
   index.css              design tokens and shadcn restyling
   lib/
     api.ts               typed API client and all response types
-    queries.ts           useStats, useBreakdown
+    queries.ts           useStats, useBreakdown, useMe, useRealtime
+    keys.ts              isTyping, PERIOD_KEYS and SHORTCUTS (the shortcut help reads them)
     use-scope.ts         URL state: period, compare, interval, filters, detail
     period.ts            period presets, ranges, intervals, time zone
     dims.ts              labels and formatting per dimension, DIM_VIEW
@@ -64,7 +65,7 @@ src/
     error-page.tsx       root errorElement: reloads once on a stale chunk, else shows the error
     app-layout.tsx       auth check + sidebar shell
     sites.tsx            site list
-    settings.tsx         site settings, tracking snippet
+    settings.tsx         site settings: section nav, tracking, pixel, goals, general, delete
     site/layout.tsx      top bar: period, comparison, filters
     site/overview.tsx    overview
     site/realtime.tsx    realtime
@@ -112,13 +113,21 @@ It reads and writes these query parameters:
 | `f` (repeated) | `country:is:NO` | Filters, `dim:op:value`. One per dimension and operator |
 | `detail` | `path:/blog` | The open detail sheet |
 | `tab` | `utm_source` | The tab in a report view (read in `report.tsx`) |
-| `metric` | `pageviews` | The metric in the overview chart. Missing means visitors |
+| `pages_tab`, `sources_tab`, `tech_tab`, … | `entry` | The tab of an overview card (`ReportCard`'s `id` plus `_tab`). Missing means the card's first tab |
+| `hours` | `pageviews` | The metric of the Active hours heatmap. Missing means visitors |
+| `metric` | `pageviews` | The metric the KPI strip picks for the chart: the overview's main chart, and the "Top … over time" chart on report and Events views. Missing means visitors |
+| `new` | `1` | Set after **Add site**: the waiting screen says "Site added". Dropped once the site has data |
 | `event`, `prop` | `signup`, `plan` | The picked event and property on the Events view. A value that is not in the period's data falls back to the top one |
 
 It returns the parsed state, a ready-made `scope` object for API calls, actions (`setPeriod`,
 `addFilter`, `openDetail`, …) and `search`, the query string without `detail`. Use `search` in
 links between views so the period and filters follow the user. Presets are worked out again when
 the local date changes (`useToday`), so "Today" in a tab left open moves on at midnight.
+
+For a parameter that must be one of a fixed list, use `useParamChoice(key, allowed)` from
+`use-scope.ts`: it falls back to the first value, leaves that one out of the URL, and writes
+through `updateParams`. `useMetricParam()` is the one for `metric`. The site list keeps its
+`period` (Today, 7, 30 days, 12 months) the same way and carries it into each row's link.
 
 Change view-specific parameters (`tab`, `metric`, `event`, `prop`) with `sc.updateParams(q => …)`,
 not with `setSearchParams`: React Router hands every update the parameters of the last render, so
@@ -148,7 +157,9 @@ Filters beyond `MAX_FILTERS` (10, the API's limit) are dropped instead of turnin
   (the rate limiter refills within a second), none for other `4xx` (`shouldRetry` in
   `lib/api.ts`). A `401` from any query re-checks `/api/auth/me`, which sends the user to
   sign-in.
-- Realtime refetches every 10 s, the sidebar's live counts every 15 s (`refetchInterval`).
+- Realtime refetches every 10 s (`REALTIME_POLL_MS`), the sidebar's live count every 15 s.
+  Both use `useRealtime(siteId, detail)`; on the Realtime page the badge reads the page's own
+  `detail` query, so there is one poll, not two.
 - `useSite(siteId)` polls while the site's `first_event_at` is `null` and stops once data has
   arrived. `waitingPoll` in `lib/queries.ts` sets the pace: every 5 s (`WAITING_POLL_MS`) in
   the first hour after the site was added, then every 60 s (`IDLE_POLL_MS`), so a site that
@@ -194,16 +205,52 @@ it. `error` alone shows a message without a button, for panels whose query alrea
 with a retry elsewhere on the page. `title` replaces "Could not load this" (the app shell uses
 "Could not reach the server").
 
-**Onboarding.** A site that has never received an event has nothing to chart, so
+**Onboarding.** **Add site** (`components/add-site-dialog.tsx`) lands on the new site's
+overview with `?new=1`. A site that has never received an event has nothing to chart, so
 `routes/site/layout.tsx` shows `<WaitingForData>` (`components/waiting-for-data.tsx`) instead of
-any view: a live "Waiting for the first event…" status, the snippet, and what to check if nothing
-arrives. When polling sees `first_event_at`, the layout swaps in the dashboard and toasts "First
-event received". Settings shows the same status (with "Site added." after `?new=1`, then
-"Receiving data" with a link to the dashboard) and "Last event … ago" once there is data. The
-site list shows "Waiting for first event" and skips the stats request for such sites. Use
+any view: a live "Waiting for the first event…" status ("Site added." in front while `new` is
+set), the snippet, custom event examples (`EventSnippets` from `tracking-snippet.tsx`), a link to
+the tracking pixel in settings, and what to check if nothing arrives. When polling sees
+`first_event_at`, the layout swaps in the dashboard, drops `new` and toasts "First event
+received". Settings shows "Waiting for the first event…" until then and "Last event … ago" once
+there is data. The site list shows "Waiting for first event" and skips the stats request for
+such sites. The Events view without any events shows how to send one instead of an empty
+table. Use
 `first_event_at === null` for "no stored events" and the usual "Nothing in this period" for an
 empty period. Onboarding follows the stored events, not history: a site whose events have all
 been purged or aged out by `RETENTION_DAYS` shows it again until the next event.
+
+## Layout
+
+- **Overview** (`routes/site/overview.tsx`): the headline (insights, KPI strip, main chart), then
+  `Section`s with an `.eyebrow` heading, grouped by the question they answer: *Content and
+  acquisition* (pages, sources), *Conversions* (goals, custom events), *Audience* (map,
+  countries), *Technology and time* (devices, browsers & OS, active hours at full width).
+- **Report and Events views**: the KPI strip picks the metric of the "Top … over time" chart, as
+  on the overview. A row in any table, events included, opens the detail sheet; on Events the
+  properties panel has its own event picker (`?event=`).
+- **Settings** (`routes/settings.tsx`): `SectionNav` (`components/section-nav.tsx`) is a sticky
+  column on wide screens and a sideways-scrolling row on narrow ones. It links to `#tracking`,
+  `#pixel`, `#goals`, `#general` and `#danger` (delete, last and apart), marks the current one
+  with `aria-current`, and scrolls to the hash, which the router does not.
+- **Every screen has a `PageHeader`**, including "No such site" and the loading fallback, so the
+  sidebar can always be opened on a phone. The comparison picker stays in the header on every
+  screen size.
+
+**Keyboard.** Single keys (periods, <kbd>X</kbd>, <kbd>D</kbd>) and <kbd>⌘K</kbd> are listed in
+`SHORTCUTS` (`lib/keys.ts`). <kbd>?</kbd>, the ⌘K menu and the user menu open the shortcut help
+(`components/shortcuts-dialog.tsx`). The ⌘K menu also switches the comparison (previous period,
+year over year, off) and opens the calendar for a custom range (`openRangePicker`). Add a new
+shortcut to `SHORTCUTS` so it shows up there. `CommandDialog` from shadcn is only the dialog:
+the menu puts its own `<Command>` root inside it, which cmdk needs.
+
+**Accessibility beyond axe.** KPI help is a real button (hover, focus or tap opens it) next to
+the metric button, not inside it. The heatmap is one tab stop with arrow, Home and End keys, and a
+label and tooltip per cell. Charts come with a screen-reader sentence (`chartSummary` in
+`traffic-chart.tsx`, the series totals in `top-series-chart.tsx`, the busiest hour in
+`heatmap.tsx`). The quick filter button in lists is always there on touch screens.
+The date picker's calendar starts a new range on the first click after a full one
+(`resetOnSelect`), instead of moving an end of the preset's range.
 
 ## App primitives
 
@@ -212,14 +259,16 @@ Use these before writing new layout:
 | Component | Use |
 |---|---|
 | `panel.tsx` | The card around every section, with title, actions and `TextTabs` |
-| `kpi-strip.tsx` | The row of key numbers with deltas, driven by `METRICS` |
+| `kpi-strip.tsx` | The row of key numbers with deltas, driven by `METRICS`; with `onMetric`, each tile picks the chart's metric |
 | `traffic-chart.tsx`, `top-series-chart.tsx` | Time series charts |
 | `bar-list.tsx` | Ranked list with proportional bars, click to open a detail |
 | `data-table.tsx` | Full table with all metrics. Its search filters the loaded rows; `ReportPage` passes `search`/`onSearch` and, when the first page is full (the server may have more), also asks the API with a `contains` filter on the dimension (debounced, not for countries, whose labels the server does not know) |
-| `report-card.tsx` | A `Panel` with a `BarList` for one dimension, used on the overview |
+| `report-card.tsx` | A `Panel` with a `BarList` for one dimension, used on the overview. Its `id` names its tab in the URL |
+| `section-nav.tsx` | Anchor links to the sections of a long page (settings) |
+| `shortcuts-dialog.tsx` | The keyboard shortcut help, from `SHORTCUTS` |
 | `filter-bar.tsx` | Active filters as removable chips |
-| `date-range-picker.tsx` | Period, custom range and interval selects |
-| `detail-sheet.tsx` | Side sheet for one value, with "Filter dashboard by this" |
+| `date-range-picker.tsx` | Period, custom range, comparison (`CompareSelect`) and interval selects |
+| `detail-sheet.tsx` | Side sheet for one value, with "Filter dashboard by this" and a link to its view on the right tab. Takes a `range` for views without a period: on Realtime it shows today |
 | `delta.tsx` | Up/down change, coloured with `--positive`/`--negative` |
 | `export-link.tsx` | The "CSV" download in a panel's action slot. Build its `href` with `exportUrl.breakdown`/`exportUrl.timeseries` from `lib/api.ts`, passing the panel's scope so the file matches what is on screen |
 | `goals-card.tsx`, `goals-settings.tsx`, `goal-button.tsx` | Conversions per goal on the overview (a row filters by the goal), goal management in settings (`#goals`), and "Make this a goal" in the detail sheet and the event properties panel. `lib/goals.ts` has the labels and the goal-to-filter mapping; `formatRate` in `lib/format.ts` formats conversion rates |
@@ -285,9 +334,6 @@ where Firebase answers with `index.html`.
 | `Cache-Control` | `firebase.json` | `no-cache` for every path (so `/` and deep links always get the latest `index.html`), and `immutable` for the hashed files under `/assets/**` and `/fonts/**`. Firebase matches header rules on the request path and the last match wins |
 | Security headers | `firebase.json` (mirrored in `apps/server/internal/web/web.go`) | CSP (`img-src 'self' data:`, so no third-party images such as GitHub avatars; the menu shows initials), HSTS, `X-Frame-Options`, `Permissions-Policy` |
 
-`bun run build` also builds the [public demo](demo.md) into `dist/demo`, served at `/demo/`: the
-same app with `/api` answered in the browser from generated data.
-
 The Vite dev server uses `strictPort`, so it fails instead of moving to another port when 5173
 is taken (the server's `PUBLIC_URL` points at 5173).
 
@@ -298,9 +344,8 @@ There are three layers. Each one catches what the one before cannot.
 | Layer | Where | Runs with | What it covers |
 |---|---|---|---|
 | Unit | `src/lib/*.test.ts`, `src/components/traffic-chart.test.ts` | `bun run test` (vitest, Node) | The API client (error mapping, retry policy, headers, id encoding, query strings), URL state parsing and the `hasOwn` guards, period maths and presets, goals, metrics, dimensions, formatting, where chart buckets end (months, DST days), and the CSP hash of the theme script |
-| Component | `src/components/*.test.tsx`, `src/routes/**/*.test.tsx`, `src/lib/*.test.tsx` | `bun run test` (vitest, happy-dom, Testing Library) | Filter bar, date range picker and its shortcuts, detail sheet, goals (the overview card, adding and removing in settings), `ErrorNote` (retry, focus, no flip on background refetches), onboarding in the site layout (polling until the first event, then the dashboard), the `useScope` actions and midnight rollover, which placeholder rows `useBreakdown` keeps, `AppLayout` on a failed re-check, `ErrorPage` reloading after a deploy, Realtime on a failed request, and copying a snippet, against a mocked `fetch`, with the URL as the observable state |
-| Demo engine | `src/demo/golden.test.ts` | `bun run test` | The demo's in-browser API gives the Go API's answers to about 80 requests (`TestDemoGolden` writes them; see [demo.md](demo.md#same-answers-as-the-server)) |
-| End to end | `e2e/*.spec.ts` | `bun run e2e` (Playwright) | The real Go server with seeded data and the production build: sign-in, every view of a site, filters, the detail sheet, settings, goals (conversions on the overview, adding and removing in settings), a CSV download with a filter, a failed request recovering with "Try again", and a new site waiting for its first event and switching to the dashboard when one is sent, with an axe scan on every page |
+| Component | `src/components/*.test.tsx`, `src/routes/**/*.test.tsx`, `src/lib/*.test.tsx` | `bun run test` (vitest, happy-dom, Testing Library) | Filter bar, date range picker (presets, calendar range, comparison and interval selects, shortcuts), ⌘K menu, shortcut help, theme switching, sidebar (sign out, add site, one realtime poll), KPI strip, heatmap keyboard grid, bar list, data table sorting and search, report cards, top series and world map, insights, goal button, detail sheet, goals (the overview card, adding and removing in settings), settings (rename, delete with confirmation, section nav), site list, `ErrorNote` (retry, focus, no flip on background refetches), onboarding in the site layout (polling until the first event, "Site added", then the dashboard), the `useScope` actions and midnight rollover, which placeholder rows `useBreakdown` keeps, `AppLayout` on a failed re-check, `ErrorPage` reloading after a deploy, Realtime (live data, polling, failure), and copying a snippet, against a mocked `fetch`, with the URL as the observable state |
+| End to end | `e2e/*.spec.ts` | `bun run e2e` (Playwright) | The real Go server with seeded data and the production build: sign-in and sign-out, every view of a site, the period, calendar, comparison and interval controls, overview sections and card tabs in the URL, filters, the detail sheet, settings (rename and delete), goals (conversions on the overview, adding and removing in settings), CSV downloads (a filtered table and the time series), keyboard shortcuts, ⌘K and the theme, a failed request recovering with "Try again", a new site waiting for its first event and switching to the dashboard when one is sent, and the real tracking script on a page sending a page view and an event to the server, with an axe scan on every page |
 
 - **Unit tests:** put logic in `lib/` as plain functions when you can, so it is easy to test. If
   you edit the theme script in `index.html`, update its hash in `firebase.json`; `csp.test.ts`
@@ -319,18 +364,22 @@ There are three layers. Each one catches what the one before cannot.
   `web` group has just built it.
   - A setup project signs in once and shares the session, because the auth endpoints are rate
     limited.
-  - Every test runs three times: desktop, mobile (Pixel 7) and the light theme. `demo.spec.ts`
-    runs on its own against the demo build (`dist/demo` on :4174), on desktop and mobile.
+  - Every test runs three times: desktop, mobile (Pixel 7) and the light theme.
   - `expectAccessible` fails on serious or critical WCAG 2.1 AA violations. Fix the cause (a
     token in `src/index.css`, a role, a label); don't exclude the rule.
   - To test a failure, fail the request with `page.route(…)` and `route.fulfill({ status: 500 })`;
     remember the query retries 5xx twice with backoff before the error shows.
+  - The tracker test serves its page from `page.route` on the API's own origin,
+    `http://localhost:18080` (the seeded blog's domain is `localhost`, and Chrome blocks a page on
+    another port from reaching the loopback API) with `data-allow-localhost`, and sets `navigator.webdriver`
+    to false in an init script: the tracker ignores automated browsers on purpose.
+  - Sign-out runs in its own signed-in context: signing out revokes the session, so it must not
+    use the shared one.
   - On failure, `apps/web/test-results/` holds a trace (`bunx playwright show-trace …`). CI
     uploads it as the `playwright-traces` artifact.
 
 ## Next steps
 
-- [Public demo](demo.md): the `/demo/` build and its in-browser API.
 - [API reference](../reference/api.md): what each endpoint returns
 - [Backend development](backend.md)
 - [Concepts](../concepts.md): what each number means

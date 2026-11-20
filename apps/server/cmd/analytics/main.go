@@ -336,6 +336,9 @@ var demoSites = []struct {
 	{"Fjord Labs Docs (demo)", "docs.localhost", 35, devdata.Docs, [][2]string{{"event", "copy-code"}, {"path", "/docs/*"}}},
 }
 
+// notifyContext is signal.NotifyContext; tests replace it to stop `seed -live` without a signal.
+var notifyContext = signal.NotifyContext
+
 // seed fills demo sites with synthetic traffic for local development.
 // Existing demo sites keep their data unless -reset is given; -live then keeps new
 // visits arriving until interrupted, so Realtime has something to show.
@@ -350,7 +353,7 @@ func seed(cfg config.Config, args []string) error {
 		return errors.New("seed -reset deletes sites and is only allowed with DEV_LOGIN=1")
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	ctx, stop := notifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	st, err := store.Open(ctx, cfg.DatabasePath)
 	if err != nil {

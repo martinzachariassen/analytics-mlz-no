@@ -1,6 +1,10 @@
 import { Link } from "react-router"
 
-import { CodeBlock, snippetFor } from "@/components/tracking-snippet"
+import {
+  CodeBlock,
+  EventSnippets,
+  snippetFor,
+} from "@/components/tracking-snippet"
 import type { Site } from "@/lib/api"
 
 /** A pulsing dot that stays still for people who prefer reduced motion. */
@@ -17,7 +21,14 @@ export function LiveDot({ className }: { className?: string }) {
  * Shown instead of a site's dashboard until its first event arrives: what to do, and a
  * live status that the site query (polled by useSite) replaces with the dashboard.
  */
-export function WaitingForData({ site }: { site: Site }) {
+export function WaitingForData({
+  site,
+  isNew = false,
+}: {
+  site: Site
+  /** Just added: says so, since adding a site lands here. */
+  isNew?: boolean
+}) {
   return (
     <section className="mx-auto flex w-full max-w-2xl flex-col gap-6 rounded-lg border bg-surface p-6 sm:p-8">
       <div className="flex flex-col gap-2">
@@ -26,9 +37,11 @@ export function WaitingForData({ site }: { site: Site }) {
           className="flex items-center gap-2.5 text-sm font-medium text-fg"
         >
           <LiveDot />
-          Waiting for the first event…
+          {isNew ? "Site added. " : ""}Waiting for the first event…
         </p>
-        <h2 className="display text-2xl">No data for {site.name} yet</h2>
+        <h2 className="display text-2xl">
+          {isNew ? `Install ${site.name}` : `No data for ${site.name} yet`}
+        </h2>
         <p className="text-fg-secondary">
           Add the snippet to the{" "}
           <code className="font-mono text-xs">&lt;head&gt;</code> of every page
@@ -37,6 +50,25 @@ export function WaitingForData({ site }: { site: Site }) {
         </p>
       </div>
       <CodeBlock code={snippetFor(site.id)} />
+      <details className="group flex flex-col gap-3 text-sm">
+        <summary className="cursor-pointer font-medium text-fg">
+          Custom events and the tracking pixel
+        </summary>
+        <div className="flex flex-col gap-3 pt-3">
+          <EventSnippets />
+          <p className="text-fg-secondary">
+            For places that can&apos;t run a script (a README, an email), turn
+            on the{" "}
+            <Link
+              to={`/sites/${site.id}/settings#pixel`}
+              className="text-accent-deep underline"
+            >
+              tracking pixel
+            </Link>
+            .
+          </p>
+        </div>
+      </details>
       <div className="flex flex-col gap-2 text-sm text-fg-secondary">
         <p className="font-medium text-fg">Nothing after a minute?</p>
         <ul className="flex list-disc flex-col gap-1 pl-5">

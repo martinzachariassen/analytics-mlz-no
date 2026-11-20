@@ -13,7 +13,7 @@ import { ChartContainer, ChartTooltip } from "@/components/ui/chart"
 import { Skeleton } from "@/components/ui/skeleton"
 import { api, type BreakdownRow, type FilterDim } from "@/lib/api"
 import { formatValue } from "@/lib/dims"
-import { formatNumber } from "@/lib/format"
+import { METRIC, type Metric } from "@/lib/metrics"
 import type { ScopeState } from "@/lib/use-scope"
 
 const SERIES = 5
@@ -27,10 +27,12 @@ export function TopSeriesChart({
   sc,
   dim,
   rows,
+  metric = METRIC.visitors,
 }: {
   sc: ScopeState
   dim: FilterDim
   rows?: BreakdownRow[]
+  metric?: Metric
 }) {
   const top = (rows ?? []).slice(0, SERIES)
   const results = useQueries({
@@ -70,7 +72,11 @@ export function TopSeriesChart({
     const point: Record<string, number | null> = { time }
     results.forEach((r, s) => {
       point[`s${s}`] =
-        time > now ? null : (r.data!.timeseries[i]?.visitors ?? 0)
+        time > now
+          ? null
+          : r.data!.timeseries[i]
+            ? metric.value(r.data!.timeseries[i]!)
+            : 0
     })
     return point
   })
@@ -83,6 +89,16 @@ export function TopSeriesChart({
 
   return (
     <div className="flex flex-col gap-3">
+      <p className="sr-only">
+        {metric.label} in this period:{" "}
+        {top
+          .map(
+            (r, s) =>
+              `${formatValue(dim, r.value)} ${metric.format(metric.value(results[s]!.data!.summary))}`
+          )
+          .join(", ")}
+        .
+      </p>
       <ChartContainer config={config} className="aspect-auto h-64 w-full">
         <LineChart data={data} margin={{ left: 0, right: 8, top: 8 }}>
           <CartesianGrid vertical={false} stroke="var(--grid)" />
@@ -102,9 +118,9 @@ export function TopSeriesChart({
             width={44}
             tickLine={false}
             axisLine={false}
-            allowDecimals={false}
+            allowDecimals={metric.key === "views_per_visit"}
             tick={AXIS_TICK}
-            tickFormatter={(n: number) => formatNumber(n)}
+            tickFormatter={(n: number) => metric.format(n)}
           />
           <ChartTooltip
             cursor={{ stroke: "var(--fg-muted)", strokeWidth: 1 }}
@@ -123,7 +139,7 @@ export function TopSeriesChart({
                       key={r.value}
                       color={`var(--series-${s + 1})`}
                       label={formatValue(dim, r.value)}
-                      value={formatNumber(pt[`s${s}`] ?? 0)}
+                      value={metric.format(pt[`s${s}`] ?? 0)}
                     />
                   ))}
                 </TipBox>

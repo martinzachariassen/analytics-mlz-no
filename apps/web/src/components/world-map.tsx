@@ -78,7 +78,16 @@ export function WorldMap({
         // An "img" hides its children from assistive technology, so a map with clickable
         // countries is a group of buttons instead.
         role={onSelect ? "group" : "img"}
-        aria-label="Visitors by country"
+        aria-label={
+          rows.length > 0
+            ? `Visitors by country. Most: ${rows
+                .slice(0, 3)
+                .map(
+                  (r) => `${formatCountry(r.value)} ${formatNumber(r.visitors)}`
+                )
+                .join(", ")}`
+            : "Visitors by country: none in this period"
+        }
         onMouseLeave={() => setHover(null)}
       >
         {all.map((s) => {
@@ -98,7 +107,11 @@ export function WorldMap({
               }
               tabIndex={v && onSelect ? 0 : undefined}
               role={v && onSelect ? "button" : undefined}
-              aria-label={v && onSelect ? `${s.name}: ${v}` : undefined}
+              aria-label={
+                v && onSelect
+                  ? `${s.name}: ${formatNumber(v)} visitors`
+                  : undefined
+              }
               onKeyDown={
                 v && onSelect
                   ? (e) => {

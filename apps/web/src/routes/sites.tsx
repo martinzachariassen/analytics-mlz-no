@@ -6,32 +6,66 @@ import { Delta } from "@/components/delta"
 import { ErrorNote } from "@/components/error-note"
 import { PageHeader } from "@/components/page-header"
 import { Sparkline } from "@/components/sparkline"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { LiveDot } from "@/components/waiting-for-data"
 import { api, type Site } from "@/lib/api"
 import { formatNumber } from "@/lib/format"
-import { periodRange } from "@/lib/period"
+import { PERIODS, type Period, periodRange } from "@/lib/period"
 import { useSites } from "@/lib/queries"
+import { useParamChoice } from "@/lib/use-scope"
 import { useTitle } from "@/lib/use-title"
+
+/** The periods the site list offers; each row links to the dashboard with the same one. */
+const LIST_PERIODS = ["7d", "today", "30d", "12m"] as const satisfies Period[]
 
 export function SitesPage() {
   useTitle("Sites")
   const sites = useSites()
   const count = sites.data?.length
+  const [period, setPeriod] = useParamChoice("period", LIST_PERIODS)
 
   return (
     <>
-      <PageHeader title="All sites" actions={<AddSiteDialog fromUrl />} />
+      <PageHeader
+        title={
+          <span className="flex items-baseline gap-2">
+            Sites
+            {count !== undefined && (
+              <span className="text-xs font-normal text-fg-muted">{count}</span>
+            )}
+          </span>
+        }
+        actions={
+          <>
+            <Select
+              value={period}
+              onValueChange={(v) =>
+                setPeriod(v as (typeof LIST_PERIODS)[number])
+              }
+            >
+              <SelectTrigger size="sm" aria-label="Period">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="end">
+                {LIST_PERIODS.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {PERIODS[p]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <AddSiteDialog fromUrl />
+          </>
+        }
+      />
       <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-6 p-4 sm:p-6 lg:py-10">
-        <header className="flex flex-col gap-1">
-          <h2 className="display text-2xl">Sites</h2>
-          <p className="text-fg-muted">
-            {count === undefined
-              ? "\u00a0"
-              : `${count} ${count === 1 ? "site" : "sites"} · last 7 days`}
-          </p>
-        </header>
-
         {sites.isPending && (
           <div className="flex flex-col gap-px overflow-hidden rounded-lg border bg-border">
             {[0, 1, 2].map((i) => (
@@ -62,7 +96,7 @@ export function SitesPage() {
             </div>
             <ul className="flex flex-col gap-2">
               {sites.data.map((s, i) => (
-                <SiteRow key={s.id} site={s} index={i} />
+                <SiteRow key={s.id} site={s} index={i} period={period} />
               ))}
             </ul>
           </div>
@@ -72,8 +106,16 @@ export function SitesPage() {
   )
 }
 
-function SiteRow({ site, index }: { site: Site; index: number }) {
-  const range = periodRange("7d")
+function SiteRow({
+  site,
+  index,
+  period,
+}: {
+  site: Site
+  index: number
+  period: Period
+}) {
+  const range = periodRange(period)
   const waiting = site.first_event_at === null
   const stats = useQuery({
     queryKey: ["stats", site.id, range],
@@ -84,7 +126,7 @@ function SiteRow({ site, index }: { site: Site; index: number }) {
   return (
     <li className="rise" style={{ "--i": index } as React.CSSProperties}>
       <Link
-        to={`/sites/${site.id}`}
+        to={`/sites/${site.id}${period === "7d" ? "" : `?period=${period}`}`}
         className="hover-lift grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-3 rounded-lg border bg-surface px-5 py-4 sm:grid-cols-[1fr_10rem_7rem_5rem]"
       >
         <span className="flex min-w-0 flex-col gap-1">

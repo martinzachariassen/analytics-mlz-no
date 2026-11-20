@@ -1,6 +1,6 @@
 import { format, parseISO } from "date-fns"
 import { CalendarDays, Check, ChevronDown } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import type { DateRange } from "react-day-picker"
 
 import { Button } from "@/components/ui/button"
@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import type { Compare, Interval } from "@/lib/api"
-import { isTyping } from "@/lib/keys"
+import { isTyping, PERIOD_KEYS } from "@/lib/keys"
 import {
   formatDay,
   formatRange,
@@ -27,18 +27,13 @@ import {
   PERIODS,
   type Period,
 } from "@/lib/period"
-import type { ScopeState } from "@/lib/use-scope"
+import { PICK_RANGE, type ScopeState } from "@/lib/use-scope"
 import { cn } from "@/lib/utils"
 
-const PRESETS: { value: Period; key: string }[] = [
-  { value: "today", key: "T" },
-  { value: "yesterday", key: "Y" },
-  { value: "7d", key: "7" },
-  { value: "30d", key: "3" },
-  { value: "month", key: "M" },
-  { value: "last_month", key: "L" },
-  { value: "12m", key: "A" },
-]
+const PRESETS = (Object.keys(PERIOD_KEYS) as Period[]).map((value) => ({
+  value,
+  key: PERIOD_KEYS[value],
+}))
 
 /**
  * Single-key shortcuts: periods (t, y, 7, 3, m, l, a) and x to toggle the
@@ -68,16 +63,23 @@ export function DateRangePicker({ sc }: { sc: ScopeState }) {
   const [draft, setDraft] = useState<DateRange | undefined>()
   const label =
     sc.period === "custom" ? formatRange(sc.range) : PERIODS[sc.period]
+  const { from, to } = sc.range
+  const onOpenChange = useCallback(
+    (o: boolean) => {
+      setOpen(o)
+      if (o) setDraft({ from: parseISO(from), to: parseISO(to) })
+    },
+    [from, to]
+  )
+  useEffect(() => {
+    // The command menu closes first; opening in the same tick would hand focus back to it.
+    const onPick = () => setTimeout(() => onOpenChange(true))
+    window.addEventListener(PICK_RANGE, onPick)
+    return () => window.removeEventListener(PICK_RANGE, onPick)
+  }, [onOpenChange])
 
   return (
-    <Popover
-      open={open}
-      onOpenChange={(o) => {
-        setOpen(o)
-        if (o)
-          setDraft({ from: parseISO(sc.range.from), to: parseISO(sc.range.to) })
-      }}
-    >
+    <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2 font-medium">
           <CalendarDays className="text-fg-muted" />
@@ -120,6 +122,8 @@ export function DateRangePicker({ sc }: { sc: ScopeState }) {
         <div className="flex flex-col p-2">
           <Calendar
             mode="range"
+            // A click after a full range starts a new one instead of moving one of its ends.
+            resetOnSelect
             numberOfMonths={1}
             selected={draft}
             onSelect={setDraft}
@@ -160,7 +164,15 @@ const COMPARE_LABEL = {
   off: "No comparison",
 }
 
+const COMPARE_SHORT = {
+  previous: "previous",
+  year: "last year",
+  off: "Compare",
+}
+
 export function CompareSelect({ sc }: { sc: ScopeState }) {
+  // X turns any comparison off, and turns the previous period on.
+  const xTarget = sc.compare ? "off" : "previous"
   return (
     <Select
       value={sc.compare ?? "off"}
@@ -170,15 +182,20 @@ export function CompareSelect({ sc }: { sc: ScopeState }) {
     >
       <SelectTrigger size="sm" aria-label="Compare with" className="gap-2">
         <SelectValue>
-          <span className="text-fg-muted max-lg:hidden">vs</span>
-          {COMPARE_LABEL[sc.compare ?? "off"]}
+          {sc.compare && <span className="text-fg-muted">vs</span>}
+          <span className="max-md:hidden">
+            {COMPARE_LABEL[sc.compare ?? "off"]}
+          </span>
+          <span className="md:hidden">
+            {COMPARE_SHORT[sc.compare ?? "off"]}
+          </span>
         </SelectValue>
       </SelectTrigger>
       <SelectContent align="end">
         {(["previous", "year", "off"] as const).map((c) => (
           <SelectItem key={c} value={c}>
             {COMPARE_LABEL[c]}
-            {c !== "year" && <Kbd className="ml-auto">X</Kbd>}
+            {c === xTarget && <Kbd className="ml-auto">X</Kbd>}
           </SelectItem>
         ))}
       </SelectContent>

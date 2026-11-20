@@ -14,7 +14,10 @@ type ThemeProviderProps = {
 
 type ThemeProviderState = {
   theme: Theme
+  resolvedTheme: ResolvedTheme
   setTheme: (theme: Theme) => void
+  /** Switches between dark and light; "system" flips whatever the system shows now. */
+  toggleTheme: () => void
 }
 
 const COLOR_SCHEME_QUERY = "(prefers-color-scheme: dark)"
@@ -62,6 +65,11 @@ function getSystemTheme(): ResolvedTheme {
   return "light"
 }
 
+const opposite = (current: Theme): ResolvedTheme =>
+  (current === "system" ? getSystemTheme() : current) === "dark"
+    ? "light"
+    : "dark"
+
 function disableTransitionsTemporarily() {
   const style = document.createElement("style")
   style.appendChild(
@@ -105,6 +113,17 @@ export function ThemeProvider({
     [storageKey]
   )
 
+  const toggleTheme = React.useCallback(() => {
+    setThemeState((currentTheme) => {
+      const nextTheme = opposite(currentTheme)
+      writeStored(storageKey, nextTheme)
+      return nextTheme
+    })
+  }, [storageKey])
+
+  const [systemTheme, setSystemTheme] =
+    React.useState<ResolvedTheme>(getSystemTheme)
+
   const applyTheme = React.useCallback(
     (nextTheme: Theme) => {
       const root = document.documentElement
@@ -136,8 +155,10 @@ export function ThemeProvider({
       return undefined
     }
 
+    setSystemTheme(getSystemTheme())
     const mediaQuery = window.matchMedia(COLOR_SCHEME_QUERY)
     const handleChange = () => {
+      setSystemTheme(getSystemTheme())
       applyTheme("system")
     }
 
@@ -166,19 +187,7 @@ export function ThemeProvider({
         return
       }
 
-      setThemeState((currentTheme) => {
-        const nextTheme =
-          currentTheme === "dark"
-            ? "light"
-            : currentTheme === "light"
-              ? "dark"
-              : getSystemTheme() === "dark"
-                ? "light"
-                : "dark"
-
-        writeStored(storageKey, nextTheme)
-        return nextTheme
-      })
+      toggleTheme()
     }
 
     window.addEventListener("keydown", handleKeyDown)
@@ -186,7 +195,7 @@ export function ThemeProvider({
     return () => {
       window.removeEventListener("keydown", handleKeyDown)
     }
-  }, [storageKey])
+  }, [toggleTheme])
 
   React.useEffect(() => {
     const handleStorageChange = (event: StorageEvent) => {
@@ -216,9 +225,11 @@ export function ThemeProvider({
   const value = React.useMemo(
     () => ({
       theme,
+      resolvedTheme: theme === "system" ? systemTheme : theme,
       setTheme,
+      toggleTheme,
     }),
-    [theme, setTheme]
+    [theme, systemTheme, setTheme, toggleTheme]
   )
 
   return (

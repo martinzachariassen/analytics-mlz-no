@@ -34,14 +34,14 @@ export function Panel({
       {(title || action || tabs) && (
         <header className="flex flex-col gap-2 border-b px-4 pt-3">
           <div className="flex min-h-7 items-center justify-between gap-3">
-            <div className="flex min-w-0 items-baseline gap-2">
+            <div className="flex min-w-0 flex-col gap-x-2 sm:flex-row sm:items-baseline">
               {title && (
                 <h2 className="truncate text-[13px] font-semibold tracking-[-0.01em] text-fg">
                   {title}
                 </h2>
               )}
               {description && (
-                <p className="truncate text-xs text-fg-muted max-sm:hidden">
+                <p className="truncate text-xs text-fg-muted max-sm:text-[11px]">
                   {description}
                 </p>
               )}

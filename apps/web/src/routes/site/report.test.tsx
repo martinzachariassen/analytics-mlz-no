@@ -95,14 +95,52 @@ describe("EventsPage", () => {
     },
   }
 
-  it("keeps the picked event and property in the URL", async () => {
+  it("keeps the event picked for its properties in the URL", async () => {
+    const user = userEvent.setup()
     mockFetch(routes)
     const { search } = renderInSite(events, "/sites/abc?compare=off")
 
     await screen.findByText("value of plan")
-    await userEvent.click(screen.getByRole("button", { name: "download" }))
-    expect(search().get("event")).toBe("download")
+    await user.click(screen.getByRole("combobox", { name: "Event" }))
+    await user.click(screen.getByRole("option", { name: "download" }))
+    await waitFor(() => expect(search().get("event")).toBe("download"))
     expect(await screen.findByText("value of file")).toBeTruthy()
+
+    await user.click(screen.getByRole("combobox", { name: "Property" }))
+    await user.click(screen.getByRole("option", { name: "format" }))
+    await waitFor(() => expect(search().get("prop")).toBe("format"))
+    expect(await screen.findByText("value of format")).toBeTruthy()
+  })
+
+  it("opens the detail sheet from a row, like every other table", async () => {
+    mockFetch(routes)
+    const { search } = renderInSite(events, "/sites/abc?compare=off")
+    await userEvent.click(
+      await screen.findByRole("button", { name: "download" })
+    )
+    await waitFor(() => expect(search().get("detail")).toBe("event:download"))
+    expect(search().get("event")).toBeNull()
+  })
+
+  it("explains how to send events when there are none", async () => {
+    mockFetch({ "/api/sites/abc/breakdown": [] })
+    renderInSite(events, "/sites/abc?compare=off")
+    expect(await screen.findByText("No custom events yet")).toBeTruthy()
+    expect(screen.getByText(/mlz\?\.track/)).toBeTruthy()
+    expect(
+      screen
+        .getByRole("link", { name: "More in the tracking settings" })
+        .getAttribute("href")
+    ).toBe("/sites/abc/settings#tracking")
+  })
+
+  it("puts the metric a KPI tile picks in the URL", async () => {
+    mockFetch(routes)
+    const { search } = renderInSite(events, "/sites/abc?compare=off")
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Page views", pressed: false })
+    )
+    await waitFor(() => expect(search().get("metric")).toBe("pageviews"))
   })
 
   it("opens the event and property from the URL, and falls back when they are gone", async () => {

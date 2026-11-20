@@ -29,7 +29,7 @@ export function PixelSettings({ site }: { site: Site }) {
   })
 
   return (
-    <Card id="pixel">
+    <Card>
       <CardHeader>
         <CardTitle>Tracking pixel</CardTitle>
         <CardDescription>

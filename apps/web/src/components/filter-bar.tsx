@@ -81,6 +81,7 @@ function AddFilter({ sc, compact }: { sc: ScopeState; compact: boolean }) {
         <Button
           variant="outline"
           size="sm"
+          aria-label={compact ? "Add filter" : undefined}
           className={cn("h-7 gap-1.5 text-xs", !compact && "px-2.5")}
         >
           <ListFilter className="text-fg-muted" />

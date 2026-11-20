@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from "react"
+import type { ReactNode } from "react"
 
 import { BarList, ViewAll } from "@/components/bar-list"
 import { ErrorNote } from "@/components/error-note"
@@ -6,7 +6,7 @@ import { Panel, TextTabs } from "@/components/panel"
 import type { Dimension } from "@/lib/api"
 import { DIM_VIEW, DIMS, isFilterDim } from "@/lib/dims"
 import { useBreakdown } from "@/lib/queries"
-import { useScope } from "@/lib/use-scope"
+import { useParamChoice, useScope, withTab } from "@/lib/use-scope"
 
 export type ReportTab = { dim: Dimension; label?: string }
 
@@ -15,6 +15,7 @@ export type ReportTab = { dim: Dimension; label?: string }
  * values as a bar list, and a link to the full report view.
  */
 export function ReportCard({
+  id,
   title,
   tabs,
   total,
@@ -23,6 +24,8 @@ export function ReportCard({
   action,
   children,
 }: {
+  /** Names the card's tab in the URL (?{id}_tab=), so a reload or a shared link keeps it. */
+  id: string
   title: string
   tabs: ReportTab[]
   /** Total visitors, for shares. */
@@ -34,7 +37,10 @@ export function ReportCard({
   children?: (dim: Dimension) => ReactNode
 }) {
   const sc = useScope()
-  const [dim, setDim] = useState<Dimension>(tabs[0]!.dim)
+  const [dim, setDim] = useParamChoice(
+    `${id}_tab`,
+    tabs.map((t) => t.dim)
+  )
   const q = useBreakdown(sc.siteId, sc.scope, dim, { limit: rows })
   const view = DIM_VIEW[dim]
 
@@ -81,11 +87,4 @@ export function ReportCard({
       )}
     </Panel>
   )
-}
-
-/** Adds ?tab=dim to a query string. */
-export function withTab(search: string, dim: string): string {
-  const q = new URLSearchParams(search)
-  q.set("tab", dim)
-  return `?${q.toString()}`
 }

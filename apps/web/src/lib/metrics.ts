@@ -1,5 +1,6 @@
 import type { Bucket, Summary } from "@/lib/api"
 import { formatDuration, formatNumber, formatPercent } from "@/lib/format"
+import { useParamChoice } from "@/lib/use-scope"
 
 export type MetricKey =
   | "visitors"
@@ -80,3 +81,8 @@ export const METRIC: Record<MetricKey, Metric> = Object.fromEntries(
 export function isMetric(v: string | null): v is MetricKey {
   return v !== null && Object.hasOwn(METRIC, v)
 }
+
+const METRIC_KEYS: MetricKey[] = METRICS.map((m) => m.key)
+
+/** The metric the KPI strip picks for the chart (?metric=), visitors by default. */
+export const useMetricParam = () => useParamChoice("metric", METRIC_KEYS)

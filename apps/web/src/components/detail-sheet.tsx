@@ -1,6 +1,6 @@
 import { ArrowUpRight, ListFilter } from "lucide-react"
 import { Link } from "react-router"
-
+import { VIEWS } from "@/components/app-sidebar"
 import { BarList } from "@/components/bar-list"
 import { Delta } from "@/components/delta"
 import { ErrorNote } from "@/components/error-note"
@@ -15,13 +15,14 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
-import type { Dimension, FilterDim, Scope } from "@/lib/api"
+import type { Dimension, FilterDim, RangeParams, Scope } from "@/lib/api"
 import { DIM_VIEW, DIMS, formatValue } from "@/lib/dims"
 import { formatPercent } from "@/lib/format"
 import { goalKindFor } from "@/lib/goals"
 import { METRIC, type MetricKey } from "@/lib/metrics"
+import { intervalsFor } from "@/lib/period"
 import { useBreakdown, useStats } from "@/lib/queries"
-import { type Detail, useScope } from "@/lib/use-scope"
+import { type Detail, useScope, withParam, withTab } from "@/lib/use-scope"
 
 /** What to break a value down by, per kind of dimension. */
 const RELATED: Record<string, Dimension[]> = {
@@ -59,30 +60,53 @@ const SHEET_METRICS: MetricKey[] = [
  * country…): its numbers, trend and what it breaks down into. Opened from any
  * list; its state is in the URL (?detail=dim:value).
  */
-export function DetailSheet() {
+export function DetailSheet({
+  range,
+  rangeNote,
+}: {
+  /** A range other than the dashboard's period, for views that have none (Realtime). */
+  range?: RangeParams
+  rangeNote?: string
+} = {}) {
   const sc = useScope()
   const d = sc.detail
   return (
     <Sheet open={d !== null} onOpenChange={(o) => !o && sc.openDetail(null)}>
       <SheetContent className="w-full gap-0 overflow-y-auto p-0 sm:max-w-xl">
-        {d && <DetailBody d={d} />}
+        {d && <DetailBody d={d} range={range} rangeNote={rangeNote} />}
       </SheetContent>
     </Sheet>
   )
 }
 
-function DetailBody({ d }: { d: Detail }) {
+function DetailBody({
+  d,
+  range,
+  rangeNote,
+}: {
+  d: Detail
+  range?: RangeParams
+  rangeNote?: string
+}) {
   const sc = useScope()
+  const base: Scope = range ? { ...sc.scope, ...range } : sc.scope
+  const interval = range ? intervalsFor(range).auto : sc.interval
   const scope: Scope = {
-    ...sc.scope,
+    ...base,
     filters: [
       ...sc.filters.filter((f) => f.dim !== d.dim),
       { dim: d.dim, op: "is", value: d.value },
     ],
   }
-  const stats = useStats(sc.siteId, scope, sc.interval)
-  const all = useStats(sc.siteId, sc.scope, sc.interval)
+  const stats = useStats(sc.siteId, scope, interval)
+  const all = useStats(sc.siteId, base, interval)
   const view = DIM_VIEW[d.dim]
+  const viewLabel = VIEWS.find((v) => v.path === view)?.label
+  // Events have no tabs: their view picks the event instead.
+  const viewSearch =
+    d.dim === "event"
+      ? withParam(sc.search, "event", d.value)
+      : withTab(sc.search, d.dim)
   const goalKind = goalKindFor(d.dim)
   const title = formatValue(d.dim, d.value)
   const share =
@@ -99,6 +123,7 @@ function DetailBody({ d }: { d: Detail }) {
         <SheetTitle className="font-mono text-[15px]! break-all">
           {title}
         </SheetTitle>
+        {rangeNote && <p className="text-xs text-fg-muted">{rangeNote}</p>}
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
@@ -115,8 +140,8 @@ function DetailBody({ d }: { d: Detail }) {
           )}
           {view && (
             <Button variant="outline" size="sm" asChild>
-              <Link to={`/sites/${sc.siteId}/${view}${sc.search}`}>
-                Open {view}
+              <Link to={`/sites/${sc.siteId}/${view}${viewSearch}`}>
+                Open {viewLabel}
                 <ArrowUpRight />
               </Link>
             </Button>

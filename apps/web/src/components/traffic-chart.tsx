@@ -50,6 +50,24 @@ export function bucketEnds(
   return starts.map((_, i) => starts[i + 1] ?? periodEnd)
 }
 
+/** The chart in one sentence, for screen readers. */
+export function chartSummary(stats: Stats, metric: Metric): string {
+  const interval = stats.period.interval
+  const value = metric.value(stats.summary)
+  let text = `${metric.label}: ${metric.format(value)}`
+  if (stats.compare) {
+    const d = change(value, metric.value(stats.previous))
+    if (d !== null) text += `, ${formatSignedPercent(d)} vs the comparison`
+  }
+  const peak = stats.timeseries.reduce<Stats["timeseries"][number] | null>(
+    (best, b) => (!best || metric.value(b) > metric.value(best) ? b : best),
+    null
+  )
+  if (peak && stats.timeseries.length > 1)
+    text += `. Highest ${format(Date.parse(peak.t), TOOLTIP_FORMAT[interval])}: ${metric.format(metric.value(peak))}`
+  return `${text}.`
+}
+
 export const AXIS_TICK = {
   fontSize: 11,
   fill: "var(--fg-muted)",
@@ -139,104 +157,111 @@ export function TrafficChart({
     )
 
   return (
-    <ChartContainer
-      config={config}
-      className={cn("aspect-auto w-full", height, className)}
-    >
-      <ComposedChart data={data} margin={{ left: 0, right: 8, top: 8 }}>
-        <defs>
-          <linearGradient id="fill-current" x1="0" y1="0" x2="0" y2="1">
-            <stop
-              offset="0%"
-              stopColor="var(--chart-fill)"
-              stopOpacity={0.28}
-            />
-            <stop offset="100%" stopColor="var(--chart-fill)" stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid vertical={false} stroke="var(--grid)" />
-        <XAxis
-          dataKey="time"
-          type="number"
-          scale="time"
-          domain={["dataMin", "dataMax"]}
-          tickLine={false}
-          axisLine={false}
-          tickMargin={10}
-          minTickGap={48}
-          tick={AXIS_TICK}
-          tickFormatter={(t: number) => format(t, AXIS_FORMAT[interval])}
-        />
-        <YAxis
-          width={44}
-          tickLine={false}
-          axisLine={false}
-          allowDecimals={metric.key === "views_per_visit"}
-          tick={AXIS_TICK}
-          tickCount={compact ? 3 : 5}
-          tickFormatter={(n: number) => metric.format(n)}
-        />
-        {partialTime !== undefined && (
-          <ReferenceLine
-            x={partialTime}
-            stroke="var(--border-strong)"
-            strokeDasharray="2 3"
+    <>
+      <p className="sr-only">{chartSummary(stats, metric)}</p>
+      <ChartContainer
+        config={config}
+        className={cn("aspect-auto w-full", height, className)}
+      >
+        <ComposedChart data={data} margin={{ left: 0, right: 8, top: 8 }}>
+          <defs>
+            <linearGradient id="fill-current" x1="0" y1="0" x2="0" y2="1">
+              <stop
+                offset="0%"
+                stopColor="var(--chart-fill)"
+                stopOpacity={0.28}
+              />
+              <stop
+                offset="100%"
+                stopColor="var(--chart-fill)"
+                stopOpacity={0}
+              />
+            </linearGradient>
+          </defs>
+          <CartesianGrid vertical={false} stroke="var(--grid)" />
+          <XAxis
+            dataKey="time"
+            type="number"
+            scale="time"
+            domain={["dataMin", "dataMax"]}
+            tickLine={false}
+            axisLine={false}
+            tickMargin={10}
+            minTickGap={48}
+            tick={AXIS_TICK}
+            tickFormatter={(t: number) => format(t, AXIS_FORMAT[interval])}
           />
-        )}
-        <ChartTooltip
-          cursor={{ stroke: "var(--fg-muted)", strokeWidth: 1 }}
-          content={({ active, payload }) => {
-            const pt = payload?.[0]?.payload as Point | undefined
-            if (!active || !pt) return null
-            return <ChartTip point={pt} interval={interval} metric={metric} />
-          }}
-        />
-        {prevSeries && (
+          <YAxis
+            width={44}
+            tickLine={false}
+            axisLine={false}
+            allowDecimals={metric.key === "views_per_visit"}
+            tick={AXIS_TICK}
+            tickCount={compact ? 3 : 5}
+            tickFormatter={(n: number) => metric.format(n)}
+          />
+          {partialTime !== undefined && (
+            <ReferenceLine
+              x={partialTime}
+              stroke="var(--border-strong)"
+              strokeDasharray="2 3"
+            />
+          )}
+          <ChartTooltip
+            cursor={{ stroke: "var(--fg-muted)", strokeWidth: 1 }}
+            content={({ active, payload }) => {
+              const pt = payload?.[0]?.payload as Point | undefined
+              if (!active || !pt) return null
+              return <ChartTip point={pt} interval={interval} metric={metric} />
+            }}
+          />
+          {prevSeries && (
+            <Line
+              dataKey="previous"
+              type="monotone"
+              stroke="var(--color-previous)"
+              strokeWidth={1.5}
+              strokeDasharray="4 4"
+              strokeOpacity={0.8}
+              dot={false}
+              activeDot={false}
+              isAnimationActive={false}
+            />
+          )}
           <Line
-            dataKey="previous"
+            dataKey="tail"
             type="monotone"
-            stroke="var(--color-previous)"
-            strokeWidth={1.5}
-            strokeDasharray="4 4"
-            strokeOpacity={0.8}
+            stroke="var(--color-current)"
+            strokeWidth={2}
+            strokeDasharray="2 4"
+            strokeLinecap="round"
             dot={false}
             activeDot={false}
+            connectNulls={false}
             isAnimationActive={false}
           />
-        )}
-        <Line
-          dataKey="tail"
-          type="monotone"
-          stroke="var(--color-current)"
-          strokeWidth={2}
-          strokeDasharray="2 4"
-          strokeLinecap="round"
-          dot={false}
-          activeDot={false}
-          connectNulls={false}
-          isAnimationActive={false}
-        />
-        <Area
-          dataKey="current"
-          type="monotone"
-          stroke="var(--color-current)"
-          strokeWidth={2}
-          fill="url(#fill-current)"
-          dot={
-            single
-              ? { r: 3, strokeWidth: 0, fill: "var(--color-current)" }
-              : false
-          }
-          activeDot={{
-            r: 4,
-            strokeWidth: 2,
-            stroke: "var(--surface)",
-            fill: "var(--color-current)",
-          }}
-          isAnimationActive={false}
-        />
-      </ComposedChart>
-    </ChartContainer>
+          <Area
+            dataKey="current"
+            type="monotone"
+            stroke="var(--color-current)"
+            strokeWidth={2}
+            fill="url(#fill-current)"
+            dot={
+              single
+                ? { r: 3, strokeWidth: 0, fill: "var(--color-current)" }
+                : false
+            }
+            activeDot={{
+              r: 4,
+              strokeWidth: 2,
+              stroke: "var(--surface)",
+              fill: "var(--color-current)",
+            }}
+            isAnimationActive={false}
+          />
+        </ComposedChart>
+      </ChartContainer>
+    </>
   )
 }
 

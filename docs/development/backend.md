@@ -135,12 +135,18 @@ go test ./internal/ingest -run '^$' -fuzz '^FuzzEvent$' -fuzztime 1m
 | Fuzzer | Package | What must hold |
 |---|---|---|
 | `FuzzEvent` | `ingest` | Stored events belong to the site, and every field is clean UTF-8 within its limit |
+| `FuzzPixel` | `ingest` | The same for `GET /api/pixel.gif` with arbitrary query parameters, referrers and user agents |
 | `FuzzClientIP` | `httpx` | `ClientIP` and `PeerIP` return a canonical parsed address or the raw `RemoteAddr` |
 | `FuzzNormalizeDomain` | `store` | A normalised domain is valid and normalising it again changes nothing |
 | `FuzzCell` | `api` | A CSV cell a spreadsheet would read as a formula always gets a leading `'` |
 
 When a fuzzer fails it writes the input to `testdata/fuzz/<Fuzzer>/`. Fix the bug and commit
 that file, so the case stays covered.
+
+`.github/workflows/fuzz.yml` runs every fuzzer for five minutes each Sunday (and on demand from
+the Actions tab). It is not a required check. A failed run keeps the failing input as an artifact
+(`fuzz-<Fuzzer>`): put it under `testdata/fuzz/<Fuzzer>/` with the fix. Add a new fuzzer to the
+workflow's matrix too.
 
 <details>
 <summary>Advanced: performance and SQLite</summary>

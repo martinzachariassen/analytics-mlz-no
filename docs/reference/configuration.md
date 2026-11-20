@@ -27,7 +27,7 @@ Read by `apps/server/internal/config/config.go`, except `LITESTREAM_REPLICA_URL`
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | – | GitHub OAuth App credentials. Setting the id turns on sign-in |
 | `ALLOWED_GITHUB_USERS` | – | Comma-separated GitHub usernames allowed to sign in. Checked on every request: removing a name signs that user out |
 | `LITESTREAM_REPLICA_URL` | – | Docker image only: continuous backup, e.g. `gs://bucket/analytics` or `s3://bucket/analytics`. S3 needs `LITESTREAM_ACCESS_KEY_ID` and `LITESTREAM_SECRET_ACCESS_KEY` (or the `AWS_*` variables); GCS outside Google Cloud needs `GOOGLE_APPLICATION_CREDENTIALS` pointing at a mounted service-account key |
-| `REQUIRE_REPLICA` | `0` | Docker image only: `1` makes a missing database plus an empty replica a startup error instead of a fresh, empty start. Leave it `0` for the very first start; set it once the replica holds data, so a lost replica stops the server instead of quietly starting with nothing |
+| `REQUIRE_REPLICA` | `0` | Docker image only: `1` makes a missing database plus an empty replica a startup error instead of a fresh, empty start. Leave it `0` for the very first start; set it once the replica holds data, so a lost replica stops the server instead of quietly starting with nothing. Without `LITESTREAM_REPLICA_URL` it is a startup error too, so a forgotten URL cannot start an unreplicated server |
 | `DEV_LOGIN` | – | `1` signs everyone in as `dev`. Local development only: refused unless `PUBLIC_URL` is on `localhost` and GitHub sign-in is off, and the dev sign-in only answers connections from the loopback interface. Also required for `analytics seed -reset` |
 
 > [!WARNING]
@@ -85,6 +85,19 @@ from `terraform output github_deploy_variables`; see the
 |---|---|---|
 | `VERSION` | `dev` | Printed by `analytics version`; the release workflow sets it to the tag |
 | `DBIP_MONTH` | empty | DB-IP Lite Country release to bundle, as `YYYY-MM`. Empty takes this month, falling back to last month early in the month. Set it for a reproducible build. The release workflow sets it to the month before the tagged commit, which is always published and the same on every rebuild |
+| `TRACKER_ORIGIN` | empty | Origin the embedded dashboard's "Tracking code" snippet and pixel URLs point at (`VITE_TRACKER_ORIGIN`). Empty uses the dashboard's own origin, which is right when the image serves both. Production builds the dashboard outside the image (`make web TRACKER_ORIGIN=…`), so none of the Makefile, CI or release builds set it |
+
+## Backup job (`backup.sh`)
+
+`infra/docker/backup.sh` restores the newest state from the Litestream replica and uploads it as
+a gzipped SQLite file. Terraform runs it as a Cloud Run Job (`infra/terraform/main/backup.tf`).
+
+| Variable | Default | Description |
+|---|---|---|
+| `LITESTREAM_REPLICA_URL` | – | Required. The replica to restore from, as for the server |
+| `BACKUP_BUCKET` | – | Bucket to upload to, with the job's service account (from the metadata server). Required unless `BACKUP_DEST_DIR` is set |
+| `BACKUP_DEST_DIR` | – | Writes to this local folder instead of a bucket, for tests (`infra/docker/test-backup.sh`) |
+| `BACKUP_EXPECT_DATA` | `0` | `1` makes an empty replica an error instead of a skipped backup: once a service has data, an empty replica means it was lost. Terraform sets it from `require_replica` |
 
 ## `PROXY_HOPS`
 

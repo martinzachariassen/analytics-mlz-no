@@ -67,6 +67,25 @@ the server guarantees instead:
 What is not prevented: a distributed attack from many real IP addresses with browser-like
 requests can still add plausible-looking events, at up to the global rate. Purge them afterwards.
 
+## Known advisories in development tools
+
+`bun audit` without `--prod` (and Scorecard's Vulnerabilities check, which reads `bun.lock`)
+lists moderate advisories in packages that only the deploy and scaffolding CLIs use. None of
+them is part of the server, the tracking script or the dashboard build:
+
+| Package | Advisory | Pulled in by | Why it stays |
+|---|---|---|---|
+| `glob` 10 and its `minimatch` 9 | [GHSA-3g3m-2fjr-6pw4](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4), [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249) | `firebase-tools` (`archiver`, `exegesis`) | The fixes are glob 14 and minimatch 11, majors that `firebase-tools` has not adopted |
+| `@opentelemetry/core` 1.x | [GHSA-8988-4f7v-96qf](https://github.com/advisories/GHSA-8988-4f7v-96qf) | `firebase-tools` (`@google-cloud/pubsub`) | The fix is 2.x, which `@google-cloud/pubsub` does not accept |
+
+`firebase-tools` only runs on a maintainer's machine and in the Deploy workflow, against our own
+files. Forcing these majors with `overrides` risks breaking every deploy: a top-level override
+also replaces `firebase-tools`' own `minimatch@3`, which it calls as a function, and the glob and
+OpenTelemetry majors change the APIs their parents use. `overrides` in
+`package.json` raise what can be raised safely (`uuid` to 11, and `@ts-morph/common`'s `minimatch`
+to 11 for the shadcn CLI). Check again when Dependabot bumps `firebase-tools`, and drop a row once
+`bun audit` no longer lists it.
+
 ## Out of scope
 
 - Findings that need an already compromised server, database or GitHub account.

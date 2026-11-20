@@ -1,6 +1,6 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
-.PHONY: run verify test lint format build docker tracker web embed-web dev-web dev dev-api dev-demo dev-live dev-reset deploy deploy-server deploy-web
+.PHONY: run verify test lint format build docker tracker web embed-web dev-web dev dev-api dev-demo dev-live dev-reset deploy deploy-check deploy-server deploy-web
 
 run:
 	go run ./apps/server/cmd/analytics serve

@@ -84,6 +84,7 @@ ENV DATABASE_PATH=/data/analytics.db \
 USER 10001:10001
 VOLUME /data
 EXPOSE 8080
+# The server listens on ADDR when it is set (as config.go does), otherwise on PORT.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
-  CMD curl -fsS "http://127.0.0.1:${PORT}/healthz" || exit 1
+  CMD port="${ADDR##*:}"; curl -fsS "http://127.0.0.1:${port:-$PORT}/healthz" || exit 1
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

@@ -7,6 +7,7 @@ All notable changes are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `.github/workflows/fuzz.yml` runs every Go fuzz test for five minutes each week (CI only replays their seed inputs) and keeps a failing input as an artifact.
 - Releases attach the binaries' signed provenance bundle as `analytics_<tag>.intoto.jsonl`, so `gh attestation verify --bundle` works without GitHub's attestation API.
 - The dashboard is built into the Docker image and the release binaries, so `docker compose up` gives a working dashboard on the same origin as the API, with the same security headers, rewrites and caching as Firebase Hosting (`internal/web`, kept in line with `apps/web/firebase.json` by a test). Text files are served gzipped with an `ETag`. `make build` embeds it too (`make embed-web`, needs Bun); production keeps serving the dashboard from Firebase Hosting.
 - `analytics seed -live` keeps synthetic visits arriving until interrupted, and `make dev` runs it, so **Realtime** shows visitors in the local test environment. The local demo sites are now called "Fjord Labs Blog (demo)" and "Fjord Labs Docs (demo)"; `seed` renames existing ones.
@@ -36,6 +37,7 @@ All notable changes are documented here. The format follows
 - Dashboard: gzipped size budgets for the production build (JavaScript loaded before the first render, all CSS, the largest lazy chunk, all JavaScript), checked by `bun run check-size` in the `web` verify group. TypeScript also checks `noUncheckedIndexedAccess`.
 
 ### Security
+- Development dependencies: `uuid` raised to 11 (from `firebase-tools`) and `@ts-morph/common`'s `minimatch` to 11 (from the shadcn CLI) with `overrides`. The advisories that remain are in `firebase-tools`' dependencies only and listed with the reason in `SECURITY.md`.
 - `POST /api/event` rejects `Origin: null` with `400`. Any page can open a sandboxed iframe that sends it, so it let third parties post events for every site from their visitors' browsers. Pages that run in an opaque origin (a site's own sandboxed iframes, `file://` previews) are no longer counted.
 - The tracking script no longer sends query parameters other than `utm_*`, and sends only the referrer's scheme and host (so app referrers such as `android-app://` keep their source), so tokens in a URL never leave the browser. The server also drops a query string inside a hash route (`#/reset?token=…`). The script's size budget is 1100 B gzipped (was 1024 B).
 - CSRF protection moved into the router: every dashboard and sign-in route is wrapped in Go's `http.CrossOriginProtection`, which rejects changes a browser marks as cross-origin (`Sec-Fetch-Site`, or an `Origin` that is neither the host nor `PUBLIC_URL`) with `403`. It replaces the per-handler origin checks on `DELETE` and logout, so a new endpoint is protected without remembering to add one. The `application/json` requirement stays as a second layer.
@@ -62,6 +64,8 @@ All notable changes are documented here. The format follows
 - Site names drop bidi overrides, like event names and paths already did, so a name cannot reorder text in the dashboard.
 
 ### Fixed
+- Docker: the health check (in the image and in `docker-compose.yml`) follows `ADDR` when it is set, like the server, instead of always probing `PORT`, so a container listening on another port is no longer reported unhealthy.
+- Docker: `REQUIRE_REPLICA=1` without `LITESTREAM_REPLICA_URL` stops the container with an error instead of quietly starting an unreplicated server.
 - Dashboard: switching a report's tab (or the site) no longer shows the previous tab's rows, clickable, under the new heading while the new ones load. A new period or filter still keeps the old numbers on screen until the new ones arrive.
 - Dashboard: in monthly charts the current month is the one marked "so far" again, also after a 30-day month and in early March (a month was taken as 31 days, which marked the previous month and left the current one undrawn). Buckets now end where the next one starts, so 23- and 25-hour DST days are right too. A chart with a single point shows it as a dot instead of nothing.
 - Dashboard: presets such as "Today" and "Last 7 days" move on at midnight in a tab left open, instead of asking for the old dates.

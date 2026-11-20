@@ -156,8 +156,8 @@ gcloud auth configure-docker <region>-docker.pkg.dev   # once
 make deploy                                            # or: make deploy-server / make deploy-web
 ```
 
-- `deploy` (and `deploy-server` or `deploy-web` on their own) runs the quality gate
-  (`scripts/verify.sh`) once, and refuses to continue unless the working tree is clean (untracked
+- `deploy` (and `deploy-server` or `deploy-web` on their own) runs the quality gate once
+  (`scripts/verify.sh lint go tracker web`: the end-to-end and infra groups are left to CI), and refuses to continue unless the working tree is clean (untracked
   files included), on `main` and identical to `origin/main` (it fetches to compare, so it needs
   the network). `FORCE=1 make deploy` skips those three checks for an emergency fix; the quality
   gate still runs.

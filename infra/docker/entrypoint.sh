@@ -7,6 +7,10 @@
 set -eu
 
 if [ "$#" -eq 0 ] || [ "$1" = "serve" ]; then
+  if [ "${REQUIRE_REPLICA:-0}" = "1" ] && [ -z "${LITESTREAM_REPLICA_URL:-}" ]; then
+    echo "REQUIRE_REPLICA=1 needs LITESTREAM_REPLICA_URL: refusing to start without a replica" >&2
+    exit 1
+  fi
   if [ -n "${LITESTREAM_REPLICA_URL:-}" ]; then
     if [ "${REQUIRE_REPLICA:-0}" = "1" ] && [ ! -f "$DATABASE_PATH" ]; then
       # Fails when the replica has no backup; litestream prints why.

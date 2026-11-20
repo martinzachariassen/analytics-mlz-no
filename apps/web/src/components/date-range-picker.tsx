@@ -87,7 +87,7 @@ export function DateRangePicker({ sc }: { sc: ScopeState }) {
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2 font-medium">
-          <CalendarDays className="text-fg-muted" />
+          <CalendarDays className="text-fg-muted max-[359px]:hidden" />
           <span className="max-w-48 truncate">{label}</span>
           <ChevronDown className="text-fg-muted" />
         </Button>

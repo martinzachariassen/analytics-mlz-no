@@ -238,7 +238,16 @@ been purged or aged out by `RETENTION_DAYS` shows it again until the next event.
   with `aria-current`, and scrolls to the hash, which the router does not.
 - **Every screen has a `PageHeader`**, including "No such site" and the loading fallback, so the
   sidebar can always be opened on a phone. The comparison picker stays in the header on every
-  screen size.
+  screen size; below 768 px (`useIsMobile`) the header's controls move from the title row to the
+  filter row, so the title keeps its width, and wrap under the filter chips when they don't fit.
+  Below 360 px the Filter button shows only its icon and the period picker drops its calendar
+  icon, so the header stays two rows on a 320 px phone.
+- **Sideways-scrolling rows** (`TextTabs`, `SectionNav`) have no scrollbar; `useScrollFade`
+  (`hooks/use-scroll-fade.ts`) fades the edge where more is hidden. A tab scrolls fully into
+  view when picked.
+- **Panel actions wrap**: a `Panel`'s header controls go to their own line when they don't fit
+  next to the title (the event properties panel on a phone). The Goals card drops its
+  Conversions column below `sm`.
 
 **Keyboard.** Single keys (periods, <kbd>X</kbd>, <kbd>D</kbd>) and <kbd>⌘K</kbd> are listed in
 `SHORTCUTS` (`lib/keys.ts`). <kbd>?</kbd>, the ⌘K menu and the user menu open the shortcut help

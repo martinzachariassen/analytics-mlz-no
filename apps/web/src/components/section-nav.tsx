@@ -1,6 +1,7 @@
 import { useEffect } from "react"
 import { Link, useLocation } from "react-router"
 
+import { useScrollFade } from "@/hooks/use-scroll-fade"
 import { cn } from "@/lib/utils"
 
 export type NavSection = { id: string; label: string }
@@ -23,6 +24,8 @@ export function SectionNav({
   const active =
     sections.find((s) => `#${s.id}` === hash)?.id ?? sections[0]?.id
 
+  const fade = useScrollFade<HTMLUListElement>()
+
   useEffect(() => {
     if (!hash || !ready) return
     document.getElementById(hash.slice(1))?.scrollIntoView({ block: "start" })
@@ -33,7 +36,11 @@ export function SectionNav({
       aria-label={label}
       className="sticky top-12 z-10 -mx-4 min-w-0 border-b bg-bg/85 px-4 backdrop-blur-md sm:-mx-6 sm:px-6 lg:top-16 lg:mx-0 lg:self-start lg:border-0 lg:bg-transparent lg:px-0 lg:backdrop-blur-none"
     >
-      <ul className="flex [scrollbar-width:none] gap-1 overflow-x-auto py-2 lg:flex-col lg:py-0">
+      <ul
+        ref={fade.ref}
+        style={fade.style}
+        className="flex [scrollbar-width:none] gap-1 overflow-x-auto py-2 lg:flex-col lg:py-0"
+      >
         {sections.map((s) => (
           <li key={s.id}>
             <Link

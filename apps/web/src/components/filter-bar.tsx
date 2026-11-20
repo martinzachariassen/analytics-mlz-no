@@ -85,7 +85,8 @@ function AddFilter({ sc, compact }: { sc: ScopeState; compact: boolean }) {
           className={cn("h-7 gap-1.5 text-xs", !compact && "px-2.5")}
         >
           <ListFilter className="text-fg-muted" />
-          {compact ? "" : "Filter"}
+          {/* On the narrowest phones the label gives way so the header keeps two rows. */}
+          {compact ? "" : <span className="max-[359px]:sr-only">Filter</span>}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-0">

@@ -65,6 +65,7 @@ All notable changes are documented here. The format follows
 - Site names drop bidi overrides, like event names and paths already did, so a name cannot reorder text in the dashboard.
 
 ### Fixed
+- Dashboard on phones: the period and comparison pickers move to the filter row, so the page title is no longer cut to a few letters; the Goals card shows goal names (it hides the Conversions column on small screens); and the event properties panel's controls wrap instead of running out of the card. Tab rows and the settings section links that scroll sideways fade out where more is hidden, and the top bar stays two rows on a 320 px screen.
 - Dashboard: the ⌘K menu no longer crashes when it opens (the menu had no cmdk root inside its dialog).
 - Dashboard: the comparison can be changed on phones again (the picker was hidden below tablet width), and the quick filter button in lists works on touch screens.
 - Dashboard: metric help in the KPI strip opens on focus and on tap, not only on hover, and is no longer a non-focusable element inside the tile's button.

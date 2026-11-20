@@ -51,12 +51,6 @@ var immutable = []string{"assets/", "fonts/"}
 
 const immutableCache = "public, max-age=31536000, immutable"
 
-// spa maps a path prefix to the page that answers every route under it, longest prefix first.
-var spa = []struct{ prefix, page string }{
-	{"demo", "demo/index.html"},
-	{"", "index.html"},
-}
-
 var contentTypes = map[string]string{
 	".html":  "text/html; charset=utf-8",
 	".js":    "text/javascript; charset=utf-8",
@@ -100,10 +94,7 @@ func Handler(fsys fs.FS) http.Handler {
 				httpx.Error(w, http.StatusNotFound, "not found")
 				return
 			}
-			f = files[page(name)]
-			if f == nil {
-				f = files["index.html"]
-			}
+			f = files["index.html"]
 		}
 		h := w.Header()
 		for _, kv := range headers {
@@ -161,14 +152,4 @@ func hashed(name string) bool {
 		}
 	}
 	return false
-}
-
-// page returns the single-page app's page for a route that is not a file.
-func page(name string) string {
-	for _, s := range spa {
-		if s.prefix == "" || name == s.prefix || strings.HasPrefix(name, s.prefix+"/") {
-			return s.page
-		}
-	}
-	return "index.html"
 }

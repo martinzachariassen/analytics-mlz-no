@@ -41,7 +41,6 @@
 - [Backend (Go)](development/backend.md)
 - [Dashboard (React)](development/dashboard.md)
 - [Colours](development/colours.md): what each colour means, the palette, and how to change it
-- [Public demo](development/demo.md): the `/demo/` build that runs the dashboard on generated data in the browser
 - [Tracking script (TypeScript)](development/tracker.md)
 - [Releasing](development/releasing.md)
 

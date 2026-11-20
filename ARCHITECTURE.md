@@ -139,11 +139,6 @@ React 19, Vite, Tailwind v4, shadcn/ui, TanStack Query and React Router. `src/ma
 routes, `src/lib/api.ts` the typed API client, and `src/lib/use-scope.ts` the URL-held view state.
 See [docs/development/dashboard.md](docs/development/dashboard.md).
 
-`src/demo/` is only in the public demo build (`vite build --mode demo`, served at `/demo/`): it
-generates traffic for a fictional company in a Web Worker and answers `/api` in the browser with a
-TypeScript copy of the read API, held to the Go API's answers by a golden test. See
-[docs/development/demo.md](docs/development/demo.md).
-
 ### Everything else
 
 | Path | What |

@@ -16,7 +16,6 @@
       "biome.json",
       "package.json",
       "!apps/web/src/components/ui",
-      "!apps/web/src/demo/testdata",
       "!apps/web/components.json"
     ]
   },

@@ -459,13 +459,17 @@ test("the real tracking script records a page view and an event", async ({
   await page.goto(`${origin}${path}`)
   expect((await sent).status()).toBe(202)
 
+  const today = new Date().toISOString().slice(0, 10)
+  // Realtime lists only the top 10 pages, which the seeded traffic already fills.
   await expect
     .poll(
       async () => {
-        const rt = await (
-          await page.request.get(`/api/sites/${blog.id}/realtime?detail=1`)
+        const rows = await (
+          await page.request.get(
+            `/api/sites/${blog.id}/breakdown?dim=path&from=${today}&to=${today}&tz=UTC&limit=100`
+          )
         ).json()
-        return (rt.pages ?? []).map((p: { value: string }) => p.value)
+        return rows.map((r: { value: string }) => r.value)
       },
       { timeout: 15_000 }
     )
@@ -476,7 +480,6 @@ test("the real tracking script records a page view and an event", async ({
   )
   await page.getByRole("button", { name: "Sign up" }).click()
   expect((await clicked).status()).toBe(202)
-  const today = new Date().toISOString().slice(0, 10)
   await expect
     .poll(
       async () => {

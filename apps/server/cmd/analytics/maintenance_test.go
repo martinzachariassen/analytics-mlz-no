@@ -85,3 +85,44 @@ func TestUntilNextRun(t *testing.T) {
 		}
 	}
 }
+
+func TestMaintainLogsFailuresAndKeepsGoing(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "m.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	log := slog.New(slog.NewTextHandler(&out, nil))
+
+	maintain(ctx, st, 30, time.Date(2026, 11, 12, 12, 0, 0, 0, time.UTC), log)
+
+	for _, step := range []string{"salt rotation", "expired session cleanup", "retention cleanup"} {
+		if !bytes.Contains(out.Bytes(), []byte(step)) {
+			t.Errorf("a failing %q step was not logged:\n%s", step, out.String())
+		}
+	}
+}
+
+func TestMaintenanceLoopStopsWhenCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "m.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = st.Close() }()
+	done := make(chan struct{})
+	go func() {
+		maintenanceLoop(ctx, st, 0, slog.New(slog.NewTextHandler(io.Discard, nil)))
+		close(done)
+	}()
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("maintenanceLoop kept running after its context was cancelled")
+	}
+}

@@ -78,12 +78,15 @@ Open <http://localhost:5173> and click **Open demo dashboard**.
 | **Locations** | Countries and a world map | |
 | **Devices** | Device type, browser, operating system | |
 | **Events** | Custom events and their properties | |
-| **Settings** | Site name, domain, tracking snippet, delete | |
+| **Settings** | Tracking snippet, tracking pixel, goals, site name and domain, delete site | |
 
 > [!TIP]
 > Everything you choose (period, comparison, interval, filters, an open detail sheet) is stored
 > in the URL, so you can bookmark or share any view. Press <kbd>⌘K</kbd> or <kbd>Ctrl+K</kbd> to
-> jump between sites and views.
+> jump between sites and views. Single keys change the period (<kbd>T</kbd> today, <kbd>Y</kbd>
+> yesterday, <kbd>7</kbd>, <kbd>3</kbd> for 30 days, <kbd>M</kbd> this month, <kbd>L</kbd> last month,
+> <kbd>A</kbd> 12 months), <kbd>X</kbd> toggles the comparison, <kbd>D</kbd> the theme and
+> <kbd>⌘B</kbd> the sidebar; <kbd>?</kbd> lists them all.
 
 ## 4. Send real events
 

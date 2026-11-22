@@ -1,6 +1,6 @@
 # Tracker development
 
-> **TL;DR** — The tracking script is under 200 lines of TypeScript in `apps/tracker/src`.
+> **TL;DR** — The tracking script is about 230 lines of TypeScript in `apps/tracker/src`.
 > `core.ts` has the logic and `index.ts` reads the `<script>` tag. `make tracker` bundles it
 > with esbuild into `apps/server/internal/script/script.js`. That file is committed and embedded
 > in the Go binary, and CI fails if it is out of date. Keep it under 1100 B gzipped.

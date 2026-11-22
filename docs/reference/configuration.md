@@ -23,7 +23,7 @@ Read by `apps/server/internal/config/config.go`, except `LITESTREAM_REPLICA_URL`
 | `INGEST_RATE_LIMIT` | `200` | Max accepted events per second across all clients. Extra events get `503` (0 = no global limit) |
 | `MAX_DATABASE_MB` | `0` | Pause ingestion (`503`) while the database is larger than this. The dashboard keeps working (0 = no limit) |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. `debug` also logs every event dropped by rate limits or bot filtering |
-| `PUBLIC_URL` | `http://localhost:8080` | Dashboard URL. Used for the OAuth callback and as the only origin allowed to log out or delete sites. Must be an origin with no path. Must be `https://` when GitHub sign-in is on (localhost excepted); https also turns on Secure cookies and HSTS |
+| `PUBLIC_URL` | `http://localhost:8080` | Dashboard URL. Used for the OAuth callback and as the only origin allowed to make changes (every `POST`, `PATCH` and `DELETE` on the dashboard API and `/api/auth/*`). Must be an origin with no path. Must be `https://` when GitHub sign-in is on (localhost excepted); https also turns on Secure cookies and HSTS |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | – | GitHub OAuth App credentials. Setting the id turns on sign-in |
 | `ALLOWED_GITHUB_USERS` | – | Comma-separated GitHub usernames allowed to sign in. Checked on every request: removing a name signs that user out |
 | `LITESTREAM_REPLICA_URL` | – | Docker image only: continuous backup, e.g. `gs://bucket/analytics` or `s3://bucket/analytics`. S3 needs `LITESTREAM_ACCESS_KEY_ID` and `LITESTREAM_SECRET_ACCESS_KEY` (or the `AWS_*` variables); GCS outside Google Cloud needs `GOOGLE_APPLICATION_CREDENTIALS` pointing at a mounted service-account key |
@@ -59,7 +59,7 @@ starting empty, and the backup job fails (and alerts) instead of reporting "noth
 Change `replica_path` only when restoring from a backup file; see
 [the runbook](../operations/runbook.md#restore-the-database-from-a-backup).
 
-Other variables only affect infrastructure: `region`, `scheduler_region`, `service_name`,
+Other variables only affect infrastructure: `project_id` (required), `region`, `scheduler_region`, `service_name`,
 `extra_domains`, `alert_email`, `backup_hourly_retention_days`, `backup_daily_retention_days` and
 `github_repository` (`owner/name`; lets that repository's `production` environment deploy from
 GitHub Actions, empty by default).

@@ -3,7 +3,7 @@
 > **TL;DR** — Four public endpoints: `POST /api/event` (the tracker), `GET /api/pixel.gif` (the
 > tracking pixel, for sites that turn it on), `GET /api/script.js` and `GET /healthz`. Everything under `/api/sites` needs the `__session` cookie from signing in. It
 > returns sites and statistics as JSON for a date range, a time zone and optional filters.
-> Errors are `{"error": "message"}`. Changes from another origin are rejected with `403`
+> Errors are `{"error": "message"}`, except from `POST /api/event` and `GET /api/pixel.gif`, which answer in plain text. Changes from another origin are rejected with `403`
 > (CSRF protection), and requests with a body must send `Content-Type: application/json`.
 
 **Read this if:** you are building on the API, debugging the dashboard, or want to know what a
@@ -55,10 +55,11 @@ These apply to every endpoint under `/api/sites` and `/api/auth`:
 | A session cookie is present and its user is still on the allowlist | `401` |
 
 The cross-origin check is the CSRF protection (Go's `http.CrossOriginProtection`). The JSON
-content type is a second layer: a foreign HTML form cannot send it. Every response also carries `X-Content-Type-Options: nosniff`,
+content type is a second layer: a foreign HTML form cannot send it. Every API and script response also carries `X-Content-Type-Options: nosniff`,
 `Referrer-Policy: no-referrer`, a deny-all `Content-Security-Policy`, `X-Frame-Options: DENY` and,
 when `PUBLIC_URL` is https, `Strict-Transport-Security`. The server sets these itself, so the
-direct Cloud Run URL and self-hosted instances get them without a proxy.
+direct Cloud Run URL and self-hosted instances get them without a proxy. The embedded dashboard's files carry
+`Referrer-Policy: strict-origin-when-cross-origin` and a `Content-Security-Policy` that allows the dashboard's own assets (`internal/web`).
 
 ## Public
 
@@ -102,6 +103,7 @@ host are kept; the tracker already sends nothing else. Unknown fields are ignore
 | `400` | Unknown site, foreign host or origin, missing or `null` `Origin`, invalid payload. |
 | `413` | Body over 8 KB. |
 | `429` | Too many requests from one client IP (10/s, burst 30), or from one upstream address. |
+| `500` | Internal error (the event could not be built or stored). |
 | `503` | Server is shedding load: over `INGEST_RATE_LIMIT`, write queue full, or the database is over `MAX_DATABASE_MB`. Sent with `Retry-After`. The tracker does not retry. |
 
 Control characters and bidi overrides are stripped from stored text, and referrers that are not
@@ -256,7 +258,7 @@ Filters (at most 10):
 
 - `dim` is one of `path`, `hostname`, `entry`, `exit`, `referrer`, `utm_source`,
   `utm_medium`, `utm_campaign`, `country`, `browser`, `os`, `device`, `event`.
-- `op` is `is`, `is_not` or `contains` (case-sensitive substring; the value may contain `:`).
+- `op` is `is`, `is_not` or `contains` (substring, case-insensitive for ASCII letters; `is` and `is_not` match exactly; the value may contain `:`).
 - How a filter applies depends on the dimension:
   - **Visitor dimensions** (`country`, `browser`, `os`, `device`) are constant within a visit.
   - **Page dimensions** (`path`, `hostname`) narrow page views to that page, and narrow

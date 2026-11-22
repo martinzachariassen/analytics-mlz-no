@@ -30,6 +30,11 @@ func setup(t *testing.T) (http.Handler, *http.Cookie) {
 
 func setupWithStore(t *testing.T) (http.Handler, *http.Cookie, *store.Store) {
 	t.Helper()
+	return setupWithConfig(t, config.Config{PublicURL: publicURL})
+}
+
+func setupWithConfig(t *testing.T, cfg config.Config) (http.Handler, *http.Cookie, *store.Store) {
+	t.Helper()
 	ctx := context.Background()
 	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "server.db"))
 	if err != nil {
@@ -51,7 +56,7 @@ func setupWithStore(t *testing.T) (http.Handler, *http.Cookie, *store.Store) {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	loc, _ := geo.Open("")
 	authn := &auth.Service{Store: st, PublicURL: publicURL, Allowed: []string{"martin"}, Log: log}
-	h := New(config.Config{PublicURL: publicURL}, st, authn, loc, log)
+	h := New(cfg, st, authn, loc, log)
 	return h, &http.Cookie{Name: auth.CookieName, Value: token}, st
 }
 
@@ -233,13 +238,19 @@ func TestStatsEndpoints(t *testing.T) {
 		"bad filter":      base + "/stats?f=country",
 		"bad filter dim":  base + "/stats?f=password:is:x",
 		"too many filter": base + "/stats?" + strings.Repeat("f=path:is:/x&", 11),
+		"bad to":          base + "/stats?from=2026-11-01&to=03.11.2026",
+		"daily too long":  base + "/stats?interval=day&from=2025-01-01&to=2026-02-05",
+		"heatmap bad tz":  base + "/heatmap?tz=Mars/Olympus",
+		"heatmap filter":  base + "/heatmap?f=password:is:x",
+		"goals bad tz":    base + "/goals/stats?tz=Mars/Olympus",
+		"goals compare":   base + "/goals/stats?compare=decade",
 	}
 	for name, path := range bad {
 		if w := call(h, "GET", path, "", c, ""); w.Code != http.StatusBadRequest {
 			t.Errorf("%s: %d, want 400 (%s)", name, w.Code, w.Body)
 		}
 	}
-	for _, path := range []string{"/stats", "/breakdown?dim=path", "/heatmap", "/realtime", ""} {
+	for _, path := range []string{"/stats", "/breakdown?dim=path", "/heatmap", "/realtime", "/export?what=timeseries", "/goals", "/goals/stats", ""} {
 		if w := call(h, "GET", "/api/sites/unknownsite"+path, "", c, ""); w.Code != http.StatusNotFound {
 			t.Errorf("unknown site %q = %d, want 404", path, w.Code)
 		}
@@ -504,5 +515,171 @@ func TestExportEndpoint(t *testing.T) {
 	}
 	if w := call(h, "GET", "/api/sites/nope/export?what=timeseries", "", c, ""); w.Code != http.StatusNotFound {
 		t.Fatalf("export of unknown site = %d, want 404", w.Code)
+	}
+}
+
+// createSite creates a site through the API and returns its id.
+func createSite(t *testing.T, h http.Handler, c *http.Cookie, body string) string {
+	t.Helper()
+	w := call(h, "POST", "/api/sites", body, c, "application/json")
+	var site struct{ ID string }
+	if err := json.Unmarshal(w.Body.Bytes(), &site); w.Code != http.StatusCreated || err != nil {
+		t.Fatalf("create %s = %d %s", body, w.Code, w.Body)
+	}
+	return site.ID
+}
+
+func TestSiteEdgeCases(t *testing.T) {
+	h, c := setup(t)
+	const js = "application/json"
+	id := createSite(t, h, c, `{"name":"Blog","domain":"mlz.no"}`)
+	createSite(t, h, c, `{"domain":"other.no"}`)
+	one := "/api/sites/" + id
+
+	for _, tc := range []struct {
+		name, method, path, body, ct string
+		want                         int
+	}{
+		{"patch to a taken domain", "PATCH", one, `{"domain":"other.no"}`, js, http.StatusConflict},
+		{"patch to an invalid domain", "PATCH", one, `{"domain":"no"}`, js, http.StatusBadRequest},
+		{"patch invalid json", "PATCH", one, `{`, js, http.StatusBadRequest},
+		{"patch text/plain", "PATCH", one, `{"name":"x"}`, "text/plain", http.StatusBadRequest},
+		{"patch pixel on unknown site", "PATCH", "/api/sites/nope", `{"pixel_enabled":true}`, js, http.StatusNotFound},
+		{"delete unknown site", "DELETE", "/api/sites/nope", "", "", http.StatusNotFound},
+		{"create invalid json", "POST", "/api/sites", `{"domain":`, js, http.StatusBadRequest},
+		{"wrong method", "PUT", "/api/sites", `{}`, js, http.StatusMethodNotAllowed},
+	} {
+		if w := call(h, tc.method, tc.path, tc.body, c, tc.ct); w.Code != tc.want {
+			t.Errorf("%s = %d, want %d (%s)", tc.name, w.Code, tc.want, w.Body)
+		}
+	}
+
+	var got struct{ ID, Name, Domain string }
+	w := call(h, "GET", one, "", c, "")
+	if err := json.Unmarshal(w.Body.Bytes(), &got); w.Code != http.StatusOK || err != nil || got.ID != id || got.Name != "Blog" || got.Domain != "mlz.no" {
+		t.Fatalf("get = %d %s; rejected updates must leave the site unchanged", w.Code, w.Body)
+	}
+
+	// An empty body keeps the domain and resets the name to it (docs/reference/api.md).
+	w = call(h, "PATCH", one, `{}`, c, js)
+	if err := json.Unmarshal(w.Body.Bytes(), &got); w.Code != http.StatusOK || err != nil || got.Domain != "mlz.no" || got.Name != "mlz.no" {
+		t.Fatalf("empty patch = %d %s", w.Code, w.Body)
+	}
+
+	w = call(h, "PATCH", one, `{"name":"  A\u0007B `+strings.Repeat("x", 200)+`"}`, c, js)
+	if err := json.Unmarshal(w.Body.Bytes(), &got); w.Code != http.StatusOK || err != nil ||
+		!strings.HasPrefix(got.Name, "AB x") || len([]rune(got.Name)) > 100 {
+		t.Fatalf("long name = %d %q; want cleaned and at most 100 characters", w.Code, got.Name)
+	}
+}
+
+func TestPurgeEdgeCases(t *testing.T) {
+	h, c, st := setupWithStore(t)
+	ctx := context.Background()
+	const js = "application/json"
+	site, _ := st.CreateSite(ctx, "", "mlz.no")
+	other, _ := st.CreateSite(ctx, "", "other.no")
+	day := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	for _, e := range []struct {
+		site, path string
+		at         time.Time
+	}{
+		{site.ID, "/spam", day}, {site.ID, "/spam", day.Add(time.Hour)},
+		{site.ID, "/keep", day},
+		{site.ID, "/spam", day.AddDate(0, 0, 2)}, // outside the range
+		{other.ID, "/spam", day},
+	} {
+		if err := st.InsertEvent(ctx, store.Event{SiteID: e.site, Time: e.at, Type: "pageview", Hostname: "mlz.no", Path: e.path}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	base := "/api/sites/" + site.ID + "/purge"
+
+	for name, tc := range map[string]struct {
+		path, body, ct string
+		want           int
+	}{
+		"missing from": {base, `{"to":"2026-11-02T00:00:00Z"}`, js, http.StatusBadRequest},
+		"missing to":   {base, `{"from":"2026-11-01T00:00:00Z"}`, js, http.StatusBadRequest},
+		"empty range":  {base, `{"from":"2026-11-01T00:00:00Z","to":"2026-11-01T00:00:00Z"}`, js, http.StatusBadRequest},
+		"not rfc 3339": {base, `{"from":"2026-11-01","to":"2026-11-02"}`, js, http.StatusBadRequest},
+		"invalid json": {base, `{`, js, http.StatusBadRequest},
+		"text/plain":   {base, `{"from":"2026-11-01T00:00:00Z","to":"2026-11-02T00:00:00Z"}`, "text/plain", http.StatusBadRequest},
+		"unknown site": {"/api/sites/nope/purge", `{"from":"2026-11-01T00:00:00Z","to":"2026-11-02T00:00:00Z"}`, js, http.StatusNotFound},
+	} {
+		if w := call(h, "POST", tc.path, tc.body, c, tc.ct); w.Code != tc.want {
+			t.Errorf("%s = %d, want %d (%s)", name, w.Code, tc.want, w.Body)
+		}
+	}
+
+	w := call(h, "POST", base, `{"from":"2026-11-01T00:00:00Z","to":"2026-11-02T00:00:00Z","path":"/spam"}`, c, js)
+	if w.Code != http.StatusOK || w.Body.String() != `{"deleted":2}`+"\n" {
+		t.Fatalf("purge = %d %q, want 2 deleted", w.Code, w.Body)
+	}
+	all := store.Range{From: day.AddDate(0, 0, -1), To: day.AddDate(0, 0, 5)}
+	for id, want := range map[string]int64{site.ID: 2, other.ID: 1} {
+		sum, err := st.Summary(ctx, id, all, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if sum.Pageviews != want {
+			t.Errorf("site %s has %d pageviews after purge, want %d", id, sum.Pageviews, want)
+		}
+	}
+}
+
+func TestGoalEdgeCases(t *testing.T) {
+	h, c := setup(t)
+	const js = "application/json"
+	id := createSite(t, h, c, `{"domain":"mlz.no"}`)
+	otherID := createSite(t, h, c, `{"domain":"other.no"}`)
+	base := "/api/sites/" + id + "/goals"
+
+	if w := call(h, "GET", base+"/stats?from=2026-11-01", "", c, ""); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"goals":[]`) {
+		t.Fatalf("stats without goals = %d %s", w.Code, w.Body)
+	}
+	for _, body := range []string{`{"kind":"event","value":""}`, `{"kind":"event","value":"   "}`, `{"kind":"path","value":""}`, `{"value":"x"}`} {
+		if w := call(h, "POST", base, body, c, js); w.Code != http.StatusBadRequest {
+			t.Errorf("POST %s = %d, want 400", body, w.Code)
+		}
+	}
+
+	w := call(h, "POST", "/api/sites/"+otherID+"/goals", `{"kind":"event","value":"theirs"}`, c, js)
+	var theirs struct{ ID int64 }
+	if err := json.Unmarshal(w.Body.Bytes(), &theirs); w.Code != http.StatusCreated || err != nil {
+		t.Fatalf("create = %d %s", w.Code, w.Body)
+	}
+	if w := call(h, "DELETE", base+"/"+strconv.FormatInt(theirs.ID, 10), "", c, ""); w.Code != http.StatusNotFound {
+		t.Fatalf("delete another site's goal = %d, want 404", w.Code)
+	}
+	if w := call(h, "GET", "/api/sites/"+otherID+"/goals", "", c, ""); !strings.Contains(w.Body.String(), `"theirs"`) {
+		t.Fatalf("the other site's goal is gone: %s", w.Body)
+	}
+
+	for i := range store.MaxGoals {
+		if w := call(h, "POST", base, `{"kind":"event","value":"e`+strconv.Itoa(i)+`"}`, c, js); w.Code != http.StatusCreated {
+			t.Fatalf("goal %d = %d %s", i, w.Code, w.Body)
+		}
+	}
+	if w := call(h, "POST", base, `{"kind":"event","value":"one-too-many"}`, c, js); w.Code != http.StatusBadRequest {
+		t.Fatalf("goal over the limit = %d, want 400", w.Code)
+	}
+}
+
+func TestIngestRateIsWired(t *testing.T) {
+	h, _, st := setupWithConfig(t, config.Config{PublicURL: publicURL, IngestRate: 1})
+	site, _ := st.CreateSite(context.Background(), "", "mlz.no")
+	codes := make([]int, 3)
+	for i := range codes {
+		req := httptest.NewRequest(http.MethodPost, "/api/event", strings.NewReader(`{"site":"`+site.ID+`","url":"https://mlz.no/"}`))
+		req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36")
+		req.Header.Set("Origin", "https://mlz.no")
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+		codes[i] = w.Code
+	}
+	// INGEST_RATE=1 allows a burst of 2.
+	if codes[0] != http.StatusAccepted || codes[1] != http.StatusAccepted || codes[2] != http.StatusServiceUnavailable {
+		t.Fatalf("codes = %v, want [202 202 503]", codes)
 	}
 }

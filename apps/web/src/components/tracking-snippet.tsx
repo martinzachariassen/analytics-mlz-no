@@ -76,13 +76,20 @@ export function TrackingSnippet({ siteId }: { siteId: string }) {
           are tracked automatically. The script sets no cookies.
         </p>
       </div>
-      <div className="flex flex-col gap-2">
-        <p>Track custom events with an attribute or from JavaScript:</p>
-        <CodeBlock
-          code={`<button data-mlz-event="signup" data-mlz-event-plan="pro">Sign up</button>`}
-        />
-        <CodeBlock code={`window.mlz?.track("signup", { plan: "pro" })`} />
-      </div>
+      <EventSnippets />
+    </div>
+  )
+}
+
+/** How to send custom events, for settings, onboarding and the empty Events view. */
+export function EventSnippets() {
+  return (
+    <div className="flex flex-col gap-2 text-sm">
+      <p>Track custom events with an attribute or from JavaScript:</p>
+      <CodeBlock
+        code={`<button data-mlz-event="signup" data-mlz-event-plan="pro">Sign up</button>`}
+      />
+      <CodeBlock code={`window.mlz?.track("signup", { plan: "pro" })`} />
     </div>
   )
 }

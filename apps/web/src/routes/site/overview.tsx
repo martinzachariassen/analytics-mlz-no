@@ -1,5 +1,5 @@
-import { lazy, Suspense } from "react"
-import { useSearchParams } from "react-router"
+import { lazy, type ReactNode, Suspense, useId } from "react"
+
 import { IntervalSelect } from "@/components/date-range-picker"
 import { ErrorNote } from "@/components/error-note"
 import { ExportLink } from "@/components/export-link"
@@ -13,7 +13,7 @@ import { ReportCard } from "@/components/report-card"
 import { LegendItem, TrafficChart } from "@/components/traffic-chart"
 import { Skeleton } from "@/components/ui/skeleton"
 import { exportUrl } from "@/lib/api"
-import { isMetric, METRIC, type MetricKey } from "@/lib/metrics"
+import { METRIC, useMetricParam } from "@/lib/metrics"
 import { formatRange } from "@/lib/period"
 import { useBreakdown, useStats } from "@/lib/queries"
 import { useScope } from "@/lib/use-scope"
@@ -22,19 +22,15 @@ const WorldMap = lazy(() =>
   import("@/components/world-map").then((m) => ({ default: m.WorldMap }))
 )
 
-/** The overview: headline numbers, the main chart and a dense grid of reports. */
+/**
+ * The overview: headline numbers and the main chart, then the reports grouped by the
+ * question they answer, most actionable first.
+ */
 export function OverviewPage() {
   const sc = useScope()
-  const [params] = useSearchParams()
-  const m = params.get("metric")
-  const metric: MetricKey = isMetric(m) ? m : "visitors"
+  const [metric, setMetric] = useMetricParam()
   const stats = useStats(sc.siteId, sc.scope, sc.interval)
   const total = stats.data?.summary.visitors
-  const setMetric = (k: MetricKey) =>
-    sc.updateParams((q) => {
-      if (k === "visitors") q.delete("metric")
-      else q.set("metric", k)
-    })
 
   return (
     <div className="flex flex-col gap-3 lg:gap-4">
@@ -76,8 +72,9 @@ export function OverviewPage() {
         />
       </Panel>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12 lg:gap-4">
+      <Section title="Content and acquisition">
         <ReportCard
+          id="pages"
           title="Pages"
           className="lg:col-span-6"
           total={total}
@@ -88,6 +85,7 @@ export function OverviewPage() {
           ]}
         />
         <ReportCard
+          id="sources"
           title="Sources"
           className="lg:col-span-6"
           total={total}
@@ -98,31 +96,58 @@ export function OverviewPage() {
             { dim: "utm_campaign", label: "Campaign" },
           ]}
         />
+      </Section>
+
+      <Section title="Conversions">
+        <GoalsCard className="lg:col-span-7" />
+        <ReportCard
+          id="events"
+          title="Custom events"
+          className="lg:col-span-5"
+          total={total}
+          tabs={[{ dim: "event", label: "Custom events" }]}
+        />
+      </Section>
+
+      <Section title="Audience">
         <MapCard className="lg:col-span-8" total={total} />
         <ReportCard
+          id="countries"
           title="Countries"
           className="lg:col-span-4"
           total={total}
           rows={10}
           tabs={[{ dim: "country" }]}
         />
-        <ActiveHours className="lg:col-span-7" />
+      </Section>
+
+      <Section title="Technology and time">
         <DevicesCard className="lg:col-span-5" total={total} />
         <ReportCard
+          id="tech"
           title="Browsers & OS"
-          className="lg:col-span-6"
+          className="lg:col-span-7"
           total={total}
           tabs={[{ dim: "browser" }, { dim: "os", label: "OS" }]}
         />
-        <ReportCard
-          title="Events"
-          className="lg:col-span-6"
-          total={total}
-          tabs={[{ dim: "event", label: "Custom events" }]}
-        />
-        <GoalsCard className="lg:col-span-12" />
-      </div>
+        <ActiveHours className="lg:col-span-12" />
+      </Section>
     </div>
+  )
+}
+
+/** A labelled group of panels on a 12-column grid. */
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  const id = useId()
+  return (
+    <section aria-labelledby={id} className="flex flex-col gap-2 pt-2 lg:pt-4">
+      <h2 id={id} className="eyebrow px-1">
+        {title}
+      </h2>
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12 lg:gap-4">
+        {children}
+      </div>
+    </section>
   )
 }
 
@@ -170,6 +195,7 @@ function DevicesCard({
   const q = useBreakdown(sc.siteId, sc.scope, "device", { limit: 8 })
   return (
     <ReportCard
+      id="devices"
       title="Devices"
       className={className}
       total={total}

@@ -1,13 +1,14 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { formatDistanceToNow } from "date-fns"
-import { CircleCheck, LoaderCircle } from "lucide-react"
-import { type FormEvent, useState } from "react"
-import { Link, useNavigate, useParams, useSearchParams } from "react-router"
+import { LoaderCircle } from "lucide-react"
+import { type FormEvent, type ReactNode, useState } from "react"
+import { useNavigate, useParams } from "react-router"
 import { toast } from "sonner"
 
 import { ErrorNote } from "@/components/error-note"
 import { GoalsSettings } from "@/components/goals-settings"
 import { PixelSettings } from "@/components/pixel-settings"
+import { type NavSection, SectionNav } from "@/components/section-nav"
 import { TrackingSnippet } from "@/components/tracking-snippet"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
@@ -35,80 +36,109 @@ import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { api, type Site } from "@/lib/api"
 import { useSite } from "@/lib/queries"
+import { cn } from "@/lib/utils"
 
 export function SettingsPage() {
   const { id = "" } = useParams()
-  const [params] = useSearchParams()
   // Live, so "Last event … ago" stays current while the page is open.
   const site = useSite(id, { live: true })
+  const sections: NavSection[] = [
+    { id: "tracking", label: "Tracking code" },
+    { id: "pixel", label: "Tracking pixel" },
+    { id: "goals", label: "Goals" },
+    { id: "general", label: "General" },
+    { id: "danger", label: "Delete site" },
+  ]
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-4 sm:p-6 lg:py-10">
-      {site.data && (
-        <SetupStatus site={site.data} isNew={params.get("new") !== null} />
-      )}
+    <div className="mx-auto grid w-full max-w-4xl grid-cols-[minmax(0,1fr)] gap-6 p-4 sm:p-6 lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-10 lg:py-10">
+      <SectionNav sections={sections} label="Settings" ready={!!site.data} />
+      <div className="flex min-w-0 flex-col gap-6">
+        {site.data && <SetupStatus site={site.data} />}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Tracking code</CardTitle>
-          {site.data?.last_event_at && (
-            <CardDescription>
-              Last event{" "}
-              <time dateTime={site.data.last_event_at}>
-                {formatDistanceToNow(site.data.last_event_at, {
-                  addSuffix: true,
-                })}
-              </time>
-            </CardDescription>
+        <Section id="tracking">
+          <Card>
+            <CardHeader>
+              <CardTitle>Tracking code</CardTitle>
+              {site.data?.last_event_at && (
+                <CardDescription>
+                  Last event{" "}
+                  <time dateTime={site.data.last_event_at}>
+                    {formatDistanceToNow(site.data.last_event_at, {
+                      addSuffix: true,
+                    })}
+                  </time>
+                </CardDescription>
+              )}
+            </CardHeader>
+            <CardContent>
+              <TrackingSnippet siteId={site.data?.id ?? id} />
+            </CardContent>
+          </Card>
+        </Section>
+
+        <Section id="pixel">
+          {site.data ? (
+            <PixelSettings site={site.data} />
+          ) : (
+            <Skeleton className="h-40" />
           )}
-        </CardHeader>
-        <CardContent>
-          <TrackingSnippet siteId={site.data?.id ?? id} />
-        </CardContent>
-      </Card>
+        </Section>
 
-      {site.data && <PixelSettings site={site.data} />}
+        <Section id="goals">
+          {site.data ? (
+            <GoalsSettings siteId={site.data.id} />
+          ) : (
+            <Skeleton className="h-40" />
+          )}
+        </Section>
 
-      {site.data ? (
-        <GeneralForm key={site.data.id} site={site.data} />
-      ) : site.isError ? (
-        <ErrorNote queries={[site]} />
-      ) : (
-        <Skeleton className="h-56" />
-      )}
-      {site.data && <GoalsSettings siteId={site.data.id} />}
-      {site.data && <DangerZone id={id} name={site.data.name} />}
+        <Section id="general">
+          {site.data ? (
+            <GeneralForm key={site.data.id} site={site.data} />
+          ) : site.isError ? (
+            <ErrorNote queries={[site]} />
+          ) : (
+            <Skeleton className="h-56" />
+          )}
+        </Section>
+
+        {site.data && (
+          <Section id="danger" className="mt-6 border-t pt-8">
+            <DangerZone id={id} name={site.data.name} />
+          </Section>
+        )}
+      </div>
     </div>
   )
 }
 
-/**
- * Onboarding status: waiting until the first event arrives (useSite polls meanwhile),
- * then, for a site that was just added, a way on to the dashboard.
- */
-function SetupStatus({ site, isNew }: { site: Site; isNew: boolean }) {
-  if (site.first_event_at === null)
-    return (
-      <Alert role="status">
-        <LoaderCircle className="text-violet motion-safe:animate-spin" />
-        <AlertTitle>
-          {isNew ? "Site added. " : ""}Waiting for the first event…
-        </AlertTitle>
-        <AlertDescription>
-          Add the snippet below to every page on {site.domain} and open the site
-          in a browser. This updates by itself.
-        </AlertDescription>
-      </Alert>
-    )
-  if (!isNew) return null
+function Section({
+  id,
+  className,
+  children,
+}: {
+  id: string
+  className?: string
+  children: ReactNode
+}) {
+  return (
+    <section id={id} className={cn("scroll-mt-28 lg:scroll-mt-20", className)}>
+      {children}
+    </section>
+  )
+}
+
+/** Until the first event arrives (useSite polls meanwhile), says what is missing. */
+function SetupStatus({ site }: { site: Site }) {
+  if (site.first_event_at !== null) return null
   return (
     <Alert role="status">
-      <CircleCheck className="text-positive" />
-      <AlertTitle>Receiving data</AlertTitle>
+      <LoaderCircle className="text-violet motion-safe:animate-spin" />
+      <AlertTitle>Waiting for the first event…</AlertTitle>
       <AlertDescription>
-        <Link to={`/sites/${site.id}`} className="text-accent-deep underline">
-          Open the dashboard
-        </Link>
+        Add the snippet below to every page on {site.domain} and open the site
+        in a browser. This updates by itself.
       </AlertDescription>
     </Alert>
   )

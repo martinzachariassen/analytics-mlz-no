@@ -8,6 +8,26 @@ import {
   type Site,
 } from "@/lib/api"
 
+/** The signed-in user. */
+export function useMe() {
+  return useQuery({ queryKey: ["me"], queryFn: api.me })
+}
+
+/** How often the realtime numbers refresh. */
+export const REALTIME_POLL_MS = 10_000
+
+/**
+ * Live visitors, shared by the sidebar badge and the Realtime page so one poll serves both.
+ * `detail` adds the per-minute series and the top lists, which only the Realtime page shows.
+ */
+export function useRealtime(siteId: string, detail = false) {
+  return useQuery({
+    queryKey: ["realtime", siteId, detail ? "detail" : "count"],
+    queryFn: () => api.realtime(siteId, detail),
+    refetchInterval: detail ? REALTIME_POLL_MS : 15_000,
+  })
+}
+
 /** How often a site waiting for its first event is re-fetched right after it was added. */
 export const WAITING_POLL_MS = 5_000
 /** The interval for a site that has waited longer than FAST_POLL_FOR_MS, and for "live" views. */

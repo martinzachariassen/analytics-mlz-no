@@ -1,7 +1,8 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQueryClient } from "@tanstack/react-query"
 import {
   Activity,
   ChevronsUpDown,
+  CircleHelp,
   FileText,
   LayoutDashboard,
   LayoutGrid,
@@ -47,7 +48,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 import { api, type User } from "@/lib/api"
-import { useSites } from "@/lib/queries"
+import { useRealtime, useSites } from "@/lib/queries"
 import { useScope } from "@/lib/use-scope"
 
 export type View = { path: string; label: string; icon: LucideIcon }
@@ -66,9 +67,11 @@ export const VIEWS: View[] = [
 export function AppSidebar({
   user,
   onSearch,
+  onShortcuts,
 }: {
   user: User
   onSearch: () => void
+  onShortcuts: () => void
 }) {
   const { id } = useParams()
   const { pathname } = useLocation()
@@ -116,7 +119,9 @@ export function AppSidebar({
                         <span>{v.label}</span>
                       </Link>
                     </SidebarMenuButton>
-                    {v.path === "realtime" && <LiveBadge siteId={id} />}
+                    {v.path === "realtime" && (
+                      <LiveBadge siteId={id} onPage={sub === "realtime"} />
+                    )}
                   </SidebarMenuItem>
                 ))}
               </SidebarMenu>
@@ -157,19 +162,16 @@ export function AppSidebar({
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <UserMenu user={user} />
+        <UserMenu user={user} onShortcuts={onShortcuts} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   )
 }
 
-function LiveBadge({ siteId }: { siteId: string }) {
-  const rt = useQuery({
-    queryKey: ["realtime", siteId],
-    queryFn: () => api.realtime(siteId),
-    refetchInterval: 15_000,
-  })
+function LiveBadge({ siteId, onPage }: { siteId: string; onPage: boolean }) {
+  // On the Realtime page the badge reads the page's own query instead of polling again.
+  const rt = useRealtime(siteId, onPage)
   const n = rt.data?.visitors ?? 0
   return (
     <SidebarMenuBadge className="gap-1.5 text-fg-muted">
@@ -244,13 +246,16 @@ function SitePicker() {
   )
 }
 
-function UserMenu({ user }: { user: User }) {
+function UserMenu({
+  user,
+  onShortcuts,
+}: {
+  user: User
+  onShortcuts: () => void
+}) {
   const queryClient = useQueryClient()
-  const { theme, setTheme } = useTheme()
-  const dark =
-    theme === "dark" ||
-    (theme === "system" &&
-      window.matchMedia("(prefers-color-scheme: dark)").matches)
+  const { resolvedTheme, toggleTheme } = useTheme()
+  const dark = resolvedTheme === "dark"
   const github = user.provider === "github"
 
   async function logout() {
@@ -281,23 +286,22 @@ function UserMenu({ user }: { user: User }) {
                   {user.login}
                 </span>
                 <span className="truncate text-xs text-fg-muted">
-                  {github
-                    ? "GitHub"
-                    : user.provider === "demo"
-                      ? "Read-only demo"
-                      : "Local demo"}
+                  {github ? "GitHub" : "Local demo"}
                 </span>
               </span>
               <ChevronsUpDown className="ml-auto text-fg-muted" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="top" align="start" className="w-56">
-            <DropdownMenuItem
-              onSelect={() => setTheme(dark ? "light" : "dark")}
-            >
+            <DropdownMenuItem onSelect={toggleTheme}>
               {dark ? <Sun /> : <Moon />}
               {dark ? "Light mode" : "Dark mode"}
               <Kbd className="ml-auto">D</Kbd>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onShortcuts}>
+              <CircleHelp />
+              Keyboard shortcuts
+              <Kbd className="ml-auto">?</Kbd>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => void logout()}>

@@ -126,3 +126,63 @@ describe("SiteLayout onboarding", () => {
     expect(document.title).toBe("mlz. analytics")
   })
 })
+
+describe("SiteLayout", () => {
+  it("keeps the header on a site that does not exist", async () => {
+    mockFetch({
+      "/api/sites/abc": () =>
+        new Response(JSON.stringify({ error: "not found" }), { status: 404 }),
+    })
+    renderInSite(layout)
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "No such site" })
+    ).toBeTruthy()
+    expect(screen.getByRole("button", { name: "Toggle Sidebar" })).toBeTruthy()
+    expect(screen.getByRole("link", { name: /Back to sites/ })).toBeTruthy()
+  })
+
+  it("says the site was just added, with events and pixel help", async () => {
+    mockFetch({ "/api/sites/abc": waiting })
+    renderInSite(layout, "/sites/abc?new=1")
+    expect((await screen.findByRole("status")).textContent).toContain(
+      "Site added. Waiting for the first event"
+    )
+    expect(screen.getByRole("heading", { name: "Install Blog" })).toBeTruthy()
+    expect(screen.getByText(/mlz\?\.track/)).toBeTruthy()
+    expect(
+      screen.getByRole("link", { name: "tracking pixel" }).getAttribute("href")
+    ).toBe("/sites/abc/settings#pixel")
+  })
+
+  it("drops ?new once the site has data, without a history entry", async () => {
+    mockFetch({
+      "/api/sites/abc": {
+        ...waiting,
+        first_event_at: "2026-11-12T10:05:00Z",
+        last_event_at: "2026-11-12T10:05:00Z",
+      },
+    })
+    const { search, router } = renderInSite(
+      layout,
+      "/sites/abc?new=1&period=30d"
+    )
+    await waitFor(() => expect(search().has("new")).toBe(false))
+    expect(search().get("period")).toBe("30d")
+    expect(router.state.historyAction).toBe("REPLACE")
+  })
+
+  it("shows the comparison picker on every screen size", async () => {
+    mockFetch({
+      "/api/sites/abc": {
+        ...waiting,
+        first_event_at: "2026-11-01T00:00:00Z",
+        last_event_at: "2026-11-12T09:00:00Z",
+      },
+    })
+    renderInSite(layout)
+    const compare = await screen.findByRole("combobox", {
+      name: "Compare with",
+    })
+    expect(compare.closest(".max-md\\:hidden")).toBeNull()
+  })
+})

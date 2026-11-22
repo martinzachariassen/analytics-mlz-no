@@ -19,8 +19,6 @@ var dist = fstest.MapFS{
 	"favicon.svg":          {Data: []byte("<svg/>")},
 	"assets/index-abc.js":  {Data: []byte("console.log(1)" + strings.Repeat(";", 200))},
 	"fonts/geist.woff2":    {Data: []byte("wOF2")},
-	"demo/index.html":      {Data: []byte("<!doctype html><title>demo</title>")},
-	"demo/assets/demo.js":  {Data: []byte("demo()")},
 	"robots.txt":           {Data: []byte("User-agent: *\nDisallow: /\n")},
 	"assets/.hidden-thing": {Data: []byte("x")},
 }
@@ -45,17 +43,12 @@ func TestHandlerWithoutBuild(t *testing.T) {
 func TestRouting(t *testing.T) {
 	h := Handler(dist)
 	for path, want := range map[string]string{
-		"/":                    "<title>app</title>",
-		"/sites/abc/pages":     "<title>app</title>",
-		"/settings":            "<title>app</title>",
-		"/demo":                "<title>demo</title>",
-		"/demo/":               "<title>demo</title>",
-		"/demo/sites/x":        "<title>demo</title>",
-		"/demonstration":       "<title>app</title>",
-		"/assets":              "<title>app</title>",
-		"/favicon.svg":         "<svg/>",
-		"/demo/assets/demo.js": "demo()",
-		"/../../etc/passwd":    "<title>app</title>",
+		"/":                 "<title>app</title>",
+		"/sites/abc/pages":  "<title>app</title>",
+		"/settings":         "<title>app</title>",
+		"/assets":           "<title>app</title>",
+		"/favicon.svg":      "<svg/>",
+		"/../../etc/passwd": "<title>app</title>",
 	} {
 		w := get(t, h, path, nil)
 		if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), want) {
@@ -83,7 +76,6 @@ func TestHeaders(t *testing.T) {
 	for path, want := range map[string]string{
 		"/assets/index-abc.js": immutableCache,
 		"/fonts/geist.woff2":   immutableCache,
-		"/demo/assets/demo.js": "no-cache",
 		"/favicon.svg":         "no-cache",
 	} {
 		if got := get(t, h, path, nil).Header().Get("Cache-Control"); got != want {

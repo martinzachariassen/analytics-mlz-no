@@ -1,13 +1,15 @@
-import { useQuery } from "@tanstack/react-query"
-import { Suspense, useState } from "react"
+import { Suspense, useCallback, useState } from "react"
 import { Navigate, Outlet, useLocation } from "react-router"
 
 import { AppSidebar } from "@/components/app-sidebar"
 import { CommandMenu } from "@/components/command-menu"
 import { ErrorNote } from "@/components/error-note"
+import { PageHeader } from "@/components/page-header"
+import { ShortcutsDialog, useShortcutsKey } from "@/components/shortcuts-dialog"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ApiError, api } from "@/lib/api"
+import { ApiError } from "@/lib/api"
+import { useMe } from "@/lib/queries"
 
 /**
  * Authenticated shell: a collapsible sidebar (sites and views) next to the
@@ -15,8 +17,11 @@ import { ApiError, api } from "@/lib/api"
  */
 export function AppLayout() {
   const location = useLocation()
-  const me = useQuery({ queryKey: ["me"], queryFn: api.me })
+  const me = useMe()
   const [search, setSearch] = useState(false)
+  const [shortcuts, setShortcuts] = useState(false)
+  const openShortcuts = useCallback(() => setShortcuts(true), [])
+  useShortcutsKey(openShortcuts)
 
   if (me.isPending) {
     return (
@@ -45,33 +50,36 @@ export function AppLayout() {
   }
 
   const dev = me.data.provider === "dev"
-  const demo = me.data.provider === "demo"
   return (
     <SidebarProvider>
-      <AppSidebar user={me.data} onSearch={() => setSearch(true)} />
+      <AppSidebar
+        user={me.data}
+        onSearch={() => setSearch(true)}
+        onShortcuts={openShortcuts}
+      />
       <SidebarInset className="min-w-0 bg-bg">
         {dev && (
           <div className="border-b py-1 text-center text-[11px] text-fg-muted">
             Local development · demo data, automatic sign-in
           </div>
         )}
-        {demo && (
-          <div className="border-b px-4 py-1.5 text-center text-xs text-fg-secondary">
-            Live demo with made-up traffic for Lumen, a fictional company ·
-            read-only, nothing leaves your browser ·{" "}
-            <a
-              href="https://github.com/martinzachariassen/analytics-mlz-no"
-              className="text-accent-deep underline"
-            >
-              Self-host it
-            </a>
-          </div>
-        )}
-        <Suspense fallback={<Skeleton className="m-6 h-96" />}>
+        <Suspense
+          fallback={
+            <>
+              <PageHeader title={<span className="sr-only">Loading</span>} />
+              <Skeleton className="m-6 h-96" />
+            </>
+          }
+        >
           <Outlet />
         </Suspense>
       </SidebarInset>
-      <CommandMenu open={search} onOpenChange={setSearch} />
+      <CommandMenu
+        open={search}
+        onOpenChange={setSearch}
+        onShortcuts={openShortcuts}
+      />
+      <ShortcutsDialog open={shortcuts} onOpenChange={setShortcuts} />
     </SidebarProvider>
   )
 }

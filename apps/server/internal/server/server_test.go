@@ -355,7 +355,6 @@ func TestDashboardFallback(t *testing.T) {
 		{"GET", "/", http.StatusTeapot},
 		{"GET", "/sites/abc/pages", http.StatusTeapot},
 		{"HEAD", "/assets/app.js", http.StatusTeapot},
-		{"GET", "/demo/", http.StatusTeapot},
 		{"GET", "/healthz", http.StatusOK},
 		{"POST", "/api/event", http.StatusAccepted},
 		{"GET", "/api", http.StatusNotFound},

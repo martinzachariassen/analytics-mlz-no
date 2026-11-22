@@ -6,12 +6,7 @@ import { defineConfig } from "vite"
 import { configDefaults } from "vitest/config"
 
 // https://vite.dev/config/
-// `--mode demo` builds the public demo into dist/demo, served at /demo/: the same app, with
-// /api answered in the browser from generated data (src/demo, docs/development/demo.md).
-export default defineConfig(({ mode }) => ({
-  ...(mode === "demo"
-    ? { base: "/demo/", build: { outDir: "dist/demo", emptyOutDir: true } }
-    : {}),
+export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     // The OAuth callback and PUBLIC_URL name this port; silently moving to 5174 would break sign-in.
@@ -34,4 +29,4 @@ export default defineConfig(({ mode }) => ({
     // Component tests opt into a DOM with `// @vitest-environment happy-dom`; e2e/ is Playwright.
     exclude: [...configDefaults.exclude, "e2e/**"],
   },
-}))
+})

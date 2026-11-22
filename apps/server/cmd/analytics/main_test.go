@@ -2,14 +2,20 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
+	"net"
+	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/martinzachariassen/analytics-mlz-no/apps/server/internal/store"
 )
 
 func TestParseTime(t *testing.T) {
@@ -83,6 +89,89 @@ func TestCLI(t *testing.T) {
 	}
 	if _, err := run("seed", "-reset"); err == nil || !strings.Contains(err.Error(), "DEV_LOGIN") {
 		t.Fatalf("seed -reset without DEV_LOGIN: %v", err)
+	}
+
+	// Two users with a session each: -user signs out only one of them.
+	ctx := context.Background()
+	st, err := store.Open(ctx, os.Getenv("DATABASE_PATH"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	for i, login := range []string{"alice", "bob"} {
+		u, err := st.LoginUser(ctx, "github", login, login, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := st.CreateSession(ctx, []byte{byte(i)}, u.ID, now, now.Add(time.Hour)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = st.Close()
+	if out, err := run("sessions", "revoke", "-user", "alice"); err != nil || !strings.Contains(out, "Revoked 1 sessions") {
+		t.Fatalf("sessions revoke -user: %q, %v", out, err)
+	}
+	if out, err := run("sessions", "revoke", "-user", "nobody"); err != nil || !strings.Contains(out, "Revoked 0 sessions") {
+		t.Fatalf("sessions revoke -user nobody: %q, %v", out, err)
+	}
+	if out, err := run("sessions", "revoke"); err != nil || !strings.Contains(out, "Revoked 1 sessions") {
+		t.Fatalf("sessions revoke everyone: %q, %v", out, err)
+	}
+
+	t.Setenv("DEV_LOGIN", "1")
+	if out, err := run("seed", "-days", "2", "-scale", "0.05"); err != nil || strings.Count(out, "over 2 days") != 3 || !strings.Contains(out, "Side Project (demo)") {
+		t.Fatalf("seed: %q, %v", out, err)
+	}
+	if out, err := run("seed", "-days", "2", "-scale", "0.05"); err != nil || !strings.Contains(out, "already has data") {
+		t.Fatalf("seed again: %q, %v", out, err)
+	}
+	if out, err := run("seed", "-reset", "-days", "1", "-scale", "0.05"); err != nil || strings.Count(out, "over 1 days") != 3 {
+		t.Fatalf("seed -reset: %q, %v", out, err)
+	}
+	if out, err := run("sites", "list"); err != nil || !strings.Contains(out, "Fjord Labs Blog (demo)") || !strings.Contains(out, id) {
+		t.Fatalf("sites list after seed: %q, %v", out, err)
+	}
+
+	// -live runs until interrupted; here the "interrupt" is a timeout.
+	notifyContext = func(parent context.Context, _ ...os.Signal) (context.Context, context.CancelFunc) {
+		return context.WithTimeout(parent, 1500*time.Millisecond)
+	}
+	t.Cleanup(func() { notifyContext = signal.NotifyContext })
+	start := time.Now()
+	if out, err := run("seed", "-live", "-days", "1", "-scale", "0.05"); err != nil || !strings.Contains(out, "Sending live visits") {
+		t.Fatalf("seed -live: %q, %v", out, err)
+	}
+	if time.Since(start) > 10*time.Second {
+		t.Fatal("seed -live did not stop when its context ended")
+	}
+
+	if _, err := run("seed", "-demo", "127.0.0.1:0"); err == nil || !strings.Contains(err.Error(), "-live") {
+		t.Fatalf("seed -demo without -live: %v", err)
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := ln.Addr().String()
+	_ = ln.Close()
+	got := make(chan string, 1)
+	go func() {
+		client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+		for range 50 {
+			if resp, err := client.Get("http://" + addr + "/blog"); err == nil {
+				_ = resp.Body.Close()
+				got <- resp.Header.Get("Location")
+				return
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+		got <- ""
+	}()
+	if out, err := run("seed", "-live", "-demo", addr, "-days", "1", "-scale", "0.05"); err != nil || !strings.Contains(out, "Demo site: http://"+addr) {
+		t.Fatalf("seed -live -demo: %q, %v", out, err)
+	}
+	if loc := <-got; !strings.HasPrefix(loc, "?site=") {
+		t.Fatalf("demo site redirected to %q, want ?site=<id>", loc)
 	}
 }
 

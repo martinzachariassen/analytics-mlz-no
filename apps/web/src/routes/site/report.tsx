@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from "react"
-import { useSearchParams } from "react-router"
+import { Link, useSearchParams } from "react-router"
 
 import { BarList } from "@/components/bar-list"
 import { DataTable } from "@/components/data-table"
@@ -11,6 +11,7 @@ import { KpiStrip } from "@/components/kpi-strip"
 import { Panel, TextTabs } from "@/components/panel"
 import { ProportionStrip } from "@/components/proportion-strip"
 import { TopSeriesChart } from "@/components/top-series-chart"
+import { EventSnippets } from "@/components/tracking-snippet"
 import {
   Select,
   SelectContent,
@@ -21,6 +22,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { exportUrl, type FilterDim } from "@/lib/api"
 import { DIMS, formatValue } from "@/lib/dims"
+import { METRIC, useMetricParam } from "@/lib/metrics"
 import { useBreakdown, useStats } from "@/lib/queries"
 import { useDebounced } from "@/lib/use-debounced"
 import { MAX_FILTERS, useScope } from "@/lib/use-scope"
@@ -79,6 +81,7 @@ export function ReportPage({ report }: { report: keyof typeof REPORTS }) {
   const [limit, setLimit] = useState(PAGE)
   const [search, setSearch] = useState("")
   const needle = useDebounced(search.trim(), SEARCH_DEBOUNCE_MS)
+  const [metric, setMetric] = useMetricParam()
 
   const stats = useStats(sc.siteId, sc.scope, sc.interval)
   const rows = useBreakdown(sc.siteId, sc.scope, dim, {
@@ -131,7 +134,12 @@ export function ReportPage({ report }: { report: keyof typeof REPORTS }) {
 
   return (
     <div className="flex flex-col gap-3 lg:gap-4">
-      <KpiStrip stats={stats.data} now={stats.dataUpdatedAt} />
+      <KpiStrip
+        stats={stats.data}
+        metric={metric}
+        onMetric={setMetric}
+        now={stats.dataUpdatedAt}
+      />
       <ErrorNote queries={[stats, rows, found]} />
       {cfg.extra === "map" && (
         <Panel
@@ -157,7 +165,7 @@ export function ReportPage({ report }: { report: keyof typeof REPORTS }) {
       )}
       <Panel
         title={`Top ${DIMS[dim].plural.toLowerCase()} over time`}
-        description="Visitors"
+        description={METRIC[metric].label}
         tabs={tabs}
         action={<IntervalSelect sc={sc} />}
       >
@@ -167,7 +175,12 @@ export function ReportPage({ report }: { report: keyof typeof REPORTS }) {
         {rows.isError ? (
           <Unavailable />
         ) : (
-          <TopSeriesChart sc={sc} dim={dim} rows={rows.data} />
+          <TopSeriesChart
+            sc={sc}
+            dim={dim}
+            rows={rows.data}
+            metric={METRIC[metric]}
+          />
         )}
       </Panel>
       <Panel
@@ -209,6 +222,7 @@ export function ReportPage({ report }: { report: keyof typeof REPORTS }) {
 /** Custom events: the table of events, and for one event its properties. */
 export function EventsPage() {
   const sc = useScope()
+  const [metric, setMetric] = useMetricParam()
   const stats = useStats(sc.siteId, sc.scope, sc.interval)
   const events = useBreakdown(sc.siteId, sc.scope, "event", {
     limit: 200,
@@ -230,17 +244,27 @@ export function EventsPage() {
 
   return (
     <div className="flex flex-col gap-3 lg:gap-4">
-      <KpiStrip stats={stats.data} now={stats.dataUpdatedAt} />
+      <KpiStrip
+        stats={stats.data}
+        metric={metric}
+        onMetric={setMetric}
+        now={stats.dataUpdatedAt}
+      />
       <ErrorNote queries={[stats, events]} />
       <Panel
         title="Top events over time"
-        description="Visitors who triggered each event"
+        description={`${METRIC[metric].label} per event`}
         action={<IntervalSelect sc={sc} />}
       >
         {events.isError ? (
           <Unavailable />
         ) : (
-          <TopSeriesChart sc={sc} dim="event" rows={events.data} />
+          <TopSeriesChart
+            sc={sc}
+            dim="event"
+            rows={events.data}
+            metric={METRIC[metric]}
+          />
         )}
       </Panel>
       <div className="grid gap-3 lg:grid-cols-12 lg:gap-4">
@@ -264,12 +288,36 @@ export function EventsPage() {
               rows={events.data}
               loading={events.isPending}
               total={total}
-              onOpen={(r) => setPicked(r.value)}
+              onOpen={(r) => sc.openDetail({ dim: "event", value: r.value })}
             />
           )}
         </Panel>
-        {event !== undefined && (
-          <Properties event={event} className="lg:col-span-5" total={total} />
+        {event !== undefined ? (
+          <Properties
+            event={event}
+            events={events.data?.map((e) => e.value) ?? []}
+            onEvent={setPicked}
+            className="lg:col-span-5"
+            total={total}
+          />
+        ) : (
+          events.data?.length === 0 && (
+            <Panel title="No custom events yet" className="lg:col-span-5">
+              <div className="flex flex-col gap-3">
+                <p className="text-sm text-fg-secondary">
+                  Custom events count what page views can&apos;t: sign-ups,
+                  downloads, button clicks. They show up here within seconds.
+                </p>
+                <EventSnippets />
+                <Link
+                  to={`/sites/${sc.siteId}/settings#tracking`}
+                  className="self-start text-xs text-accent-deep underline"
+                >
+                  More in the tracking settings
+                </Link>
+              </div>
+            </Panel>
+          )
         )}
       </div>
     </div>
@@ -278,10 +326,15 @@ export function EventsPage() {
 
 function Properties({
   event,
+  events,
+  onEvent,
   className,
   total,
 }: {
   event: string
+  /** Every event in the period, for the picker. */
+  events: string[]
+  onEvent: (event: string) => void
   className?: string
   total?: number
 }) {
@@ -304,11 +357,26 @@ function Properties({
 
   return (
     <Panel
-      title={formatValue("event", event)}
-      description="Properties"
+      // With several events the picker names the event, so the title need not.
+      title={events.length > 1 ? "Properties" : formatValue("event", event)}
+      description={events.length > 1 ? undefined : "Properties"}
       className={className}
       action={
         <>
+          {events.length > 1 && (
+            <Select value={event} onValueChange={onEvent}>
+              <SelectTrigger size="sm" className="w-36" aria-label="Event">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="end">
+                {events.map((e) => (
+                  <SelectItem key={e} value={e}>
+                    {formatValue("event", e)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <GoalButton siteId={sc.siteId} kind="event" value={event} />
           {key !== undefined && (
             <ExportLink

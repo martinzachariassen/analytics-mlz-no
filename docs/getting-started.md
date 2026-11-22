@@ -1,8 +1,8 @@
 # Getting started
 
 > **TL;DR** — Run `mise install && bun install`, then `make dev`, then open <http://localhost:5173> and
-> click **Open demo dashboard**. You get two demo sites with two years of synthetic traffic and a
-> demo page that sends real events. No accounts, no configuration.
+> click **Open demo dashboard**. You get four demo sites with two years of synthetic traffic that
+> touches every feature, and a demo page that sends real events. No accounts, no configuration.
 
 **Read this if:** you have never run the project before. Time: about 10 minutes. At the end you
 will have seen every part of the system working, and you will know where to look next.
@@ -12,7 +12,6 @@ will have seen every part of the system working, and you will know where to look
 | Tool | Version | Why |
 |---|---|---|
 | [mise](https://mise.jdx.dev) | any | Installs every other tool at the version pinned in `mise.toml`: Go (the server), Bun and Node (dashboard and tracker), Terraform and the linters |
-| Python 3 | any | Serves the demo site (`python3 -m http.server`) |
 | Docker | optional | Only to test the production image |
 
 Install the tools and the JavaScript dependencies once:
@@ -28,20 +27,43 @@ bun install     # one Bun workspace for apps/web and apps/tracker; also enables 
 make dev
 ```
 
-This does three things:
+`make dev` runs `scripts/dev.sh`, which does five things:
 
-1. `analytics seed` creates `data/dev.db` with two demo sites, "Fjord Labs Blog (demo)"
-   (`localhost`) and "Fjord Labs Docs (demo)" (`docs.localhost`), filled with two years of
-   synthetic traffic: growth, weekends, seasonal dips, spikes, returning visitors and custom
-   events. On later runs, existing demo data is kept.
-2. It prints the links:
+1. It checks that Go and Bun are installed and that ports 8080, 5173 and 8081 are free. If one
+   is taken, it says which process holds it and stops.
+2. It builds the server once, into `data/bin/analytics`.
+3. `analytics seed` creates `data/dev.db` with four demo sites:
+   - "Fjord Labs Blog (demo)" (`localhost`) and "Fjord Labs Docs (demo)" (`docs.localhost`),
+     filled with two years of synthetic traffic: growth, weekends, seasonal dips, spikes,
+     returning visitors, long tails, campaigns, custom events, pixel views and a spam burst.
+   - "Old Portfolio (demo)", which went quiet 45 days ago.
+   - "Side Project (demo)", which has no events yet.
+
+   On later runs, existing demo data is kept. [seed-data.md](development/seed-data.md) lists
+   which data shows which feature.
+4. It starts three processes, each with its own prefix in the log (`api`, `web`, `live`):
+   - the API on `127.0.0.1:8080`, with `DEV_LOGIN=1` so sign-in is one click;
+   - the dashboard dev server on `:5173`, which proxies `/api` to the API;
+   - `analytics seed -live -demo 127.0.0.1:8081`, which keeps synthetic visitors arriving so
+     **Realtime** is never empty, and serves the demo site on `:8081`. The demo site adds the
+     blog's id to its URL by itself.
+5. Once all three answer, it prints what runs where:
    ```
-     Dashboard:  http://localhost:5173
-     Demo site:  http://localhost:8081/?site=<id>
+   ── mlz analytics · local development ──────────────────────────────────────────
+     Dashboard  http://localhost:5173                  Vite dev server, /api proxied to http://127.0.0.1:8080   pid 4711
+     API        http://127.0.0.1:8080                  analytics dev-83376ac, health http://127.0.0.1:8080/healthz   pid 4710
+     Tracker    http://127.0.0.1:8080/api/script.js
+     Demo site  http://localhost:8081                  real events to Fjord Labs Blog (demo), plus live visits   pid 4713
+     Database   data/dev.db                            SQLite, 28M
+     Sign-in    one click, as "dev"                    DEV_LOGIN=1, loopback only
+     Binds      127.0.0.1:8080 (API), 127.0.0.1:8081 (demo) localhost:5173 (Vite); nothing is reachable from the network
+     Sites
+                ID            NAME                    DOMAIN          CREATED
+                …
    ```
-3. It starts four processes: the API on `:8080` (with `DEV_LOGIN=1`, so sign-in is one click),
-   the dashboard dev server on `:5173` (which proxies `/api` to `:8080`), the demo site on `:8081`,
-   and `analytics seed -live`, which keeps synthetic visitors arriving so **Realtime** is never empty.
+
+<kbd>Ctrl+C</kbd> stops all three. `make dev-api`, `make dev-web` and `make dev-live` start one
+part each, with the same settings.
 
 ## 3. Tour of the dashboard
 
@@ -124,7 +146,8 @@ without `-H Origin` (`400`) to see the filters at work. Why they behave that way
 - **Tracking script:** edit `apps/tracker/src`, run `make tracker`, and restart.
 - **Before a pull request:** `make verify`, the same checks CI runs. See [CONTRIBUTING.md](../CONTRIBUTING.md).
 
-Start over with fresh data: `make dev-reset && make dev`.
+Start over with fresh data: `make dev-reset && make dev`. After an upgrade that adds seed data,
+this is how you get it.
 
 ## Next steps
 

@@ -54,9 +54,15 @@ export function BarList({
 
   const max = rows[0]?.visitors || 1
   const compare = rows.some((r) => r.previous_visitors !== undefined)
+  const filterable = onFilter !== undefined && isFilterDim(dim)
   return (
     <div className="flex flex-col">
-      <div className="mb-1 flex items-center justify-between gap-3 px-2 text-[11px] font-medium text-fg-muted">
+      <div
+        className={cn(
+          "mb-1 flex items-center justify-between gap-3 px-2 text-[11px] font-medium text-fg-muted",
+          filterable && "pr-10"
+        )}
+      >
         <span>Name</span>
         <span className="flex gap-4">
           {showCount && <span className="w-14 text-right">{countLabel}</span>}
@@ -70,13 +76,13 @@ export function BarList({
         {rows.slice(0, rowsShown).map((r) => {
           const label = formatValue(dim, r.value)
           return (
-            <li key={r.value} className="group relative">
+            <li key={r.value} className="group flex items-center gap-1">
               <button
                 type="button"
                 onClick={onOpen ? () => onOpen(r) : undefined}
                 disabled={!onOpen}
                 className={cn(
-                  "relative flex h-7 w-full items-center justify-between gap-3 rounded-md px-2 text-left text-xs transition-colors",
+                  "relative flex h-7 min-w-0 flex-1 items-center justify-between gap-3 rounded-md px-2 text-left text-xs transition-colors",
                   onOpen && "hover:bg-surface-2",
                   selected === r.value && "bg-surface-2"
                 )}
@@ -119,13 +125,13 @@ export function BarList({
                   </span>
                 </span>
               </button>
-              {onFilter && isFilterDim(dim) && (
+              {filterable && (
                 <button
                   type="button"
                   aria-label={`Filter by ${label}`}
                   title="Filter by this"
                   onClick={() => onFilter(r)}
-                  className="absolute top-1/2 right-1 hidden size-6 -translate-y-1/2 items-center justify-center rounded-md border border-border-strong bg-surface text-fg-muted shadow-sm group-focus-within:flex group-hover:flex hover:text-fg max-md:hidden"
+                  className="flex size-7 shrink-0 items-center justify-center rounded-md text-fg-muted transition-opacity hover:bg-surface-2 hover:text-fg focus-visible:opacity-100 md:opacity-40 md:group-focus-within:opacity-100 md:group-hover:opacity-100 pointer-coarse:opacity-100"
                 >
                   <FilterIcon className="size-3" />
                 </button>

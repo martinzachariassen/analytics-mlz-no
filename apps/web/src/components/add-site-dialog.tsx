@@ -41,7 +41,7 @@ export function AddSiteDialog({ fromUrl = false }: { fromUrl?: boolean }) {
     onSuccess: async (site) => {
       await queryClient.invalidateQueries({ queryKey: ["sites"] })
       setOpen(false)
-      navigate(`/sites/${site.id}/settings?new=1`)
+      navigate(`/sites/${site.id}?new=1`)
     },
   })
 

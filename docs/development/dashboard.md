@@ -117,6 +117,8 @@ It reads and writes these query parameters:
 | `hours` | `pageviews` | The metric of the Active hours heatmap. Missing means visitors |
 | `metric` | `pageviews` | The metric the KPI strip picks for the chart: the overview's main chart, and the "Top … over time" chart on report and Events views. Missing means visitors |
 | `new` | `1` | Set after **Add site**: the waiting screen says "Site added". Dropped once the site has data |
+| `add` | `1` | On `/sites`: opens the Add site dialog (the sidebar's "Add site" link) |
+| `auth_error` | `denied` (also `not_allowed`, `conflict`, `state`, `failed`) | On `/`: shows why sign-in failed (`AUTH_ERRORS` in `routes/home.tsx`) |
 | `event`, `prop` | `signup`, `plan` | The picked event and property on the Events view. A value that is not in the period's data falls back to the top one |
 
 It returns the parsed state, a ready-made `scope` object for API calls, actions (`setPeriod`,
@@ -249,7 +251,7 @@ been purged or aged out by `RETENTION_DAYS` shows it again until the next event.
   next to the title (the event properties panel on a phone). The Goals card drops its
   Conversions column below `sm`.
 
-**Keyboard.** Single keys (periods, <kbd>X</kbd>, <kbd>D</kbd>) and <kbd>⌘K</kbd> are listed in
+**Keyboard.** Single keys (periods, <kbd>X</kbd>, <kbd>D</kbd>), <kbd>⌘K</kbd> and <kbd>⌘B</kbd> (sidebar) are listed in
 `SHORTCUTS` (`lib/keys.ts`). <kbd>?</kbd>, the ⌘K menu and the user menu open the shortcut help
 (`components/shortcuts-dialog.tsx`). The ⌘K menu also switches the comparison (previous period,
 year over year, off) and opens the calendar for a custom range (`openRangePicker`); it offers

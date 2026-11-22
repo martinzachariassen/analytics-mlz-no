@@ -36,8 +36,8 @@ than a separate blue, keeps the product recognisably mlz where people look most.
 | Role | Token | Where it is used |
 |---|---|---|
 | Main data series and brand | `--accent`, `--series-1`, `--chart-1`, Tailwind `violet` | `traffic-chart.tsx` (line), realtime bars, `sparkline.tsx` (active KPI), `kpi-strip.tsx` (active marker), `brand-mark.tsx` |
-| Area under the main line | `--chart-fill` (= `--accent`) | `traffic-chart.tsx`, a gradient from 22 % to 0 |
-| Bars in ranked lists | `bg-violet/14` | `bar-list.tsx`, `data-table.tsx`, `goals-card.tsx` |
+| Area under the main line | `--chart-fill` (= `--accent`) | `traffic-chart.tsx`, a gradient from 28 % to 0 |
+| Bars in ranked lists | `bg-violet/14`, `bg-violet/12` | `bar-list.tsx`, `goals-card.tsx` (`/14`) and `data-table.tsx` (`/12`) |
 | Amount (one hue, light to dark) | `ramp()` mixes `--accent` into `--surface-2` | `heatmap.tsx`, `world-map.tsx` |
 | Comparison | `--chart-2` (= `--fg-muted`), dashed | `traffic-chart.tsx`, inactive sparklines |
 | Categories | `--series-1` … `--series-5` | `top-series-chart.tsx`, `proportion-strip.tsx` |

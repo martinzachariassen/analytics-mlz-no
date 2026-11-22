@@ -15,7 +15,7 @@
 | `analytics sites list` | Lists all sites |
 | `analytics events purge -site ID -from T -to T [-path P]` | Deletes events in a time window |
 | `analytics sessions revoke [-user LOGIN]` | Signs one dashboard user, or everyone, out everywhere |
-| `analytics seed [-days N] [-scale X] [-reset] [-live [-demo ADDR]]` | Creates the two demo sites with synthetic traffic |
+| `analytics seed [-days N] [-scale X] [-reset] [-live [-demo ADDR]]` | Creates the four demo sites with synthetic traffic |
 | `analytics version` | Prints the version, without reading any configuration |
 
 Every command except `version` reads the same environment variables as the server (see
@@ -46,8 +46,7 @@ arguments). Any other subcommand runs directly against `/data/analytics.db`.
 analytics serve
 ```
 
-Opens (and migrates) the database, starts the retention cleanup if `RETENTION_DAYS` is set (once
-an hour), and listens on `ADDR` or `PORT`. On `SIGINT` or `SIGTERM` it stops accepting requests
+Opens (and migrates) the database, starts the maintenance loop (at startup, every hour and just after UTC midnight: rotates the daily salt, deletes expired sessions and, if `RETENTION_DAYS` is set, old events), and listens on `ADDR` or `PORT`. On `SIGINT` or `SIGTERM` it stops accepting requests
 and waits up to 5 seconds for running ones, which leaves Litestream time for a final sync on
 Cloud Run.
 
@@ -156,7 +155,8 @@ shows which feature.
 | Fjord Labs Docs (demo) | `docs.localhost` | Developer traffic, a `search` event with many values. Goals: `copy-code`, `/docs/*`, `/docs/*/install` |
 | Old Portfolio (demo) | `old.localhost` | Traffic that stops 45 days ago |
 | Side Project (demo) | `side.localhost` | No events, so the dashboard shows onboarding |
- A demo site that already exists is left alone unless
+
+A demo site that already exists is left alone unless
 you pass `-reset`, which deletes it and its events first. An older name is updated, though, and
 the blog's pixel is switched on.
 

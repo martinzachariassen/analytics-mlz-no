@@ -110,11 +110,11 @@ What the server defends against, and what it does not, is in the
 
 | Package | What lives there |
 |---|---|
-| `cmd/analytics` | `main.go`: the binary. Subcommands `serve` (default), `sites add|list`, `events purge`, `seed`, `version`. Starts the maintenance loop (`maintenance.go`: salt rotation at UTC midnight, expired sessions, `RETENTION_DAYS`) and graceful shutdown |
+| `cmd/analytics` | `main.go`: the binary. Subcommands `serve` (default), `sites add|list`, `events purge`, `sessions revoke`, `seed`, `version`. Starts the maintenance loop (`maintenance.go`: salt rotation at UTC midnight, expired sessions, `RETENTION_DAYS`) and graceful shutdown |
 | `cmd/loadtest` | Ingest load generator |
 | `internal/config` | `Load()` reads every environment variable. The single source of configuration |
 | `internal/server` | `New()` wires all routes and middleware. Start reading here. `sizeguard.go` pauses ingestion when `MAX_DATABASE_MB` is exceeded |
-| `internal/ingest` | `Handler` for `POST /api/event` and `GET /api/pixel.gif` (`pixel.go`, image proxies in `proxy.go`). The abuse checks in order (`admit`, `record`), `isBot`, `buildEvent` (validation and normalisation), `cleanText`, prop parsing |
+| `internal/ingest` | `Handler` for `POST /api/event` and `GET /api/pixel.gif` (`pixel.go`, image proxies in `proxy.go`). The abuse checks in order (`admit`, `record`), `isBot`, `buildEvent` (validation and normalisation, cleaning with `internal/text`), prop parsing |
 | `internal/visitor` | `Hasher.ID`: SHA-256 of daily salt, site id, IP and user agent, truncated to 63 bits |
 | `internal/geo` | `Locator.Country`: local MaxMind/DB-IP lookup. Returns `""` without a database |
 | `internal/httpx` | `ClientIP` and `PeerIP` (`X-Forwarded-For` with `PROXY_HOPS`), `RateLimiter`, `ReadJSON`, `WriteJSON` and `AcceptsGzip` |
@@ -146,7 +146,7 @@ See [docs/development/dashboard.md](docs/development/dashboard.md).
 | `infra/docker` | `Dockerfile` (dashboard build, static binary with it embedded, DB-IP database, Litestream), `entrypoint.sh` (Litestream restore and replicate, `REQUIRE_REPLICA`), `docker-compose.yml` (hardened; settings from `.env`, template `.env.example`), `backup.sh` (the standalone backup job), `test-restore.sh`, `test-backup.sh` |
 | `infra/terraform/bootstrap` | GCP project, APIs, state bucket, budget |
 | `infra/terraform/main` | Cloud Run service and backup job, buckets, Secret Manager, Firebase Hosting, monitoring dashboard and alerts, Workload Identity Federation for the Deploy workflow (`deploy.tf`) |
-| `.github/workflows` | `ci.yml` (one job per `scripts/verify.sh` group, plus docs links, Docker, security) `codeql.yml` (CodeQL for Go, TypeScript and the workflows), `scorecard.yml` (OpenSSF Scorecard), `release.yml` (images with SBOM and provenance attestations, binaries on tag) and `deploy.yml` (deploys `main` to Cloud Run and Firebase Hosting after CI passes, through the `make deploy-*` targets) |
+| `.github/workflows` | `ci.yml` (one job per `scripts/verify.sh` group, plus docs links, Docker, security) `codeql.yml` (CodeQL for Go, TypeScript and the workflows), `scorecard.yml` (OpenSSF Scorecard), `fuzz.yml` (every fuzz test for five minutes each week), `release.yml` (images with SBOM and provenance attestations, binaries on tag) and `deploy.yml` (deploys `main` to Cloud Run and Firebase Hosting after CI passes, through the `make deploy-*` targets) |
 | `.trivyignore.yaml` | Image-scan findings CI may ignore, each with a reason and an expiry |
 | `scripts/dev.sh` | `make dev`: checks ports, builds once, seeds, starts API, dashboard and demo site, prints what runs where |
 | `scripts/verify.sh` | The quality gate: groups `lint`, `go`, `tracker`, `web`, `e2e`, `infra`. `make verify` and CI run it |
@@ -159,12 +159,12 @@ Defined in `apps/server/internal/store/migrations/`:
 
 | Table | Holds |
 |---|---|
-| `sites` | `id` (public, used in the snippet), `name`, `domain` (subdomains match) |
+| `sites` | `id` (public, used in the snippet), `name`, `domain` (subdomains match), `pixel_enabled` |
 | `events` | One row per page view or custom event: time, type, name, hostname, path, referrer host, UTM, country, browser, OS, device, `visitor_id`, `session_id` |
 | `event_props` | Custom event properties, as key and value |
 | `goals` | Per site: `kind` (`event` or `path`) and `value` (event name, or path with optional `*`). Evaluated at read time |
 | `salts` | One random salt per UTC day. Older salts are deleted |
-| `users`, `sessions` | Dashboard users (GitHub id and login), and SHA-256 hashes of session tokens |
+| `users`, `sessions` | Dashboard users (GitHub id and login), and SHA-256 hashes of session tokens, with when each was created and when it expires |
 | `schema_migrations` | Applied migration numbers |
 
 ## Invariants

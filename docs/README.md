@@ -31,7 +31,7 @@
 ### Reference
 - [HTTP API](reference/api.md): event collection, auth, sites, stats, breakdowns
 - [Configuration](reference/configuration.md): every environment and Terraform variable
-- [CLI](reference/cli.md): `analytics serve`, `sites`, `events purge`, `seed`, `version`
+- [CLI](reference/cli.md): `analytics serve`, `sites`, `events purge`, `sessions revoke`, `seed`, `version`
 
 ### Operations
 - [Runbook](operations/runbook.md): health checks, logs, alerts, and playbooks for incidents

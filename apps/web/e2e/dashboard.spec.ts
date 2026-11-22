@@ -375,8 +375,7 @@ test("a site can be renamed and deleted", async ({ page }, testInfo) => {
   expect(gone.status()).toBe(404)
 })
 
-test("keyboard: shortcut help, ⌘K and theme", async ({ page, isMobile }) => {
-  test.skip(isMobile, "keyboard shortcuts need a keyboard")
+test("keyboard: shortcut help, ⌘K and theme", async ({ page }) => {
   await openSite(page, "Fjord Labs Blog")
   await expect(page.getByText("Visitors").first()).toBeVisible()
 

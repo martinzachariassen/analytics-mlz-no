@@ -199,3 +199,15 @@ func TestAcceptsGzip(t *testing.T) {
 		}
 	}
 }
+
+func TestRemoteHostFallsBackToTheRawAddress(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.RemoteAddr = "@"
+	if got := remoteHost(r); got != "@" {
+		t.Fatalf("unparsable RemoteAddr: got %q, want it unchanged", got)
+	}
+	r.RemoteAddr = "[::ffff:192.0.2.9]:80"
+	if got := remoteHost(r); got != "192.0.2.9" {
+		t.Fatalf("mapped IPv6: got %q, want the IPv4 form", got)
+	}
+}

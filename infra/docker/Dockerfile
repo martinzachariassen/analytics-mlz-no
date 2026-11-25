@@ -12,7 +12,7 @@
 # Build stages run on the host platform and cross-compile (pure Go, no CGO). Running the Go
 # toolchain under amd64 emulation on Apple Silicon crashes, and native builds are much faster.
 # The dashboard build is the same for every target platform, so it runs once, natively.
-FROM --platform=$BUILDPLATFORM oven/bun:1.4.2-alpine@sha256:d888c0ae6c86d7866ff10c5aafdd9077b36aee6455b33dd270fb93c0dd5cef6f AS web
+FROM --platform=$BUILDPLATFORM oven/bun:1.4.5-alpine@sha256:da816670775f4c2b4e990b6b1847cf5540dcdc721a42033dd331ce7a88ba6a3b AS web
 # Host for the tracking snippet on the dashboard's "Tracking code" page; empty = the dashboard's own origin.
 ARG TRACKER_ORIGIN=""
 WORKDIR /src

@@ -257,8 +257,9 @@ Sessions also expire by themselves after 7 days without use, and 30 days after s
 
 ### Litestream compaction fails
 
-**Symptoms:** the "Litestream reported a problem" alert, and a log line like this every few
-minutes, with the same transaction ids every time:
+**Symptoms:** the "Litestream reported a problem" alert, and a log line like this at every
+compaction of the next level (every 5 minutes into level 1, every hour into level 2, every 6 hours
+into level 3; `infra/docker/litestream.yml`), with the same transaction ids every time:
 
 ```text
 level=ERROR msg="compaction failed" system=store db=analytics.db level=2 error="write ltx file: extract timestamp from LTX header: non-contiguous transaction ids in input files: (…0190,…0191) -> (…0191,…0191)"
@@ -293,8 +294,9 @@ the higher levels stop advancing and the lower one keeps growing until it is fix
    gcloud storage rm gs://<project_id>-db/analytics/ltx/1/<file>.ltx …
    scripts/check-replica.sh gs://<project_id>-db/analytics   # must print "ok"
    ```
-6. **Confirm.** Within five minutes the log shows `compaction complete … level=2`, and the error
-   stops.
+6. **Confirm.** At the next compaction of that level (within an hour for `level=2`) the log shows
+   `compaction complete … level=2`, and the error stops. To check sooner, run
+   `scripts/check-replica.sh` again.
 
 <details>
 <summary>Doing nothing also fixes it, eventually</summary>

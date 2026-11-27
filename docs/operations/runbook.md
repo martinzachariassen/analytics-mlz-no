@@ -128,7 +128,9 @@ gcloud storage cp gs://<project_id>-backups/daily/<file>.db.gz . && gunzip <file
 DATABASE_PATH=<file>.db make run
 ```
 
-Litestream keeps hours of point-in-time history; the backup files reach back 90 days.
+Litestream keeps hours of point-in-time history; the backup files reach back 90 days. Restore
+points from the last few minutes are one second apart; older ones are 5 minutes apart (the level 1
+compaction interval in `infra/docker/litestream.yml`).
 
 **Symptoms:** the "Litestream reported a problem" alert, a backup run failing with "the replica is
 empty", an instance that refuses to start because the replica is empty (`require_replica = true`),

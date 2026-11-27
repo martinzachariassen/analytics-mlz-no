@@ -115,6 +115,7 @@ All notable changes are documented here. The format follows
 - Dashboard accessibility (WCAG 2.1 AA): muted text, deltas and sidebar group labels have enough contrast in both themes; clickable table rows are real buttons instead of rows with `role="button"`; the clickable world map is a group instead of an image; the landing page's Home link is named by its visible text and its code block wraps instead of scrolling; animations skip their delay when reduced motion is on.
 
 ### Changed
+- Litestream compacts and checks L0 retention less often (`l0-retention-check-interval: 2m`, levels 5m, 1h, 6h instead of 15s and 30s, 5m, 1h). Each of those lists the replica, a billed GCS Class A operation, so this cuts about 8 lists a minute to under one and most of the replica's GCS cost. Uploads still happen every second, so a crash loses no more than before. Point-in-time restore points older than a few minutes are now 5 minutes apart instead of 30 seconds.
 - Dashboard: the overview is grouped into sections by question (content and acquisition, conversions, audience, technology and time), with goals moved up from the bottom. Card tabs (`?pages_tab=` …) and the heatmap metric (`?hours=`) are kept in the URL.
 - Dashboard: KPI tiles pick the chart metric on report and Events views too. A row in the Events table opens the detail sheet like every other table; the properties panel has its own event picker.
 - Dashboard: settings have a section menu (tracking code, pixel, goals, general, delete site), with deleting the site last and apart.

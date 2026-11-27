@@ -3,7 +3,7 @@
 > **TL;DR** — Two Terraform stacks (`bootstrap`, then `main`), one secret, DNS records, then
 > `make deploy` once. After that, every merge to `main` deploys itself through GitHub Actions
 > (optional; `make deploy` keeps working). You end up with the dashboard on Firebase Hosting, the API on one Cloud Run
-> instance, and SQLite replicated to GCS. It costs about $1 a month for personal traffic.
+> instance, and SQLite replicated to GCS. It costs well under $1 a month for personal traffic.
 > Time: about an hour, mostly waiting for DNS and certificates.
 
 **Read this if:** you want the same production setup as `analytics.mlz.no`. Self-hosting without
@@ -26,8 +26,11 @@ carries the dashboard (for self-hosting without a CDN); behind Firebase it goes 
 Firebase answers file requests itself. SQLite lives on the instance
 and Litestream replicates it to a GCS bucket. The reasons are in [decisions.md](../decisions.md).
 
-For personal traffic this stays inside the free tiers. The only steady cost is Litestream's writes
-to GCS, which come to roughly $1 a month. The hourly and daily backups add a few cents.
+For personal traffic this stays inside the free tiers. The only steady cost is Litestream's
+Class A operations on GCS: not its uploads, which only happen when the database changes, but the
+lists it runs before each compaction and L0 retention check. With the intervals in
+`infra/docker/litestream.yml` that is well under a dollar a month; Litestream's defaults list about
+8 times a minute, around $1.30 a month. The hourly and daily backups add a few cents.
 
 ## Prerequisites
 

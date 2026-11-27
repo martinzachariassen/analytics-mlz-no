@@ -1,5 +1,15 @@
 # Environment variables are expanded by Litestream.
 # On GCP, credentials come from the Cloud Run service account (Application Default Credentials).
+
+# Every compaction and L0 retention check lists the replica, and each list is a billed Class A
+# operation, also when nothing changed. The defaults (15s check; levels 30s, 5m, 1h) add up to about
+# 8 lists a minute on an instance that never scales to zero. New writes still upload every second.
+l0-retention-check-interval: 2m
+levels:
+  - interval: 5m
+  - interval: 1h
+  - interval: 6h
+
 dbs:
   - path: ${DATABASE_PATH}
     replica:
